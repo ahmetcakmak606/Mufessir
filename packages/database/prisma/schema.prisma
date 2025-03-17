@@ -1,0 +1,107 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Kullanıcı modeli
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String?
+  openaiApiKey   String?   // Şifrelenmiş olarak saklanmalı
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  searches       Search[]
+  favorites      Favorite[]
+}
+
+// Ayet modeli
+model Verse {
+  id             String    @id @default(cuid())
+  surahNumber    Int
+  surahName      String
+  verseNumber    Int
+  arabicText     String
+  transliteration String?
+  translation    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  tafsirs        Tafsir[]
+  searches       Search[]
+  favorites      Favorite[]
+
+  @@unique([surahNumber, verseNumber])
+}
+
+// Müfessir modeli
+model Scholar {
+  id              String    @id @default(cuid())
+  name            String
+  birthYear       Int?
+  deathYear       Int?
+  century         Int
+  madhab          String?   // Mezhep
+  period          String?   // Dönem
+  environment     String?   // Darul islam, darul harp, vb.
+  originCountry   String?
+  reputationScore Float?    // 1-10 arası puanlama
+  tafsirs         Tafsir[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// Tefsir modeli
+model Tafsir {
+  id             String    @id @default(cuid())
+  verseId        String
+  scholarId      String
+  tafsirText     String    @db.Text
+  tafsirType     String?   // Filolojik, İşari, vb.
+  keywords       String[]
+  languageLevel  Int?      // 1-10 arası (entelektüel seviye)
+  emotionalRatio Float?    // 0-1 arası (duygusal/rasyonel oranı)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  verse          Verse     @relation(fields: [verseId], references: [id])
+  scholar        Scholar   @relation(fields: [scholarId], references: [id])
+  searchResults  SearchResult[]
+}
+
+// Arama modeli
+model Search {
+  id             String    @id @default(cuid())
+  userId         String
+  verseId        String
+  query          Json      // Kullanıcının filtre ve ayarları
+  createdAt      DateTime  @default(now())
+  user           User      @relation(fields: [userId], references: [id])
+  verse          Verse     @relation(fields: [verseId], references: [id])
+  results        SearchResult[]
+}
+
+// Arama sonucu modeli
+model SearchResult {
+  id             String    @id @default(cuid())
+  searchId       String
+  tafsirId       String
+  aiResponse     String    @db.Text
+  similarityScore Float?   // AI çıktısının belirli tefsire benzerlik skoru
+  createdAt      DateTime  @default(now())
+  search         Search    @relation(fields: [searchId], references: [id])
+  tafsir         Tafsir    @relation(fields: [tafsirId], references: [id])
+}
+
+// Favoriler modeli
+model Favorite {
+  id             String    @id @default(cuid())
+  userId         String
+  verseId        String
+  note           String?
+  createdAt      DateTime  @default(now())
+  user           User      @relation(fields: [userId], references: [id])
+  verse          Verse     @relation(fields: [verseId], references: [id])
+}
