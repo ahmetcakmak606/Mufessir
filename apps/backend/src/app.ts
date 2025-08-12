@@ -1,7 +1,7 @@
 import { config } from "dotenv";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
-import express from "express";
+import express, { type Express } from "express";
 import cors from "cors";
 import { PrismaClient } from "@prisma/client";
 import healthRouter from "./routes/health.js";
@@ -15,7 +15,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 config({ path: resolve(__dirname, "../../../.env") });
 
-const app = express();
+const app: Express = express();
 const prisma = new PrismaClient();
 
 // Store prisma on app locals for access in routers
