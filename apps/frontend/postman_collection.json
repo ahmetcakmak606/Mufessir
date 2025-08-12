@@ -1,0 +1,116 @@
+{
+  "info": {
+    "name": "Mufessir API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "mufessir-api-collection"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": { "method": "GET", "url": "{{baseUrl}}/health" }
+    },
+    {
+      "name": "Auth - Register",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"pass1234\",\n  \"name\": \"Test User\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/register"
+      }
+    },
+    {
+      "name": "Auth - Login",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"pass1234\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.collectionVariables.set('token', pm.response.json().token);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth - Me",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": "{{baseUrl}}/auth/me"
+      }
+    },
+    {
+      "name": "Filters",
+      "request": { "method": "GET", "url": "{{baseUrl}}/filters" }
+    },
+    {
+      "name": "Verses by Numbers",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/verses?surahNumber={{surahNumber}}&verseNumber={{verseNumber}}",
+          "query": [
+            { "key": "surahNumber", "value": "{{surahNumber}}" },
+            { "key": "verseNumber", "value": "{{verseNumber}}" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Tafseer - Non-streaming",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"verseId\": \"{{verseId}}\",\n  \"filters\": {\n    \"tone\": 7,\n    \"intellectLevel\": 7,\n    \"language\": \"English\"\n  },\n  \"stream\": false\n}"
+        },
+        "url": "{{baseUrl}}/tafseer"
+      }
+    },
+    {
+      "name": "Tafseer - Streaming (SSE)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"verseId\": \"{{verseId}}\",\n  \"filters\": {\n    \"tone\": 7,\n    \"intellectLevel\": 7,\n    \"language\": \"English\"\n  },\n  \"stream\": true\n}"
+        },
+        "url": "{{baseUrl}}/tafseer"
+      },
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "description": "Note: Postman does not render SSE incrementally; use curl for live chunks."
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000" },
+    { "key": "token", "value": "" },
+    { "key": "surahNumber", "value": "1" },
+    { "key": "verseNumber", "value": "1" },
+    { "key": "verseId", "value": "verse-1-1" }
+  ]
+}
+
+

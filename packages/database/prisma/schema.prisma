@@ -5,18 +5,24 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DB_URL")
 }
 
 // Kullanıcı modeli
 model User {
   id             String    @id @default(cuid())
   email          String    @unique
+  passwordHash   String    // Bcrypt-hashed password
   name           String?
   openaiApiKey   String?   // Şifrelenmiş olarak saklanmalı
+  dailyQuota     Int       @default(10) // Remaining AI calls for the current window
+  quotaResetAt   DateTime  @default(now())
+  emailVerified  Boolean   @default(false)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   searches       Search[]
   favorites      Favorite[]
+  passwordResets PasswordReset[]
 }
 
 // Ayet modeli
@@ -64,6 +70,7 @@ model Tafsir {
   keywords       String[]
   languageLevel  Int?      // 1-10 arası (entelektüel seviye)
   emotionalRatio Float?    // 0-1 arası (duygusal/rasyonel oranı)
+  embedding      Unsupported("vector(1536)")? // OpenAI text-embedding-3-small embedding
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   verse          Verse     @relation(fields: [verseId], references: [id])
@@ -104,4 +111,18 @@ model Favorite {
   createdAt      DateTime  @default(now())
   user           User      @relation(fields: [userId], references: [id])
   verse          Verse     @relation(fields: [verseId], references: [id])
+}
+
+// Password reset tokens
+model PasswordReset {
+  id         String   @id @default(cuid())
+  userId     String
+  codeHash   String
+  expiresAt  DateTime
+  used       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }

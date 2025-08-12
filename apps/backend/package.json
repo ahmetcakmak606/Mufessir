@@ -1,0 +1,38 @@
+{
+  "name": "@mufessir/backend",
+  "private": true,
+  "type": "module",
+  "main": "dist/src/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "seed": "node scripts/insert-sample-data.js",
+    "import-sqlite": "tsx scripts/import-sqlite.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "6.11.1",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^9.6.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.6",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.1",
+    "node-fetch": "^3.3.2",
+    "nodemailer": "^6.9.13",
+    "openai": "^4.28.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.2",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.4",
+    "@types/nodemailer": "^6.4.17",
+    "@types/supertest": "^2.0.16",
+    "supertest": "^7.0.0",
+    "tsx": "^4.19.2",
+    "vitest": "^2.0.5"
+  }
+}
