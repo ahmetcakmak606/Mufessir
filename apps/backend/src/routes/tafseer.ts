@@ -46,6 +46,7 @@ router.post("/",
           tone?: number; // 1-10 emotional vs rational
           intellectLevel?: number; // 1-10 vocabulary richness
           language?: string;
+          responseLength?: number; // 1-10 desired length (short->long)
         };
         stream?: boolean;
       };
@@ -424,7 +425,7 @@ ${similarTafsirs.map((result: any, index: number) =>
 - Tone: ${filters?.tone || 'Not specified'}/10 (1=emotional, 10=rational)
 - Intellect Level: ${filters?.intellectLevel || 'Not specified'}/10
 - Language: ${filters?.language || 'Not specified'}
-- Compare with: ${filters?.compareWith || 'Not specified'}
+- Response Length: ${filters?.responseLength || 'Not specified'}/10
 
 *This is a fallback response. In production, this would be an AI-generated tafsir based on the provided scholar excerpts and your specified parameters.*`;
 
