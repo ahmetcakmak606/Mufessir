@@ -5,7 +5,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "embed": "tsx scripts/embed-tafsirs.ts",
-    "generate": "prisma generate"
+    "generate": "prisma generate",
+    "import:quran": "tsx scripts/import-quran.ts --ar packages/database/data/quran-ar.json --tr packages/database/data/quran-tr-diyanet.json"
   },
   "keywords": [],
   "author": "",

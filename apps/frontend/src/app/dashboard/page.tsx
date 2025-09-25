@@ -3,10 +3,11 @@
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { fetchFilters, fetchVerseByNumbers, startTafseerStream, type Filters } from '@/lib/tafseer';
+import { fetchFilters, fetchVerseByNumbers, startTafseerStream, type Filters, type ScholarOption } from '@/lib/tafseer';
 import { useLang } from '@/context/LangContext';
 import { locales } from '@/locales';
 import { tokenStorage } from '@/lib/auth';
+import { surahs } from '@/lib/surahs';
 
 export default function Dashboard() {
   const { user, logout, loading, refreshUser } = useAuth();
@@ -18,14 +19,28 @@ export default function Dashboard() {
   const [verseNumber, setVerseNumber] = useState<number>(1);
   const [verseId, setVerseId] = useState<string>('');
   const [surahName, setSurahName] = useState<string>('');
+  const [revelationType, setRevelationType] = useState<'Mekki' | 'Medeni' | 'Bilinmiyor'>('Bilinmiyor');
 
-  const [filters, setFilters] = useState<Filters>({ language: 'Turkish', tone: 7, intellectLevel: 7 });
+  const [filters, setFilters] = useState<Filters>({ language: 'Turkish', tone: 7, intellectLevel: 7, responseLength: 6 });
   const [availableFilters, setAvailableFilters] = useState<import('@/lib/tafseer').FiltersResponse | null>(null);
   const [loadingFilters, setLoadingFilters] = useState<boolean>(false);
 
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [streamContent, setStreamContent] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [firstByteAt, setFirstByteAt] = useState<number | null>(null);
+  const [completedAt, setCompletedAt] = useState<number | null>(null);
+  const [usage, setUsage] = useState<{ promptTokens?: number; completionTokens?: number; totalTokens?: number } | null>(null);
+  const [scholarQuery, setScholarQuery] = useState<string>('');
+  const [calendarMode, setCalendarMode] = useState<'gregorian' | 'hijri'>('gregorian');
+  const [deathYearMin, setDeathYearMin] = useState<number>(610);
+  const [deathYearMax, setDeathYearMax] = useState<number>(2025);
+
+  // Year conversion helpers (approximate)
+  const gToH = (g: number) => Math.max(1, Math.round((g - 622) * (33 / 32))); // Hijrî ~ (G-622)*33/32
+  const hToG = (h: number) => Math.round(h * (32 / 33) + 622);
+  const clampG = (g: number) => Math.min(2025, Math.max(610, g));
 
   useEffect(() => {
     if (!loading && !user) {
@@ -39,6 +54,9 @@ export default function Dashboard() {
         setLoadingFilters(true);
         const data = await fetchFilters();
         setAvailableFilters(data);
+        // Default: include all scholars
+        const allIds = (data.scholars || []).map((s) => s.id);
+        setFilters((prev) => ({ ...prev, scholars: allIds, excludeScholars: [] }));
       } catch (e) {
         console.error(e);
       } finally {
@@ -47,6 +65,9 @@ export default function Dashboard() {
     };
     loadFilters();
   }, []);
+
+  // Basic surah metadata for seeded examples (expand later)
+  const surahOptions = useMemo(() => surahs, []);
 
   const resolveVerseId = useCallback(async () => {
     try {
@@ -71,20 +92,78 @@ export default function Dashboard() {
         if (!cancelled) {
           setVerseId(verse.id);
           setSurahName(verse.surahName);
+          const meta = surahOptions.find(s => s.number === surahNumber);
+          setRevelationType(meta && meta.revelation ? meta.revelation : 'Bilinmiyor');
         }
       } catch {
         if (!cancelled) {
           setVerseId('');
           setSurahName('');
+          setRevelationType('Bilinmiyor');
         }
       }
     })();
     return () => { cancelled = true; };
-  }, [surahNumber, verseNumber]);
+  }, [surahNumber, verseNumber, surahOptions]);
 
   const canAnalyze = useMemo(() => {
     return !!user && (user.dailyQuota ?? 0) > 0 && !isAnalyzing;
   }, [user, isAnalyzing]);
+
+  const filteredScholars = useMemo<ScholarOption[]>(() => {
+    let list: ScholarOption[] = (availableFilters?.scholars as ScholarOption[]) || [];
+    if (scholarQuery.trim()) {
+      const q = scholarQuery.toLowerCase();
+      list = list.filter(s => s.name.toLowerCase().includes(q));
+    }
+    list = list.filter(s => (s.deathYear ?? Number.POSITIVE_INFINITY) >= deathYearMin);
+    list = list.filter(s => (s.deathYear ?? Number.NEGATIVE_INFINITY) <= deathYearMax);
+    return list;
+  }, [availableFilters, scholarQuery, deathYearMin, deathYearMax]);
+
+  // Scholar picklist helpers
+  const includeIds = useMemo(() => new Set(filters.scholars || []), [filters.scholars]);
+  const excludeIds = useMemo(() => new Set(filters.excludeScholars || []), [filters.excludeScholars]);
+  const includeList = useMemo(() => filteredScholars.filter(s => includeIds.has(s.id)), [filteredScholars, includeIds]);
+  const excludeList = useMemo(() => filteredScholars.filter(s => excludeIds.has(s.id)), [filteredScholars, excludeIds]);
+  const availableList = useMemo(() => filteredScholars.filter(s => !includeIds.has(s.id) && !excludeIds.has(s.id)), [filteredScholars, includeIds, excludeIds]);
+
+  const addInclude = (id: string) => {
+    const next = new Set(filters.scholars || []);
+    next.add(id);
+    // Remove from exclude if present
+    const nextEx = new Set(filters.excludeScholars || []);
+    nextEx.delete(id);
+    setFilters(prev => ({ ...prev, scholars: Array.from(next), excludeScholars: Array.from(nextEx) }));
+  };
+  const addExclude = (id: string) => {
+    const next = new Set(filters.excludeScholars || []);
+    next.add(id);
+    const nextIn = new Set(filters.scholars || []);
+    nextIn.delete(id);
+    setFilters(prev => ({ ...prev, excludeScholars: Array.from(next), scholars: Array.from(nextIn) }));
+  };
+  const removeInclude = (id: string) => {
+    const next = new Set(filters.scholars || []);
+    next.delete(id);
+    setFilters(prev => ({ ...prev, scholars: Array.from(next) }));
+  };
+  const removeExclude = (id: string) => {
+    const next = new Set(filters.excludeScholars || []);
+    next.delete(id);
+    setFilters(prev => ({ ...prev, excludeScholars: Array.from(next) }));
+  };
+  const includeAll = () => {
+    const allIds = (availableFilters?.scholars || []).map((s) => s.id);
+    setFilters((prev) => ({ ...prev, scholars: allIds, excludeScholars: [] }));
+  };
+  const excludeAll = () => {
+    const allIds = (availableFilters?.scholars || []).map((s) => s.id);
+    setFilters((prev) => ({ ...prev, excludeScholars: allIds, scholars: [] }));
+  };
+  const resetSelections = () => {
+    setFilters((prev) => ({ ...prev, scholars: [], excludeScholars: [] }));
+  };
 
   if (loading) {
     return (
@@ -109,6 +188,10 @@ export default function Dashboard() {
   const handleAnalyze = async () => {
     setError('');
     setStreamContent('');
+    setUsage(null);
+    setStartedAt(null);
+    setFirstByteAt(null);
+    setCompletedAt(null);
     setIsAnalyzing(true);
     try {
       const id = verseId || (await resolveVerseId());
@@ -124,6 +207,7 @@ export default function Dashboard() {
         token,
         (evt) => {
           if (evt.type === 'chunk' && evt.content) {
+            if (!firstByteAt) setFirstByteAt(performance.now());
             setStreamContent((prev) => prev + evt.content);
           }
           if (evt.type === 'error') {
@@ -132,6 +216,11 @@ export default function Dashboard() {
           if (evt.type === 'complete') {
             // Refresh user to reflect quota decrement
             void refreshUser();
+            setUsage(evt.usage || null);
+            setCompletedAt(performance.now());
+          }
+          if (evt.type === 'start') {
+            setStartedAt(performance.now());
           }
         }
       );
@@ -212,14 +301,15 @@ export default function Dashboard() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">{t.surahLabel}</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={114}
+                    <select
                       value={surahNumber}
                       onChange={(e) => setSurahNumber(Number(e.target.value))}
                       className="w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                    />
+                    >
+                      {surahOptions.map((s) => (
+                        <option key={s.number} value={s.number}>{s.number}. {s.nameTr}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">{t.verseLabel}</label>
@@ -232,10 +322,11 @@ export default function Dashboard() {
                     />
                   </div>
                 </div>
-                {/* Display resolved Surah name when known */}
-                {verseId && (
-                  <p className="text-xs text-gray-600 mt-2">{t.surahLabel}: {surahNumber} · {surahName}</p>
-                )}
+                {/* Display resolved Surah info */}
+                <div className="flex items-center justify-between text-xs text-gray-600 mt-2">
+                  <p>{t.surahLabel}: {surahNumber} · {surahName || surahOptions.find(s => s.number === surahNumber)?.nameTr || ''}</p>
+                  <p>{t.revelationType}: {revelationType === 'Mekki' ? t.mekki : revelationType === 'Medeni' ? t.medeni : 'Bilinmiyor'}</p>
+                </div>
               </div>
             </div>
 
@@ -254,6 +345,7 @@ export default function Dashboard() {
                       onChange={(e) => updateFilter('tone', Number(e.target.value))}
                       className="w-full"
                     />
+                    <p className="text-xs text-gray-500 mt-1">{t.toneHelp}</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">{t.intellectLabel}</label>
@@ -265,7 +357,20 @@ export default function Dashboard() {
                       onChange={(e) => updateFilter('intellectLevel', Number(e.target.value))}
                       className="w-full"
                     />
+                    <p className="text-xs text-gray-500 mt-1">{t.intellectHelp}</p>
                   </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.lengthLabel}</label>
+                  <input
+                    type="range"
+                    min={1}
+                    max={10}
+                    value={filters.responseLength ?? 6}
+                    onChange={(e) => updateFilter('responseLength', Number(e.target.value))}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">{t.lengthHelp}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t.languageLabel}</label>
@@ -284,73 +389,10 @@ export default function Dashboard() {
                       </>
                     )}
                   </select>
+                  <p className="text-xs text-gray-500 mt-1">{t.languageHelp}</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.compareLabel}</label>
-                  <input
-                    type="text"
-                    placeholder={t.comparePlaceholder}
-                    value={filters.compareWith ?? ''}
-                    onChange={(e) => updateFilter('compareWith', e.target.value)}
-                    className="w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-gray-700">{t.includeScholarsTitle}</label>
-                    <div className="space-x-2 text-xs">
-                      <button type="button" className="text-indigo-600 hover:underline" onClick={() => updateFilter('scholars', (availableFilters?.scholars || []).map((s) => s.id))}>{t.selectAll}</button>
-                      <button type="button" className="text-gray-600 hover:underline" onClick={() => updateFilter('scholars', [])}>{t.clear}</button>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2 max-h-40 overflow-auto border rounded-md p-2">
-                    {(availableFilters?.scholars || []).map((s) => {
-                      const selected = (filters.scholars || []).includes(s.id);
-                      return (
-                        <button
-                          type="button"
-                          key={s.id}
-                          onClick={() => {
-                            const current = new Set(filters.scholars || []);
-                            if (current.has(s.id)) current.delete(s.id); else current.add(s.id);
-                            updateFilter('scholars', Array.from(current));
-                          }}
-                          className={`px-2 py-1 rounded-full text-xs border ${selected ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'}`}
-                        >
-                          {s.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-gray-700">{t.excludeScholarsTitle}</label>
-                    <div className="space-x-2 text-xs">
-                      <button type="button" className="text-indigo-600 hover:underline" onClick={() => updateFilter('excludeScholars', (availableFilters?.scholars || []).map((s) => s.id))}>{t.selectAll}</button>
-                      <button type="button" className="text-gray-600 hover:underline" onClick={() => updateFilter('excludeScholars', [])}>{t.clear}</button>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2 max-h-40 overflow-auto border rounded-md p-2">
-                    {(availableFilters?.scholars || []).map((s) => {
-                      const excluded = (filters.excludeScholars || []).includes(s.id);
-                      return (
-                        <button
-                          type="button"
-                          key={s.id}
-                          onClick={() => {
-                            const current = new Set(filters.excludeScholars || []);
-                            if (current.has(s.id)) current.delete(s.id); else current.add(s.id);
-                            updateFilter('excludeScholars', Array.from(current));
-                          }}
-                          className={`px-2 py-1 rounded-full text-xs border ${excluded ? 'bg-red-600 text-white border-red-600' : 'bg-white text-gray-700 border-gray-300'}`}
-                        >
-                          {s.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                
+                <div className="text-xs text-gray-500">Müfessir seçimi: Aşağıdaki geniş tabloda yapabilirsiniz.</div>
 
                 <button
                   disabled={!canAnalyze || loadingFilters}
@@ -371,10 +413,141 @@ export default function Dashboard() {
             <div className="bg-white overflow-hidden shadow rounded-lg h-full">
               <div className="px-4 py-5 sm:p-6">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">{t.resultTitle}</h3>
+                {/* Performance Bar */}
+                <div className="text-xs text-gray-600 mb-3 flex gap-4 flex-wrap">
+                  <div><span className="font-medium">{t.perfTitle}:</span></div>
+                  <div>{t.perfStart}: {startedAt ? '✓' : '—'}</div>
+                  <div>{t.perfFirstByte}: {startedAt && firstByteAt ? `${Math.max(0, Math.round(firstByteAt - startedAt))} ms` : '—'}</div>
+                  <div>{t.perfTotal}: {startedAt && completedAt ? `${Math.max(0, Math.round(completedAt - startedAt))} ms` : '—'}</div>
+                  <div>{t.perfTokens}: {usage?.totalTokens ?? '—'}</div>
+                </div>
                 <div className="prose max-w-none whitespace-pre-wrap">
                   {streamContent ? streamContent : (
                     <p className="text-gray-500">{t.resultHelp}</p>
                   )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Scholar selection – full width */}
+          <div className="lg:col-span-3">
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-3">{t.includeScholarsTitle} / {t.excludeScholarsTitle}</h3>
+                <div className="flex items-center gap-2 mb-3 text-xs">
+                  <button type="button" onClick={includeAll} className="px-2 py-1 border rounded text-indigo-700 border-indigo-300 hover:bg-indigo-50">{t.includeAll}</button>
+                  <button type="button" onClick={excludeAll} className="px-2 py-1 border rounded text-red-700 border-red-300 hover:bg-red-50">{t.excludeAll}</button>
+                  <button type="button" onClick={resetSelections} className="px-2 py-1 border rounded text-gray-700 border-gray-300 hover:bg-gray-50">{t.resetSelections}</button>
+                </div>
+                {/* Search */}
+                <input
+                  type="text"
+                  placeholder={t.scholarsSearchPlaceholder}
+                  className="w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm px-2 py-1 mb-2"
+                  onChange={(e) => setScholarQuery(e.target.value)}
+                />
+                {/* Death year filters with calendar toggle */}
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-gray-600">{t.deathYearFilterLabel}</span>
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <span>{t.calendarMode}:</span>
+                      <button type="button" onClick={()=> setCalendarMode('gregorian')} className={`px-2 py-0.5 border rounded ${calendarMode==='gregorian' ? 'bg-indigo-600 text-white border-indigo-600' : 'text-gray-700 border-gray-300'}`}>{t.gregorian}</button>
+                      <button type="button" onClick={()=> setCalendarMode('hijri')} className={`px-2 py-0.5 border rounded ${calendarMode==='hijri' ? 'bg-indigo-600 text-white border-indigo-600' : 'text-gray-700 border-gray-300'}`}>{t.islamic}</button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 items-center">
+                    {/* Min */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min={calendarMode==='gregorian' ? 610 : 1}
+                        max={calendarMode==='gregorian' ? 2025 : gToH(2025)}
+                        value={calendarMode==='gregorian' ? deathYearMin : gToH(deathYearMin)}
+                        onChange={(e)=> {
+                          const val = Number(e.target.value);
+                          const g = calendarMode==='gregorian' ? val : hToG(val);
+                          setDeathYearMin(clampG(g));
+                        }}
+                        className="w-full"
+                      />
+                      <input
+                        type="number"
+                        className="w-20 rounded-md border-gray-300 text-sm px-2 py-1"
+                        value={calendarMode==='gregorian' ? deathYearMin : gToH(deathYearMin)}
+                        onChange={(e)=> {
+                          const val = Number(e.target.value);
+                          const g = calendarMode==='gregorian' ? val : hToG(val);
+                          setDeathYearMin(clampG(g));
+                        }}
+                      />
+                    </div>
+                    {/* Max */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min={calendarMode==='gregorian' ? 610 : 1}
+                        max={calendarMode==='gregorian' ? 2025 : gToH(2025)}
+                        value={calendarMode==='gregorian' ? deathYearMax : gToH(deathYearMax)}
+                        onChange={(e)=> {
+                          const val = Number(e.target.value);
+                          const g = calendarMode==='gregorian' ? val : hToG(val);
+                          setDeathYearMax(clampG(g));
+                        }}
+                        className="w-full"
+                      />
+                      <input
+                        type="number"
+                        className="w-20 rounded-md border-gray-300 text-sm px-2 py-1"
+                        value={calendarMode==='gregorian' ? deathYearMax : gToH(deathYearMax)}
+                        onChange={(e)=> {
+                          const val = Number(e.target.value);
+                          const g = calendarMode==='gregorian' ? val : hToG(val);
+                          setDeathYearMax(clampG(g));
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Scholar table with tri-state include/exclude (simplified: hide mezhep/ülke for now) */}
+                <div className="border rounded-md overflow-hidden">
+                  <div className="max-h-80 overflow-auto">
+                    <table className="min-w-full text-sm table-fixed">
+                      <colgroup>
+                        <col className="w-3/5" />
+                        <col className="w-1/5" />
+                        <col className="w-1/5" />
+                      </colgroup>
+                      <thead className="bg-gray-50 sticky top-0 z-10">
+                        <tr>
+                          <th className="text-left px-3 py-2">Müfessir</th>
+                          <th className="text-left px-3 py-2">Vefat</th>
+                          <th className="text-right px-3 py-2">Seçim</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredScholars.map((s) => {
+                          const included = includeIds.has(s.id);
+                          const excluded = excludeIds.has(s.id);
+                          return (
+                            <tr key={s.id} className="border-t">
+                              <td className="px-3 py-1.5 truncate" title={s.name}>{s.name}</td>
+                              <td className="px-3 py-1.5">{s.deathYear ?? '-'}</td>
+                              <td className="px-3 py-1.5 text-right space-x-2">
+                                <button type="button" className={`px-2 py-0.5 border rounded ${included ? 'bg-indigo-600 text-white border-indigo-600' : 'text-indigo-700 border-indigo-300'}`} onClick={()=> addInclude(s.id)}>Dahil</button>
+                                <button type="button" className={`px-2 py-0.5 border rounded ${excluded ? 'bg-red-600 text-white border-red-600' : 'text-red-700 border-red-300'}`} onClick={()=> addExclude(s.id)}>Hariç</button>
+                                {(included || excluded) && (
+                                  <button type="button" className="px-2 py-0.5 border rounded text-gray-700 border-gray-300" onClick={()=> { removeInclude(s.id); removeExclude(s.id); }}>Sıfırla</button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>

@@ -6,12 +6,14 @@ export interface Filters {
   tone?: number;
   intellectLevel?: number;
   language?: string;
-  compareWith?: string;
+  responseLength?: number;
 }
 
 export interface ScholarOption {
   id: string;
   name: string;
+  birthYear: number | null;
+  deathYear: number | null;
   century: number;
   madhab: string | null;
   period: string | null;
@@ -28,6 +30,8 @@ export interface FiltersResponse {
     periods: string[];
     environments: string[];
     countries: string[];
+    birthYearRange: { min: number; max: number } | null;
+    deathYearRange: { min: number; max: number } | null;
   };
   toneRange: { min: number; max: number; description: string };
   intellectRange: { min: number; max: number; description: string };
@@ -122,8 +126,5 @@ export async function requestTafseer(body: TafseerRequestBody, token: string) {
   }
   return res.json();
 }
-
-
-
 
 

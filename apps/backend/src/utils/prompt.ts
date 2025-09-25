@@ -19,7 +19,7 @@ export interface PromptOptions {
     tone?: number; // 1-10 emotional vs rational
     intellectLevel?: number; // 1-10 vocabulary richness
     language?: string;
-    compareWith?: string;
+    responseLength?: number; // 1-10 desired length (short -> long)
   };
 }
 
@@ -49,16 +49,18 @@ export function buildTafsirPrompt(opts: PromptOptions): string {
   if (userParams.tone) prompt += `- Tone: ${userParams.tone}/10 (1=emotional, 10=rational)\n`;
   if (userParams.intellectLevel) prompt += `- Intellect Level: ${userParams.intellectLevel}/10 (vocabulary richness)\n`;
   if (userParams.language) prompt += `- Output Language: ${userParams.language}\n`;
-  if (userParams.compareWith) prompt += `- Compare with: ${userParams.compareWith}\n`;
+  if (userParams.responseLength) prompt += `- Response Length: ${userParams.responseLength}/10 (1=few sentences, 10=long, multi-paragraph)\n`;
 
   prompt += `\nInstructions:\n`;
   prompt += `- Base your answer strictly on the provided tafsir excerpts and metadata.\n`;
   prompt += `- Do NOT use information from outside sources or the internet.\n`;
   prompt += `- Do NOT repeat the verse text or its translation in your answer. Start directly with the tafsir.\n`;
-  prompt += `- If the user requested a comparison, provide a comparative analysis.\n`;
+  // Comparison temporarily disabled in UI
   prompt += `- Output should be scholarly, clear, and reference the scholars by name where relevant.\n`;
   prompt += `- When tone (1-10) is provided, 1 = emotional, 10 = rational. Adjust the writing accordingly.\n`;
   prompt += `- When intellect level (1-10) is provided, 1 = simple vocabulary, 10 = highly academic vocabulary. Adjust the complexity accordingly.\n`;
+  prompt += `- When Response Length is provided, keep the output approximately within that scale: 1-3 sentences (1-3), 1-2 short paragraphs (4-6), 3-6 paragraphs (7-8), longer analytical essay (9-10).\n`;
+  prompt += `- Always end with a complete sentence; do not stop mid-sentence even if the output is brief.\n`;
 
   return prompt;
 } 

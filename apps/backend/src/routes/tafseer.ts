@@ -1,8 +1,12 @@
 import { Router } from "express";
+import { readFileSync } from "fs";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 import { authenticateJWT, enforceQuota, decrementQuota } from "../middleware/auth.js";
 import { PrismaClient } from "@prisma/client";
 import { generateTafsirStream, generateTafsirNonStreaming } from "../utils/openai.js";
 import { buildTafsirPrompt, type ScholarMeta } from "../utils/prompt.js";
+import { finalizeResponse } from "../utils/text.js";
 import { performSimilaritySearch } from "../utils/similarity-search.js";
 import { findMostSimilarTafsir } from "../utils/similarity-calculation.js";
 
@@ -10,6 +14,22 @@ const router: Router = Router();
 
 const prisma: PrismaClient = (global as any).prisma || new PrismaClient();
 if (!(global as any).prisma) (global as any).prisma = prisma;
+
+// Optional DEMO mode: serve precomputed tafsir for selected verses
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const demoMode = process.env.DEMO_MODE === '1';
+let demoMap: Record<string, { language: string; content: string }[]> = {};
+if (demoMode) {
+  try {
+    const demoPath = resolve(__dirname, "../..", "scripts", "demo-tafsir.json");
+    const raw = readFileSync(demoPath, "utf8");
+    demoMap = JSON.parse(raw);
+    console.log("DEMO_MODE enabled. Loaded", Object.keys(demoMap).length, "precomputed entries");
+  } catch (e) {
+    console.warn("DEMO_MODE enabled but demo-tafsir.json not found or invalid.");
+  }
+}
 
 // Protected endpoint that requires auth and enforces quota
 router.post("/", 
@@ -26,7 +46,6 @@ router.post("/",
           tone?: number; // 1-10 emotional vs rational
           intellectLevel?: number; // 1-10 vocabulary richness
           language?: string;
-          compareWith?: string; // scholar name to compare with
         };
         stream?: boolean;
       };
@@ -89,11 +108,11 @@ router.post("/",
         }));
       }
 
-      // Build prompt options
+      // Build prompt options (clip excerpts for cost and speed)
       const promptOptions = {
         verseText: verse.arabicText,
         translation: verse.translation || undefined,
-        tafsirExcerpts: similarTafsirs.map((result: any) => ({
+        tafsirExcerpts: similarTafsirs.slice(0, 3).map((result: any) => ({
           scholar: {
             name: result.scholar.name,
             century: result.scholar.century,
@@ -103,15 +122,14 @@ router.post("/",
             originCountry: result.scholar.originCountry || undefined,
             reputationScore: result.scholar.reputationScore || undefined,
           } as ScholarMeta,
-          excerpt: result.tafsirText.length > 500 
-            ? result.tafsirText.substring(0, 500) + "..." 
+          excerpt: result.tafsirText.length > 300 
+            ? result.tafsirText.substring(0, 300) + "..." 
             : result.tafsirText,
         })),
         userParams: {
           tone: filters?.tone,
           intellectLevel: filters?.intellectLevel,
           language: filters?.language || 'Turkish',
-          compareWith: filters?.compareWith,
         },
       };
 
@@ -179,6 +197,59 @@ router.post("/",
         return;
       }
 
+      // DEMO mode: if precomputed exists, short-circuit with cached content
+      if (demoMode) {
+        const items = demoMap[verseId];
+        const targetLang = (filters?.language || 'Turkish').toLowerCase();
+        const match = items?.find((x) => (x.language || 'Turkish').toLowerCase() === targetLang) || items?.[0];
+        if (match) {
+          if (stream) {
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
+
+            res.write(`data: ${JSON.stringify({ type: 'start', searchId: 'demo' })}\n\n`);
+
+            const requestedLang = filters?.language || 'Turkish';
+            const translationLabel = requestedLang === 'Turkish' ? 'Meal' : 'Meaning';
+            const tafsirHeader = requestedLang === 'Turkish' ? 'Tefsir' : 'Tafsir';
+            const prefaceLines = [
+              `Arabic: ${verse.arabicText}`,
+              verse.translation ? `${translationLabel}: ${verse.translation}` : undefined,
+              '',
+              `${tafsirHeader}:`,
+              '',
+            ].filter(Boolean).join('\n');
+            res.write(`data: ${JSON.stringify({ type: 'chunk', content: prefaceLines + "\n" })}\n\n`);
+
+            res.write(`data: ${JSON.stringify({ type: 'chunk', content: match.content })}\n\n`);
+            res.write(`data: ${JSON.stringify({ type: 'complete', searchId: 'demo', cached: true, usage: { totalTokens: 0 } })}\n\n`);
+            res.end();
+            return;
+          } else {
+            return res.json({
+              verse: {
+                id: verse.id,
+                surahNumber: verse.surahNumber,
+                surahName: verse.surahName,
+                verseNumber: verse.verseNumber,
+                arabicText: verse.arabicText,
+                translation: verse.translation
+              },
+              filters,
+              aiResponse: match.content,
+              similarityScore: null,
+              searchId: 'demo',
+              usage: { totalTokens: 0 },
+              cached: true,
+              demo: true,
+            });
+          }
+        }
+      }
+
       // Create new search record
       const search = await prisma.search.create({
         data: {
@@ -203,30 +274,50 @@ router.post("/",
           // Send initial data
           res.write(`data: ${JSON.stringify({ type: 'start', searchId: search.id })}\n\n`);
 
-          // Send verse preface first: Arabic, then translation in requested language (if available)
+          // Send verse preface first: Arabic, then translation line, then Tefsir/Tafsir header
           const requestedLang = filters?.language || 'Turkish';
-          const label = requestedLang === 'Turkish' ? 'Meal' : 'Meaning';
-          const prefaceLines = [`Arabic: ${verse.arabicText}`];
-          if (verse.translation) prefaceLines.push(`${label}: ${verse.translation}`);
-          prefaceLines.push("\nMeali:");
-          res.write(`data: ${JSON.stringify({ type: 'chunk', content: prefaceLines.join("\n") + "\n\n" })}\n\n`);
+          const translationLabel = requestedLang === 'Turkish' ? 'Meal' : 'Meaning';
+          const tafsirHeader = requestedLang === 'Turkish' ? 'Tefsir' : 'Tafsir';
+          const prefaceLines = [
+            `Arabic: ${verse.arabicText}`,
+            verse.translation ? `${translationLabel}: ${verse.translation}` : undefined,
+            '',
+            `${tafsirHeader}:`,
+            '',
+          ].filter(Boolean).join('\n');
+          res.write(`data: ${JSON.stringify({ type: 'chunk', content: prefaceLines + "\n" })}\n\n`);
 
           let streamContent = "";
           
           try {
+            // Scale max tokens by desired response length (1-10)
+            const lengthScale = typeof filters?.responseLength === 'number' ? filters.responseLength : 6;
+            const envMax = Number(process.env.OPENAI_MAX_TOKENS ?? 800);
+            const maxTokens = Math.min(envMax, 200 + lengthScale * 100);
+
             const result = await generateTafsirStream(
-              { promptOptions },
+              { promptOptions, maxTokens },
               (chunk) => {
-                streamContent += chunk;
-                res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`);
+                // For short responses, buffer chunks and emit at the end to avoid mid-sentence cutoffs
+                if (lengthScale <= 3) {
+                  streamContent += chunk;
+                } else {
+                  streamContent += chunk;
+                  res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`);
+                }
               }
             );
 
-            aiResponse = result.content;
+            aiResponse = finalizeResponse(result.content, lengthScale, filters?.language);
+
+            if (lengthScale <= 3) {
+              // Emit finalized short content now
+              res.write(`data: ${JSON.stringify({ type: 'chunk', content: aiResponse })}\n\n`);
+            }
 
             // Calculate similarity to existing tafsirs
             const mostSimilar = await findMostSimilarTafsir(
-              result.content,
+              aiResponse,
               similarTafsirs.map((t: any) => ({
                 tafsirId: t.tafsirId,
                 tafsirText: t.tafsirText,
@@ -240,7 +331,7 @@ router.post("/",
                 data: {
                   searchId: search.id,
                   tafsirId: saveTafsirId,
-                  aiResponse: result.content,
+                  aiResponse: aiResponse,
                   similarityScore: mostSimilar?.similarityScore || null,
                 },
               });
@@ -263,15 +354,20 @@ router.post("/",
           res.end();
         } else {
           // Non-streaming response
-          const result = await generateTafsirNonStreaming({ promptOptions });
+          const lengthScale = typeof filters?.responseLength === 'number' ? filters.responseLength : 6;
+          const envMax = Number(process.env.OPENAI_MAX_TOKENS ?? 800);
+          const maxTokens = Math.min(envMax, 200 + lengthScale * 100);
+          const result = await generateTafsirNonStreaming({ promptOptions, maxTokens });
           const requestedLang = filters?.language || 'Turkish';
-          const label = requestedLang === 'Turkish' ? 'Meal' : 'Meaning';
-          const preface = `Arabic: ${verse.arabicText}\n` + (verse.translation ? `${label}: ${verse.translation}\n\nTefsir:\n` : `\nTefsir:\n`);
-          aiResponse = preface + result.content;
+          const translationLabel = requestedLang === 'Turkish' ? 'Meal' : 'Meaning';
+          const tafsirHeader = requestedLang === 'Turkish' ? 'Tefsir' : 'Tafsir';
+          const preface = `Arabic: ${verse.arabicText}\n` + (verse.translation ? `${translationLabel}: ${verse.translation}\n\n${tafsirHeader}:\n` : `\n${tafsirHeader}:\n`);
+          const finalized = finalizeResponse(result.content, lengthScale, filters?.language);
+          aiResponse = preface + finalized;
 
           // Calculate similarity to existing tafsirs
           const mostSimilar = await findMostSimilarTafsir(
-            result.content,
+            finalized,
             similarTafsirs.map((t: any) => ({
               tafsirId: t.tafsirId,
               tafsirText: t.tafsirText,
@@ -285,7 +381,7 @@ router.post("/",
               data: {
                 searchId: search.id,
                 tafsirId: saveTafsirId,
-                aiResponse: result.content,
+                aiResponse: finalized,
                 similarityScore: mostSimilar?.similarityScore || null,
               },
             });

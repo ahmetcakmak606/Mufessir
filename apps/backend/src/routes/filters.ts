@@ -14,6 +14,8 @@ router.get("/", async (_req: Request, res: Response) => {
       select: {
         id: true,
         name: true,
+        birthYear: true,
+        deathYear: true,
         century: true,
         madhab: true,
         period: true,
@@ -26,6 +28,8 @@ router.get("/", async (_req: Request, res: Response) => {
 
     // Get unique values for filter options
     const centuries = [...new Set(scholars.map((s: { century: number }) => s.century))].sort();
+    const birthYears = scholars.map((s: any) => s.birthYear).filter((n: any) => typeof n === 'number');
+    const deathYears = scholars.map((s: any) => s.deathYear).filter((n: any) => typeof n === 'number');
     const isString = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
     const madhabs = [...new Set(scholars.map((s: { madhab: string | null }) => s.madhab).filter(isString))].sort();
     const periods = [...new Set(scholars.map((s: { period: string | null }) => s.period).filter(isString))].sort();
@@ -39,7 +43,9 @@ router.get("/", async (_req: Request, res: Response) => {
         madhabs,
         periods,
         environments,
-        countries
+        countries,
+        birthYearRange: birthYears.length ? { min: Math.min(...birthYears), max: Math.max(...birthYears) } : null,
+        deathYearRange: deathYears.length ? { min: Math.min(...deathYears), max: Math.max(...deathYears) } : null
       },
       toneRange: { min: 1, max: 10, description: "Emotional vs Rational tone" },
       intellectRange: { min: 1, max: 10, description: "Vocabulary richness and intellectual level" },
