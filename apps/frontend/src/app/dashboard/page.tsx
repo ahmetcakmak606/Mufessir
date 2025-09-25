@@ -124,9 +124,7 @@ export default function Dashboard() {
   // Scholar picklist helpers
   const includeIds = useMemo(() => new Set(filters.scholars || []), [filters.scholars]);
   const excludeIds = useMemo(() => new Set(filters.excludeScholars || []), [filters.excludeScholars]);
-  const includeList = useMemo(() => filteredScholars.filter(s => includeIds.has(s.id)), [filteredScholars, includeIds]);
-  const excludeList = useMemo(() => filteredScholars.filter(s => excludeIds.has(s.id)), [filteredScholars, excludeIds]);
-  const availableList = useMemo(() => filteredScholars.filter(s => !includeIds.has(s.id) && !excludeIds.has(s.id)), [filteredScholars, includeIds, excludeIds]);
+  // Lists derived on the fly where needed; no precomputed unused lists to satisfy lint
 
   const addInclude = (id: string) => {
     const next = new Set(filters.scholars || []);
