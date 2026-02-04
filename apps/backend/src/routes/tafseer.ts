@@ -67,10 +67,13 @@ router.post("/",
       // Perform vector similarity search to find relevant tafsirs
       let similarTafsirs = [];
       try {
+        const hasScholarFilter =
+          (filters?.scholars?.length ?? 0) > 0 ||
+          (filters?.excludeScholars?.length ?? 0) > 0;
         const searchQuery = `${verse.arabicText} ${verse.translation || ""}`.trim();
         similarTafsirs = await performSimilaritySearch(prisma, {
           query: searchQuery,
-          verseId: filters?.scholars || filters?.excludeScholars ? undefined : verseId, // Only filter by verse if no scholar filtering
+          verseId: hasScholarFilter ? undefined : verseId, // Only filter by verse if no scholar filtering
           scholarIds: filters?.scholars,
           excludeScholarIds: filters?.excludeScholars,
           limit: 5,

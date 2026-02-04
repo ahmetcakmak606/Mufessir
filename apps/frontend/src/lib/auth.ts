@@ -113,7 +113,14 @@ export const isTokenValid = (token: string | null): boolean => {
   if (!token) return false;
   
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
+    const parts = token.split('.');
+    if (parts.length < 2) return false;
+    const decodeBase64Url = (value: string) => {
+      const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+      return atob(padded);
+    };
+    const payload = JSON.parse(decodeBase64Url(parts[1] || ""));
     const now = Date.now() / 1000;
     return payload.exp > now;
   } catch {

@@ -31,21 +31,24 @@ export function enforceQuota(prisma: PrismaClient) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(401).json({ error: "Unauthenticated" });
 
+    let dailyQuota = user.dailyQuota;
+
     // Reset quota if window elapsed
     if (user.quotaResetAt < now) {
+      dailyQuota = Number(process.env.FREE_DAILY_QUOTA) || 10;
       await prisma.user.update({ 
         where: { id: userId }, 
         data: { 
-          dailyQuota: Number(process.env.FREE_DAILY_QUOTA) || 100, 
+          dailyQuota, 
           quotaResetAt: new Date(now.getTime() + 24 * 60 * 60 * 1000) 
         } 
       });
     }
 
-    if (user.dailyQuota <= 0) return res.status(429).json({ error: "Quota exhausted" });
+    if (dailyQuota <= 0) return res.status(429).json({ error: "Quota exhausted" });
 
     // Store user info for quota decrement middleware
-    req.user = { ...req.user, dailyQuota: user.dailyQuota } as any;
+    req.user = { ...req.user, dailyQuota } as any;
     next();
   };
 }

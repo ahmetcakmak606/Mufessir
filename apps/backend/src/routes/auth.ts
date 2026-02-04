@@ -19,7 +19,7 @@ router.post("/register", async (req: Request, res: Response) => {
     if (existing) return res.status(409).json({ error: "User already exists" });
 
     const passwordHash = await hashPassword(password);
-    const user = await prisma.user.create({ data: { email, passwordHash, name, dailyQuota: Number(process.env.FREE_DAILY_QUOTA) || 3, quotaResetAt: new Date(Date.now() + 24 * 60 * 60 * 1000) } });
+    const user = await prisma.user.create({ data: { email, passwordHash, name, dailyQuota: Number(process.env.FREE_DAILY_QUOTA) || 10, quotaResetAt: new Date(Date.now() + 24 * 60 * 60 * 1000) } });
 
     const token = signJwt(user);
     return res.status(201).json({ token });

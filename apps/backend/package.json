@@ -11,7 +11,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "seed": "node scripts/insert-sample-data.js",
-    "import-sqlite": "tsx scripts/import-sqlite.ts"
+    "import-sqlite": "tsx scripts/import-sqlite.ts",
+    "import-mysql-dump": "tsx scripts/import-mysql-dump.ts",
+    "copy-users": "tsx scripts/copy-users.ts",
+    "import-users-csv": "tsx scripts/import-users-csv.ts"
   },
   "dependencies": {
     "@prisma/client": "6.11.1",

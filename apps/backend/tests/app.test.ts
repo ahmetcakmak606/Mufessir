@@ -2,12 +2,24 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { createServer } from 'http';
 import express from 'express';
+import { config } from 'dotenv';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import healthRouter from '../src/routes/health.js';
 import authRouter from '../src/routes/auth.js';
 import filtersRouter from '../src/routes/filters.js';
 import versesRouter from '../src/routes/verses.js';
 import tafseerRouter from '../src/routes/tafseer.js';
 import { PrismaClient } from '@prisma/client';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+config({ path: resolve(__dirname, "../../../.env") });
+config({ path: resolve(__dirname, "../.env") });
+
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = "test-secret";
+}
 
 // Create an in-process express app using the same routers
 const app = express();
@@ -108,5 +120,4 @@ describe('Tafseer', () => {
     expect(res.body.verse.id).toBe(verseId);
   });
 });
-
 

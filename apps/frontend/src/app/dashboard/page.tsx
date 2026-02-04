@@ -196,16 +196,17 @@ export default function Dashboard() {
       const token = tokenStorage.get();
       if (!token) throw new Error('Not authenticated');
 
+      const resolvedLanguage = filters.language || backendLanguageLabel;
       await startTafseerStream(
         {
           verseId: id,
-          filters: { ...filters, language: backendLanguageLabel },
+          filters: { ...filters, language: resolvedLanguage },
           stream: true,
         },
         token,
         (evt) => {
           if (evt.type === 'chunk' && evt.content) {
-            if (!firstByteAt) setFirstByteAt(performance.now());
+            setFirstByteAt((prev) => prev ?? performance.now());
             setStreamContent((prev) => prev + evt.content);
           }
           if (evt.type === 'error') {
