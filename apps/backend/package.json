@@ -6,11 +6,18 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
+    "check-types": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/src/index.js",
     "postinstall": "prisma generate --schema ../../packages/database/prisma/schema.prisma",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:traceability": "vitest run tests/traceability.test.ts",
     "test:watch": "vitest",
     "seed": "node scripts/insert-sample-data.js",
+    "derive-scholar-metadata": "tsx scripts/derive-scholar-metadata.ts",
+    "quality:scholars": "tsx scripts/check-scholar-data-quality.ts",
+    "export-scholar-enrichment-starter": "tsx scripts/export-scholar-enrichment-starter.ts",
+    "import-scholar-enrichment": "tsx scripts/import-scholar-enrichment-csv.ts",
     "import-sqlite": "tsx scripts/import-sqlite.ts",
     "import-mysql-dump": "tsx scripts/import-mysql-dump.ts",
     "copy-users": "tsx scripts/copy-users.ts",
@@ -29,6 +36,7 @@
     "openai": "^4.28.0"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.9",
     "@types/node": "^20",
     "@types/bcryptjs": "^2.4.2",
     "@types/cors": "^2.8.17",
@@ -39,6 +47,6 @@
     "prisma": "^6.11.1",
     "supertest": "^7.0.0",
     "tsx": "^4.19.2",
-    "vitest": "^2.0.5"
+    "vitest": "^2.1.9"
   }
 }

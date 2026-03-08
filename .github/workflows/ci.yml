@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  backend-core:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: ankane/pgvector:latest
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mufessir
+      SHADOW_DB_URL: postgresql://postgres:postgres@localhost:5432/mufessir_shadow
+      JWT_SECRET: ci-secret
+      FREE_DAILY_QUOTA: 10
+      AI_MODE: off
+      OPENAI_DISABLED: "1"
+      SIMILARITY_MODE: sample
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create CI databases
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          psql -h localhost -U postgres -d postgres -c "CREATE DATABASE mufessir;"
+          psql -h localhost -U postgres -d postgres -c "CREATE DATABASE mufessir_shadow;"
+        env:
+          PGPASSWORD: postgres
+
+      - name: Run migrations
+        run: npm run db:migrate
+
+      - name: Seed sample data
+        run: npm run db:seed
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run check-types
+
+      - name: Frontend tests
+        run: npm --workspace apps/frontend run test
+
+      - name: Backend tests
+        run: npm --workspace apps/backend run test
+
+      - name: Frontend coverage gate
+        run: npm --workspace apps/frontend run test:coverage
+
+      - name: Install Playwright browser
+        run: npm exec --workspace apps/frontend playwright install --with-deps chromium
+
+      - name: Frontend E2E (mocked API)
+        run: npm --workspace apps/frontend run test:e2e
+
+      - name: Backend coverage gate
+        run: npm --workspace apps/backend run test:coverage
+
+      - name: Scholar quality gate (non-strict)
+        run: npm run quality:scholars
+
+      - name: Build backend for Newman
+        run: npm --workspace apps/backend run build
+
+      - name: Postman smoke suite (Newman)
+        run: |
+          set -euo pipefail
+
+          PORT=4000 node apps/backend/dist/src/index.js > /tmp/backend.log 2>&1 &
+          BACKEND_PID=$!
+          cleanup() {
+            if kill -0 "${BACKEND_PID}" 2>/dev/null; then
+              kill "${BACKEND_PID}" || true
+            fi
+          }
+          trap cleanup EXIT
+
+          for i in {1..30}; do
+            if curl -fsS "http://127.0.0.1:4000/health" >/dev/null; then
+              break
+            fi
+            if [ "${i}" -eq 30 ]; then
+              echo "Backend did not become healthy in time"
+              cat /tmp/backend.log || true
+              exit 1
+            fi
+            sleep 1
+          done
+
+          npx --yes newman run apps/backend/postman_collection.json \
+            --env-var baseUrl=http://127.0.0.1:4000 \
+            --timeout-request 30000 \
+            --timeout 240000 \
+            --bail
+
+      - name: Print backend log on failure
+        if: failure()
+        run: |
+          echo "---- backend.log ----"
+          cat /tmp/backend.log || true

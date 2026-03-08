@@ -26,6 +26,15 @@ export interface LoginData {
   password: string;
 }
 
+export interface GoogleSsoData {
+  idToken: string;
+}
+
+export interface AppleSsoData {
+  idToken: string;
+  name?: string | null;
+}
+
 // Token management
 export const tokenStorage = {
   get: (): string | null => {
@@ -77,6 +86,22 @@ export const authApi = {
 
   login: async (data: LoginData): Promise<AuthResponse> => {
     const response = await apiCall('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return response;
+  },
+
+  googleSso: async (data: GoogleSsoData): Promise<AuthResponse> => {
+    const response = await apiCall('/auth/sso/google', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return response;
+  },
+
+  appleSso: async (data: AppleSsoData): Promise<AuthResponse> => {
+    const response = await apiCall('/auth/sso/apple', {
       method: 'POST',
       body: JSON.stringify(data),
     });

@@ -75,67 +75,189 @@ async function insertSampleData() {
     });
 
     // Insert scholars
-    await prisma.scholar.createMany({
-      data: [
+    const scholarSeed = [
         {
           id: 'scholar-tabari',
           name: 'Abu Ja\'far al-Tabari',
+          mufassirTr: 'Taberî',
+          mufassirEn: 'Al-Tabari',
+          mufassirAr: 'الطبري',
+          mufassirNameLong: 'Muhammad ibn Jarir al-Tabari',
           birthYear: 839,
           deathYear: 923,
+          deathHijri: 310,
           century: 9,
           madhab: 'Shafi\'i',
           period: 'Abbasid',
+          periodCode: 'CLASSICAL_EARLY',
           environment: 'Dar al-Islam',
           originCountry: 'Persia',
-          reputationScore: 9.5
+          reputationScore: 5.0,
+          scholarlyInfluence: 5,
+          methodologicalRigor: 5,
+          corpusBreadth: 5,
+          traditionAcceptance: ['SUNNI_MAINSTREAM', 'CROSS_TRADITION'],
+          sourceAccessibility: 'FULL_DIGITAL',
+          tafsirType1: 'RIVAYET'
         },
         {
           id: 'scholar-qurtubi',
           name: 'Al-Qurtubi',
+          mufassirTr: 'Kurtubî',
+          mufassirEn: 'Al-Qurtubi',
+          mufassirAr: 'القرطبي',
+          mufassirNameLong: 'Abu Abdullah al-Qurtubi',
           birthYear: 1214,
           deathYear: 1273,
+          deathHijri: 671,
           century: 13,
           madhab: 'Maliki',
           period: 'Almohad',
+          periodCode: 'CLASSICAL_MATURE',
           environment: 'Dar al-Islam',
           originCountry: 'Al-Andalus',
-          reputationScore: 9.2
+          reputationScore: 4.3,
+          scholarlyInfluence: 4,
+          methodologicalRigor: 5,
+          corpusBreadth: 4,
+          traditionAcceptance: ['SUNNI_MAINSTREAM'],
+          sourceAccessibility: 'FULL_DIGITAL',
+          tafsirType1: 'FIKHI'
         },
         {
           id: 'scholar-kathir',
           name: 'Ibn Kathir',
+          mufassirTr: 'İbn Kesîr',
+          mufassirEn: 'Ibn Kathir',
+          mufassirAr: 'ابن كثير',
+          mufassirNameLong: 'Ismail ibn Umar ibn Kathir',
           birthYear: 1300,
           deathYear: 1373,
+          deathHijri: 774,
           century: 14,
           madhab: 'Shafi\'i',
           period: 'Mamluk',
+          periodCode: 'POST_CLASSICAL',
           environment: 'Dar al-Islam',
           originCountry: 'Syria',
-          reputationScore: 9.8
+          reputationScore: 4.7,
+          scholarlyInfluence: 5,
+          methodologicalRigor: 4,
+          corpusBreadth: 5,
+          traditionAcceptance: ['SUNNI_MAINSTREAM'],
+          sourceAccessibility: 'FULL_DIGITAL',
+          tafsirType1: 'RIVAYET'
         },
         {
           id: 'scholar-razi',
           name: 'Fakhr al-Din al-Razi',
+          mufassirTr: 'Fahreddin Râzî',
+          mufassirEn: 'Fakhr al-Din al-Razi',
+          mufassirAr: 'فخر الدين الرازي',
+          mufassirNameLong: 'Fakhr al-Din Muhammad al-Razi',
           birthYear: 1149,
           deathYear: 1210,
+          deathHijri: 606,
           century: 12,
           madhab: 'Shafi\'i',
           period: 'Ayyubid',
+          periodCode: 'CLASSICAL_MATURE',
           environment: 'Dar al-Islam',
           originCountry: 'Persia',
-          reputationScore: 9.3
+          reputationScore: 4.7,
+          scholarlyInfluence: 5,
+          methodologicalRigor: 5,
+          corpusBreadth: 4,
+          traditionAcceptance: ['SUNNI_MAINSTREAM', 'CROSS_TRADITION'],
+          sourceAccessibility: 'FULL_DIGITAL',
+          tafsirType1: 'DIRAYET'
         },
         {
           id: 'scholar-baydawi',
           name: 'Al-Baydawi',
+          mufassirTr: 'Beydâvî',
+          mufassirEn: 'Al-Baydawi',
+          mufassirAr: 'البيضاوي',
+          mufassirNameLong: 'Nasir al-Din al-Baydawi',
           birthYear: 1226,
           deathYear: 1286,
+          deathHijri: 685,
           century: 13,
           madhab: 'Shafi\'i',
           period: 'Ilkhanate',
+          periodCode: 'CLASSICAL_MATURE',
           environment: 'Dar al-Islam',
           originCountry: 'Persia',
-          reputationScore: 8.9
+          reputationScore: 4.0,
+          scholarlyInfluence: 4,
+          methodologicalRigor: 4,
+          corpusBreadth: 4,
+          traditionAcceptance: ['SUNNI_MAINSTREAM'],
+          sourceAccessibility: 'FULL_DIGITAL',
+          tafsirType1: 'DIRAYET'
+        }
+    ];
+    for (const scholar of scholarSeed) {
+      await prisma.scholar.upsert({
+        where: { id: scholar.id },
+        update: scholar,
+        create: scholar,
+      });
+    }
+
+    await prisma.scholarReference.deleteMany({
+      where: {
+        provenance: 'manual_seed',
+        scholarId: {
+          in: scholarSeed.map((s) => s.id),
+        },
+      },
+    });
+    await prisma.scholarReference.createMany({
+      data: [
+        {
+          scholarId: 'scholar-tabari',
+          sourceType: 'DIA',
+          sourceTitle: 'TDV İslâm Ansiklopedisi',
+          volume: '39',
+          page: '284-292',
+          edition: 'İstanbul, TDV',
+          citationText: 'Taberî maddesi',
+          provenance: 'manual_seed',
+          isPrimary: true
+        },
+        {
+          scholarId: 'scholar-tabari',
+          sourceType: 'ZEHEBI',
+          sourceTitle: 'et-Tefsîr ve’l-Müfessirûn',
+          volume: '1',
+          page: '115-125',
+          edition: 'Dârü’l-Hadîs',
+          citationText: 'Taberî metodolojisi',
+          provenance: 'manual_seed',
+          isPrimary: true
+        },
+        {
+          scholarId: 'scholar-razi',
+          sourceType: 'DIA',
+          sourceTitle: 'TDV İslâm Ansiklopedisi',
+          volume: '34',
+          page: '479-485',
+          edition: 'İstanbul, TDV',
+          citationText: 'Râzî maddesi',
+          provenance: 'manual_seed',
+          isPrimary: true
+        },
+        {
+          scholarId: 'scholar-kathir',
+          sourceType: 'DIA',
+          sourceTitle: 'TDV İslâm Ansiklopedisi',
+          volume: '20',
+          page: '132-134',
+          edition: 'İstanbul, TDV',
+          citationText: 'İbn Kesîr maddesi',
+          provenance: 'manual_seed',
+          isPrimary: true
         }
       ],
       skipDuplicates: true
@@ -212,11 +334,13 @@ async function insertSampleData() {
     const verseCount = await prisma.verse.count();
     const scholarCount = await prisma.scholar.count();
     const tafsirCount = await prisma.tafsir.count();
+    const citationCount = await prisma.scholarReference.count();
 
     console.log('\n📊 Database Summary:');
     console.log(`   Verses: ${verseCount}`);
     console.log(`   Scholars: ${scholarCount}`);
     console.log(`   Tafsirs: ${tafsirCount}`);
+    console.log(`   Scholar references: ${citationCount}`);
 
     console.log('\n🎉 Sample data insertion completed!');
   } catch (error) {

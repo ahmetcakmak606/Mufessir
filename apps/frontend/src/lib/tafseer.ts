@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+import { API_BASE_URL, apiRequest } from '@/lib/api-client';
 
 export interface Filters {
   scholars?: string[];
@@ -7,19 +7,37 @@ export interface Filters {
   intellectLevel?: number;
   language?: string;
   responseLength?: number;
+  periodCodes?: string[];
+  madhabs?: string[];
+  traditions?: string[];
+  sourceAccessibilities?: string[];
+  tafsirTypes?: string[];
 }
+
+export type RunDraftFilters = Filters;
 
 export interface ScholarOption {
   id: string;
   name: string;
+  mufassirTr: string | null;
+  mufassirEn: string | null;
+  mufassirAr: string | null;
+  mufassirNameLong: string | null;
   birthYear: number | null;
   deathYear: number | null;
+  deathHijri: number | null;
   century: number;
   madhab: string | null;
   period: string | null;
+  periodCode: string | null;
   environment: string | null;
   originCountry: string | null;
   reputationScore: number | null;
+  sourceAccessibility: string | null;
+  tafsirType1: string | null;
+  tafsirType2: string | null;
+  traditionAcceptance: string[];
+  _count?: { references: number };
 }
 
 export interface FiltersResponse {
@@ -28,15 +46,41 @@ export interface FiltersResponse {
     centuries: number[];
     madhabs: string[];
     periods: string[];
+    periodCodes: string[];
     environments: string[];
     countries: string[];
+    sourceAccessibilities: string[];
+    traditions: string[];
+    tafsirTypes: string[];
     birthYearRange: { min: number; max: number } | null;
     deathYearRange: { min: number; max: number } | null;
+    deathHijriRange: { min: number; max: number } | null;
   };
   toneRange: { min: number; max: number; description: string };
   intellectRange: { min: number; max: number; description: string };
   supportedLanguages: string[];
 }
+
+export interface Citation {
+  scholarId: string;
+  scholarName: string;
+  sourceType: string;
+  sourceTitle: string;
+  volume: string | null;
+  page: string | null;
+  edition: string | null;
+  citationText: string | null;
+  provenance: string | null;
+  isPrimary: boolean;
+}
+
+export interface SourceExcerpt {
+  scholarId: string;
+  scholarName: string;
+  excerpt: string;
+}
+
+export type ProvenanceIndicator = 'PRIMARY' | 'MIXED' | 'NONE';
 
 export interface TafseerRequestBody {
   verseId: string;
@@ -44,24 +88,137 @@ export interface TafseerRequestBody {
   stream?: boolean;
 }
 
-export async function fetchFilters(): Promise<FiltersResponse> {
-  const res = await fetch(`${API_BASE_URL}/filters`);
-  if (!res.ok) throw new Error('Failed to load filters');
-  return res.json();
+export interface VersePayload {
+  id: string;
+  surahNumber: number;
+  surahName: string;
+  verseNumber: number;
+  arabicText?: string;
+  translation?: string | null;
 }
 
-export async function fetchVerseByNumbers(surahNumber: number, verseNumber: number) {
-  const res = await fetch(`${API_BASE_URL}/verses?surahNumber=${surahNumber}&verseNumber=${verseNumber}`);
-  if (!res.ok) throw new Error('Verse not found');
-  return res.json();
+export interface TafseerResponse {
+  verse: VersePayload;
+  filters?: RunDraftFilters;
+  aiResponse: string;
+  confidence?: number | null;
+  provenance?: ProvenanceIndicator | null;
+  citations?: Citation[];
+  sourceExcerpts?: SourceExcerpt[];
+  searchId?: string;
+  runId?: string;
+  usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number } | null;
+  cached?: boolean;
+  fallback?: boolean;
+}
+
+export interface TafseerRun {
+  runId: string;
+  searchId: string;
+  verse: VersePayload;
+  filters: RunDraftFilters;
+  aiResponse: string;
+  confidence: number | null;
+  provenance: ProvenanceIndicator | null;
+  citations: Citation[];
+  sourceExcerpts: SourceExcerpt[];
+  createdAt: string;
+  updatedAt: string;
+  title: string | null;
+  notes: string | null;
+  starred: boolean;
+}
+
+export interface RunSummary {
+  runId: string;
+  searchId: string;
+  verse: Pick<VersePayload, 'id' | 'surahNumber' | 'surahName' | 'verseNumber'>;
+  filters: RunDraftFilters;
+  title: string | null;
+  notes: string | null;
+  starred: boolean;
+  aiResponsePreview: string | null;
+  confidence: number | null;
+  provenance: ProvenanceIndicator | null;
+  citationsCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type RunDetail = TafseerRun;
+
+export interface SavedPreset {
+  id: string;
+  label: string;
+  filters: RunDraftFilters;
+}
+
+export interface ComparisonRunModel {
+  primaryRun: TafseerRun | null;
+  secondaryRun: TafseerRun | null;
+}
+
+export interface ReplayPayload {
+  verseId: string;
+  filters: RunDraftFilters;
+}
+
+export function serializeReplayPayload(payload: ReplayPayload): string {
+  return JSON.stringify(payload);
+}
+
+export function deserializeReplayPayload(raw: string): ReplayPayload | null {
+  try {
+    const parsed = JSON.parse(raw) as ReplayPayload;
+    if (typeof parsed?.verseId !== 'string') return null;
+    return { verseId: parsed.verseId, filters: parsed.filters || {} };
+  } catch {
+    return null;
+  }
+}
+
+export function normalizeTafseerResponseToRun(
+  response: TafseerResponse,
+  defaults?: Partial<Pick<TafseerRun, 'createdAt' | 'updatedAt' | 'title' | 'notes' | 'starred'>>
+): TafseerRun {
+  const runId = response.runId || response.searchId || `local-${Date.now()}`;
+  return {
+    runId,
+    searchId: response.searchId || runId,
+    verse: response.verse,
+    filters: response.filters || {},
+    aiResponse: response.aiResponse,
+    confidence: typeof response.confidence === 'number' ? response.confidence : null,
+    provenance: response.provenance || null,
+    citations: Array.isArray(response.citations) ? response.citations : [],
+    sourceExcerpts: Array.isArray(response.sourceExcerpts) ? response.sourceExcerpts : [],
+    createdAt: defaults?.createdAt || new Date().toISOString(),
+    updatedAt: defaults?.updatedAt || new Date().toISOString(),
+    title: defaults?.title || null,
+    notes: defaults?.notes || null,
+    starred: defaults?.starred || false,
+  };
+}
+
+export async function fetchFilters(): Promise<FiltersResponse> {
+  return apiRequest<FiltersResponse>('/filters');
+}
+
+export async function fetchVerseByNumbers(surahNumber: number, verseNumber: number): Promise<VersePayload> {
+  return apiRequest<VersePayload>(`/verses?surahNumber=${surahNumber}&verseNumber=${verseNumber}`);
 }
 
 export type StreamEvent = {
   type: 'start' | 'chunk' | 'complete' | 'error';
   content?: string;
   searchId?: string;
+  runId?: string;
   error?: string;
   usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
+  confidence?: number;
+  provenance?: ProvenanceIndicator;
+  citations?: Citation[];
+  sourceExcerpts?: SourceExcerpt[];
   cached?: boolean;
 };
 
@@ -95,7 +252,6 @@ export async function startTafseerStream(
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
 
-    // SSE events are lines starting with "data: {json}\n\n"
     let idx;
     while ((idx = buffer.indexOf('\n\n')) !== -1) {
       const raw = buffer.slice(0, idx).trim();
@@ -105,26 +261,48 @@ export async function startTafseerStream(
         try {
           const evt = JSON.parse(jsonStr);
           onEvent(evt);
-        } catch {}
+        } catch {
+          // Ignore malformed stream event chunks
+        }
       }
     }
   }
 }
 
-export async function requestTafseer(body: TafseerRequestBody, token: string) {
-  const res = await fetch(`${API_BASE_URL}/tafseer`, {
+export async function requestTafseer(body: TafseerRequestBody, token: string): Promise<TafseerResponse> {
+  return apiRequest<TafseerResponse>('/tafseer', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ ...body, stream: false }),
+    body: { ...body, stream: false },
+    token,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(err.error || 'Request failed');
-  }
-  return res.json();
 }
 
+export async function fetchRunHistory(params?: {
+  cursor?: string;
+  limit?: number;
+  token?: string | null;
+}): Promise<{ items: RunSummary[]; nextCursor: string | null }> {
+  const query = new URLSearchParams();
+  if (params?.cursor) query.set('cursor', params.cursor);
+  if (typeof params?.limit === 'number') query.set('limit', String(params.limit));
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return apiRequest<{ items: RunSummary[]; nextCursor: string | null }>(`/tafseer/runs${suffix}`, {
+    token: params?.token,
+  });
+}
 
+export async function fetchRunDetail(runId: string, token?: string | null): Promise<RunDetail> {
+  return apiRequest<RunDetail>(`/tafseer/runs/${runId}`, { token });
+}
+
+export async function updateRunMetadata(
+  runId: string,
+  payload: { title?: string | null; starred?: boolean; notes?: string | null },
+  token?: string | null
+): Promise<RunSummary> {
+  return apiRequest<RunSummary>(`/tafseer/runs/${runId}`, {
+    method: 'PATCH',
+    body: payload,
+    token,
+  });
+}

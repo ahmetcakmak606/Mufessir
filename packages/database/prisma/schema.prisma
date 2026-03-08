@@ -8,6 +8,33 @@ datasource db {
   shadowDatabaseUrl = env("SHADOW_DB_URL")
 }
 
+enum ScholarPeriod {
+  FOUNDATION
+  CLASSICAL_EARLY
+  CLASSICAL_MATURE
+  POST_CLASSICAL
+  MODERN
+  CONTEMPORARY
+}
+
+enum TraditionAcceptance {
+  SUNNI_MAINSTREAM
+  MUTAZILI
+  SHII_IMAMI
+  SHII_ZAYDI
+  SUFI_ISHARI
+  IBADI
+  SALAFI
+  CROSS_TRADITION
+}
+
+enum SourceAccessibility {
+  FULL_DIGITAL
+  PARTIAL_DIGITAL
+  MANUSCRIPT_ONLY
+  LOST
+}
+
 // Kullanıcı modeli
 model User {
   id             String    @id @default(cuid())
@@ -45,19 +72,40 @@ model Verse {
 
 // Müfessir modeli
 model Scholar {
-  id              String    @id @default(cuid())
-  name            String
-  birthYear       Int?
-  deathYear       Int?
-  century         Int
-  madhab          String?   // Mezhep
-  period          String?   // Dönem
-  environment     String?   // Darul islam, darul harp, vb.
-  originCountry   String?
-  reputationScore Float?    // 1-10 arası puanlama
-  tafsirs         Tafsir[]
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                 String                 @id @default(cuid())
+  name               String
+  mufassirTr         String?
+  mufassirEn         String?
+  mufassirAr         String?
+  mufassirNameLong   String?
+  birthYear          Int?
+  deathYear          Int?
+  deathHijri         Int?
+  century            Int                    @default(0)
+  madhab             String?                // Mezhep
+  period             String?                // Legacy/free-form period
+  periodCode         ScholarPeriod?
+  environment        String?                // Darul islam, darul harp, vb.
+  originCountry      String?
+  bookId             String?
+  tafsirType1        String?
+  tafsirType2        String?
+  explanation        String?                @db.Text
+  detailInformation  String?                @db.Text
+  reputationScore    Float?                 // Compatibility score (derived average)
+  scholarlyInfluence Int?
+  methodologicalRigor Int?
+  corpusBreadth      Int?
+  traditionAcceptance TraditionAcceptance[] @default([])
+  sourceAccessibility SourceAccessibility?
+  tafsirs            Tafsir[]
+  references         ScholarReference[]
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([periodCode])
+  @@index([madhab])
+  @@index([sourceAccessibility])
 }
 
 // Tefsir modeli
@@ -92,14 +140,16 @@ model Search {
 
 // Arama sonucu modeli
 model SearchResult {
-  id             String    @id @default(cuid())
-  searchId       String
-  tafsirId       String
-  aiResponse     String    @db.Text
+  id              String    @id @default(cuid())
+  searchId        String
+  tafsirId        String
+  aiResponse      String    @db.Text
+  citations       Json?
+  confidenceScore Float?
   similarityScore Float?   // AI çıktısının belirli tefsire benzerlik skoru
-  createdAt      DateTime  @default(now())
-  search         Search    @relation(fields: [searchId], references: [id])
-  tafsir         Tafsir    @relation(fields: [tafsirId], references: [id])
+  createdAt       DateTime  @default(now())
+  search          Search    @relation(fields: [searchId], references: [id])
+  tafsir          Tafsir    @relation(fields: [tafsirId], references: [id])
 }
 
 // Favoriler modeli
@@ -125,4 +175,24 @@ model PasswordReset {
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId])
+}
+
+model ScholarReference {
+  id           String   @id @default(cuid())
+  scholarId    String
+  sourceType   String
+  sourceTitle  String
+  volume       String?
+  page         String?
+  edition      String?
+  citationText String?  @db.Text
+  provenance   String?
+  isPrimary    Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  scholar Scholar @relation(fields: [scholarId], references: [id], onDelete: Cascade)
+
+  @@index([scholarId])
+  @@index([sourceType])
 }

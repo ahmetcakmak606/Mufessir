@@ -11,6 +11,7 @@ export default function Home() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const { lang, setLang } = useLang();
+  const t = locales[lang].home;
 
   useEffect(() => {
     if (!loading && user) {
@@ -20,10 +21,10 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="ui-shell flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-[rgba(14,122,105,0.2)] border-t-[var(--brand)]"></div>
+          <p className="ui-muted mt-4 text-sm">{t.loading}</p>
         </div>
       </div>
     );
@@ -33,68 +34,78 @@ export default function Home() {
     return null; // Will redirect to dashboard
   }
 
-  const t = locales[lang].home;
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col items-center justify-center min-h-screen text-center relative">
-          <div className="absolute right-0 top-4">
-            <div className="flex items-center gap-2">
-              <button onClick={() => setLang('tr')} className={`px-2 py-1 rounded text-sm border ${lang==='tr' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'}`}>TR</button>
-              <button onClick={() => setLang('en')} className={`px-2 py-1 rounded text-sm border ${lang==='en' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'}`}>EN</button>
-            </div>
+    <div className="ui-shell overflow-hidden">
+      <div className="pointer-events-none absolute -left-24 top-16 h-56 w-56 rounded-full bg-[rgba(14,122,105,0.18)] blur-3xl" />
+      <div className="pointer-events-none absolute -right-20 top-20 h-64 w-64 rounded-full bg-[rgba(12,57,61,0.16)] blur-3xl" />
+      <main className="ui-container relative flex min-h-screen flex-col py-4 sm:py-6">
+        <header className="mb-8 flex items-center justify-between gap-3 sm:mb-12">
+          <Link href="/" className="font-display text-[1.15rem] font-bold text-[var(--text-strong)] sm:text-[1.35rem]">
+            {t.brand}
+          </Link>
+          <div className="ui-panel flex items-center gap-1 rounded-full p-1">
+            <button
+              onClick={() => setLang('tr')}
+              className="ui-button-ghost"
+              data-active={lang === 'tr'}
+            >
+              TR
+            </button>
+            <button
+              onClick={() => setLang('en')}
+              className="ui-button-ghost"
+              data-active={lang === 'en'}
+            >
+              EN
+            </button>
           </div>
-          <div className="max-w-3xl">
-             <h1 className="text-4xl sm:text-6xl font-bold text-gray-900 mb-6">
-               <span className="text-indigo-600">{t.brand}</span>
-               <br />
-               {t.title}
-             </h1>
-            
-             <p className="text-xl text-gray-600 mb-8 max-w-2xl">{t.subtitle}</p>
+        </header>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                href="/register"
-                className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                 {t.getStarted}
+        <section className="grid flex-1 items-start gap-6 pb-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+          <div className="ui-fade-up space-y-6">
+            <span className="ui-badge">{t.heroBadge}</span>
+            <h1 className="ui-title font-display text-4xl leading-tight sm:text-5xl lg:text-6xl">
+              {t.title}
+            </h1>
+            <p className="ui-muted max-w-2xl text-base leading-relaxed sm:text-lg">{t.subtitle}</p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Link href="/register" className="ui-button px-5 py-3 text-sm sm:text-base">
+                {t.getStarted}
               </Link>
-              <Link
-                href="/login"
-                className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                 {t.signIn}
+              <Link href="/login" className="ui-button-secondary px-5 py-3 text-sm sm:text-base">
+                {t.signIn}
               </Link>
             </div>
+            <p className="ui-muted text-sm">{t.foot}</p>
           </div>
 
-          <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl">
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <div className="text-indigo-600 text-2xl mb-4">📖</div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">{t.card1Title}</h3>
-              <p className="text-gray-600">{t.card1Text}</p>
+          <div className="ui-fade-up space-y-3">
+            <div className="ui-panel p-4 sm:p-5">
+              <h2 className="font-display text-xl font-semibold text-[var(--text-strong)]">{t.insightTitle}</h2>
+              <p className="ui-muted mt-2 text-sm sm:text-base">
+                {t.insightText}
+              </p>
             </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <div className="text-indigo-600 text-2xl mb-4">🤖</div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">{t.card2Title}</h3>
-              <p className="text-gray-600">{t.card2Text}</p>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <div className="text-indigo-600 text-2xl mb-4">⚡</div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">{t.card3Title}</h3>
-              <p className="text-gray-600">{t.card3Text}</p>
+            <div className="grid grid-cols-1 gap-3">
+              <article className="ui-panel-strong p-4 sm:p-5">
+                <p className="ui-muted text-xs font-semibold">01</p>
+                <h3 className="mt-2 text-base font-semibold text-[var(--text-strong)]">{t.card1Title}</h3>
+                <p className="ui-muted mt-1 text-sm">{t.card1Text}</p>
+              </article>
+              <article className="ui-panel-strong p-4 sm:p-5">
+                <p className="ui-muted text-xs font-semibold">02</p>
+                <h3 className="mt-2 text-base font-semibold text-[var(--text-strong)]">{t.card2Title}</h3>
+                <p className="ui-muted mt-1 text-sm">{t.card2Text}</p>
+              </article>
+              <article className="ui-panel-strong p-4 sm:p-5">
+                <p className="ui-muted text-xs font-semibold">03</p>
+                <h3 className="mt-2 text-base font-semibold text-[var(--text-strong)]">{t.card3Title}</h3>
+                <p className="ui-muted mt-1 text-sm">{t.card3Text}</p>
+              </article>
             </div>
           </div>
-
-          <div className="mt-12 text-sm text-gray-500">
-            <p>{t.foot}</p>
-          </div>
-        </div>
-      </div>
+        </section>
+      </main>
     </div>
   );
 }

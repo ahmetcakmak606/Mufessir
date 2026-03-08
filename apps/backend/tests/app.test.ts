@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import request from 'supertest';
-import { createServer } from 'http';
 import express from 'express';
 import { config } from 'dotenv';
 import { resolve, dirname } from 'path';
@@ -33,25 +32,13 @@ app.use('/filters', filtersRouter);
 app.use('/verses', versesRouter);
 app.use('/tafseer', tafseerRouter);
 
-const server = createServer(app);
-
-let base = '';
-
-beforeAll(async () => {
-  await new Promise<void>((resolve) => server.listen(0, resolve));
-  const address = server.address();
-  const port = typeof address === 'object' && address ? address.port : 0;
-  base = `http://127.0.0.1:${port}`;
-});
-
 afterAll(async () => {
-  await new Promise<void>((resolve) => server.close(() => resolve()));
   await prisma.$disconnect();
 });
 
 describe('Health', () => {
   it('GET /health should return ok', async () => {
-    const res = await request(base).get('/health');
+    const res = await request(app).get('/health');
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('ok');
   });
@@ -59,16 +46,19 @@ describe('Health', () => {
 
 describe('Auth', () => {
   let token = '';
+  const resetEmail = `resetuser+${Date.now()}@example.com`;
+  const resetOriginalPassword = 'oldpass1234';
+  const resetNewPassword = 'newpass1234';
 
   it('registers a user', async () => {
-    const res = await request(base)
+    const res = await request(app)
       .post('/auth/register')
       .send({ email: 'testuser@example.com', password: 'pass1234', name: 'Tester' });
     expect([200, 201, 409]).toContain(res.status); // 409 if user exists
   });
 
   it('logs in and returns a token', async () => {
-    const res = await request(base)
+    const res = await request(app)
       .post('/auth/login')
       .send({ email: 'testuser@example.com', password: 'pass1234' });
     expect(res.status).toBe(200);
@@ -76,48 +66,264 @@ describe('Auth', () => {
     token = res.body.token;
   });
 
+  it('returns 400 for login with missing fields', async () => {
+    const res = await request(app).post('/auth/login').send({ email: 'missing@example.com' });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 401 for /auth/me without token', async () => {
+    const res = await request(app).get('/auth/me');
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 401 for /auth/me with invalid token', async () => {
+    const res = await request(app).get('/auth/me').set('Authorization', 'Bearer invalid-token');
+    expect(res.status).toBe(401);
+  });
+
   it('returns profile with /auth/me', async () => {
-    const res = await request(base)
+    const res = await request(app)
       .get('/auth/me')
       .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.email).toBe('testuser@example.com');
   });
+
+  it('rejects google sso request without id token', async () => {
+    const res = await request(app)
+      .post('/auth/sso/google')
+      .send({});
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 503 for google sso when provider is not configured', async () => {
+    const prevGoogleClientId = process.env.GOOGLE_CLIENT_ID;
+    const prevGoogleClientIds = process.env.GOOGLE_CLIENT_IDS;
+    process.env.GOOGLE_CLIENT_ID = '';
+    process.env.GOOGLE_CLIENT_IDS = '';
+    try {
+      const res = await request(app).post('/auth/sso/google').send({ idToken: 'dummy-google-token' });
+      expect(res.status).toBe(503);
+    } finally {
+      if (prevGoogleClientId === undefined) {
+        delete process.env.GOOGLE_CLIENT_ID;
+      } else {
+        process.env.GOOGLE_CLIENT_ID = prevGoogleClientId;
+      }
+      if (prevGoogleClientIds === undefined) {
+        delete process.env.GOOGLE_CLIENT_IDS;
+      } else {
+        process.env.GOOGLE_CLIENT_IDS = prevGoogleClientIds;
+      }
+    }
+  });
+
+  it('rejects apple sso request without id token', async () => {
+    const res = await request(app)
+      .post('/auth/sso/apple')
+      .send({});
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 503 for apple sso when provider is not configured', async () => {
+    const prevAppleClientId = process.env.APPLE_CLIENT_ID;
+    const prevAppleClientIds = process.env.APPLE_CLIENT_IDS;
+    process.env.APPLE_CLIENT_ID = '';
+    process.env.APPLE_CLIENT_IDS = '';
+    try {
+      const res = await request(app).post('/auth/sso/apple').send({ idToken: 'dummy-apple-token' });
+      expect(res.status).toBe(503);
+    } finally {
+      if (prevAppleClientId === undefined) {
+        delete process.env.APPLE_CLIENT_ID;
+      } else {
+        process.env.APPLE_CLIENT_ID = prevAppleClientId;
+      }
+      if (prevAppleClientIds === undefined) {
+        delete process.env.APPLE_CLIENT_IDS;
+      } else {
+        process.env.APPLE_CLIENT_IDS = prevAppleClientIds;
+      }
+    }
+  });
+
+  it('registers a dedicated password-reset user', async () => {
+    const res = await request(app)
+      .post('/auth/register')
+      .send({ email: resetEmail, password: resetOriginalPassword, name: 'Reset User' });
+    expect([201, 409]).toContain(res.status);
+  });
+
+  it('rejects password reset request when email is missing', async () => {
+    const res = await request(app).post('/auth/password/reset/request').send({});
+    expect(res.status).toBe(400);
+  });
+
+  it('accepts password reset request for unknown email (non-enumeration)', async () => {
+    const res = await request(app)
+      .post('/auth/password/reset/request')
+      .send({ email: 'unknown-user@example.com' });
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+  });
+
+  it('creates a password reset code for existing user', async () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const res = await request(app).post('/auth/password/reset/request').send({ email: resetEmail });
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+    } finally {
+      randomSpy.mockRestore();
+    }
+  });
+
+  it('rejects password reset confirmation with missing fields', async () => {
+    const res = await request(app).post('/auth/password/reset/confirm').send({ email: resetEmail });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects password reset confirmation with wrong code', async () => {
+    const res = await request(app)
+      .post('/auth/password/reset/confirm')
+      .send({ email: resetEmail, code: '999999', newPassword: resetNewPassword });
+    expect(res.status).toBe(400);
+  });
+
+  it('confirms password reset with valid code', async () => {
+    const res = await request(app)
+      .post('/auth/password/reset/confirm')
+      .send({ email: resetEmail, code: '100000', newPassword: resetNewPassword });
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+  });
+
+  it('logs in with the new password after reset', async () => {
+    const res = await request(app)
+      .post('/auth/login')
+      .send({ email: resetEmail, password: resetNewPassword });
+    expect(res.status).toBe(200);
+    expect(typeof res.body.token).toBe('string');
+  });
 });
 
 describe('Filters & Verses', () => {
   it('GET /filters returns scholars and options', async () => {
-    const res = await request(base).get('/filters');
+    const res = await request(app).get('/filters');
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.scholars)).toBe(true);
+    expect(res.body.filterOptions).toBeDefined();
+    expect(Array.isArray(res.body.filterOptions.periodCodes)).toBe(true);
+    expect(Array.isArray(res.body.filterOptions.sourceAccessibilities)).toBe(true);
   });
 
   it('GET /verses composite lookup works', async () => {
-    const res = await request(base).get('/verses').query({ surahNumber: 1, verseNumber: 1 });
+    const res = await request(app).get('/verses').query({ surahNumber: 1, verseNumber: 1 });
     expect(res.status).toBe(200);
     expect(res.body.id).toMatch(/^verse-/);
+  });
+
+  it('GET /verses returns 404 for unknown composite key', async () => {
+    const res = await request(app).get('/verses').query({ surahNumber: 999, verseNumber: 1 });
+    expect(res.status).toBe(404);
+  });
+
+  it('GET /verses supports text search', async () => {
+    const res = await request(app).get('/verses').query({ q: 'Allah', take: 5, skip: 0 });
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.items)).toBe(true);
+    expect(typeof res.body.total).toBe('number');
+    expect(res.body.skip).toBe(0);
+    expect(res.body.take).toBe(5);
+  });
+
+  it('GET /verses lists verses when no query is provided', async () => {
+    const res = await request(app).get('/verses').query({ take: 3, skip: 0 });
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.items)).toBe(true);
+    expect(typeof res.body.total).toBe('number');
+    expect(res.body.skip).toBe(0);
+    expect(res.body.take).toBe(3);
   });
 });
 
 describe('Tafseer', () => {
   let token = '';
+  let runId = '';
   beforeAll(async () => {
-    const login = await request(base)
+    const login = await request(app)
       .post('/auth/login')
       .send({ email: 'testuser@example.com', password: 'pass1234' });
     token = login.body.token;
   });
 
   it('POST /tafseer returns AI or fallback (non-streaming)', async () => {
-    const verseRes = await request(base).get('/verses').query({ surahNumber: 1, verseNumber: 1 });
+    const verseRes = await request(app).get('/verses').query({ surahNumber: 1, verseNumber: 1 });
     const verseId = verseRes.body.id;
-    const res = await request(base)
+    const res = await request(app)
       .post('/tafseer')
       .set('Authorization', `Bearer ${token}`)
       .send({ verseId, filters: { tone: 7, intellectLevel: 7, language: 'English' }, stream: false });
     expect(res.status).toBe(200);
     expect(typeof res.body.aiResponse).toBe('string');
     expect(res.body.verse.id).toBe(verseId);
+    expect(typeof res.body.confidence === 'number' || res.body.confidence === null).toBe(true);
+    expect(Array.isArray(res.body.citations)).toBe(true);
+    expect(Array.isArray(res.body.sourceExcerpts)).toBe(true);
+    expect(typeof res.body.runId).toBe('string');
+    runId = res.body.runId;
+  });
+
+  it('POST /tafseer stream mode emits SSE events with runId', async () => {
+    const verseRes = await request(app).get('/verses').query({ surahNumber: 1, verseNumber: 1 });
+    const verseId = verseRes.body.id;
+    const res = await request(app)
+      .post('/tafseer')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ verseId, filters: { tone: 7, intellectLevel: 7, language: 'English' }, stream: true });
+
+    expect(res.status).toBe(200);
+    expect(String(res.headers['content-type'] || '')).toContain('text/event-stream');
+    expect(res.text).toContain('"type":"start"');
+    expect(res.text).toContain('"type":"complete"');
+    expect(res.text).toContain('"runId"');
+  });
+
+  it('GET /tafseer/runs returns paginated runs for current user', async () => {
+    const res = await request(app)
+      .get('/tafseer/runs')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.items)).toBe(true);
+    expect(res.body.nextCursor === null || typeof res.body.nextCursor === 'string').toBe(true);
+    expect(res.body.items.length).toBeGreaterThan(0);
+    expect(res.body.items.some((item: any) => item.runId === runId)).toBe(true);
+  });
+
+  it('GET /tafseer/runs/:runId returns run detail', async () => {
+    const res = await request(app)
+      .get(`/tafseer/runs/${runId}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.runId).toBe(runId);
+    expect(res.body.searchId).toBe(runId);
+    expect(typeof res.body.aiResponse).toBe('string');
+    expect(Array.isArray(res.body.citations)).toBe(true);
+    expect(Array.isArray(res.body.sourceExcerpts)).toBe(true);
+  });
+
+  it('PATCH /tafseer/runs/:runId updates run metadata', async () => {
+    const res = await request(app)
+      .patch(`/tafseer/runs/${runId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Test run', starred: true, notes: 'Updated by test' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.runId).toBe(runId);
+    expect(res.body.title).toBe('Test run');
+    expect(res.body.starred).toBe(true);
+    expect(res.body.notes).toBe('Updated by test');
   });
 });
-

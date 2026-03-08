@@ -26,6 +26,10 @@ type MufassirInfo = {
   nameEn: string | null;
   nameAr: string | null;
   nameLong: string | null;
+  detailInformation: string | null;
+  explanation: string | null;
+  bookId: string | null;
+  deathHijri: number | null;
   deathMiladi: number | null;
   century: number | null;
   madhab: string | null;
@@ -34,6 +38,7 @@ type MufassirInfo = {
   originCountry: string | null;
   reputationScore: number | null;
   tafsirType1: string | null;
+  tafsirType2: string | null;
 };
 
 type MufassirFallback = {
@@ -61,6 +66,34 @@ const mufassirById = new Map<number, MufassirInfo>();
 const mufassirFallbackById = new Map<number, MufassirFallback>();
 
 const mufassirTypeById = new Map<number, string>();
+
+type ScholarPeriodCode =
+  | 'FOUNDATION'
+  | 'CLASSICAL_EARLY'
+  | 'CLASSICAL_MATURE'
+  | 'POST_CLASSICAL'
+  | 'MODERN'
+  | 'CONTEMPORARY';
+
+function deriveCenturyFromHijri(deathHijri: number | null): number | null {
+  if (!deathHijri || deathHijri <= 0) return null;
+  return Math.ceil(deathHijri / 100);
+}
+
+function derivePeriodCode(deathHijri: number | null): ScholarPeriodCode | null {
+  if (!deathHijri || deathHijri <= 0) return null;
+  if (deathHijri <= 150) return 'FOUNDATION';
+  if (deathHijri <= 400) return 'CLASSICAL_EARLY';
+  if (deathHijri <= 700) return 'CLASSICAL_MATURE';
+  if (deathHijri <= 1200) return 'POST_CLASSICAL';
+  if (deathHijri <= 1400) return 'MODERN';
+  return 'CONTEMPORARY';
+}
+
+function deriveSourceAccessibility(bookId: string | null): 'PARTIAL_DIGITAL' | null {
+  if (!bookId || !bookId.trim()) return null;
+  return 'PARTIAL_DIGITAL';
+}
 
 let versesReady = false;
 let scholarsReady = false;
@@ -211,14 +244,46 @@ async function buildScholars() {
   const batch: Array<{
     id: string;
     name: string;
+    mufassirTr: string | null;
+    mufassirEn: string | null;
+    mufassirAr: string | null;
+    mufassirNameLong: string | null;
     birthYear: number | null;
     deathYear: number | null;
+    deathHijri: number | null;
     century: number;
     madhab: string | null;
     period: string | null;
+    periodCode:
+      | 'FOUNDATION'
+      | 'CLASSICAL_EARLY'
+      | 'CLASSICAL_MATURE'
+      | 'POST_CLASSICAL'
+      | 'MODERN'
+      | 'CONTEMPORARY'
+      | null;
     environment: string | null;
     originCountry: string | null;
+    bookId: string | null;
+    tafsirType1: string | null;
+    tafsirType2: string | null;
+    explanation: string | null;
+    detailInformation: string | null;
+    sourceAccessibility: 'PARTIAL_DIGITAL' | null;
     reputationScore: number | null;
+    scholarlyInfluence: number | null;
+    methodologicalRigor: number | null;
+    corpusBreadth: number | null;
+    traditionAcceptance: Array<
+      | 'SUNNI_MAINSTREAM'
+      | 'MUTAZILI'
+      | 'SHII_IMAMI'
+      | 'SHII_ZAYDI'
+      | 'SUFI_ISHARI'
+      | 'IBADI'
+      | 'SALAFI'
+      | 'CROSS_TRADITION'
+    >;
   }> = [];
 
   for (const id of ids) {
@@ -240,14 +305,30 @@ async function buildScholars() {
     batch.push({
       id: `scholar-${id}`,
       name,
+      mufassirTr: m?.nameTr ?? null,
+      mufassirEn: m?.nameEn ?? null,
+      mufassirAr: m?.nameAr ?? null,
+      mufassirNameLong: m?.nameLong ?? null,
       birthYear: null,
       deathYear: m?.deathMiladi ?? null,
-      century: m?.century ?? 0,
+      deathHijri: m?.deathHijri ?? null,
+      century: m?.century ?? deriveCenturyFromHijri(m?.deathHijri ?? null) ?? 0,
       madhab: m?.madhab ?? null,
       period: m?.period ?? null,
+      periodCode: derivePeriodCode(m?.deathHijri ?? null),
       environment: m?.environment ?? null,
       originCountry: m?.originCountry ?? null,
+      bookId: m?.bookId ?? null,
+      tafsirType1: m?.tafsirType1 ?? null,
+      tafsirType2: m?.tafsirType2 ?? null,
+      explanation: m?.explanation ?? null,
+      detailInformation: m?.detailInformation ?? null,
+      sourceAccessibility: deriveSourceAccessibility(m?.bookId ?? null),
       reputationScore: m?.reputationScore ?? null,
+      scholarlyInfluence: null,
+      methodologicalRigor: null,
+      corpusBreadth: null,
+      traditionAcceptance: [],
     });
   }
 
@@ -415,6 +496,10 @@ async function handleRow(table: string, row: Field[]) {
       nameEn: asString(toValue(row[2])),
       nameAr: asString(toValue(row[4])),
       nameLong: asString(toValue(row[5])),
+      detailInformation: asString(toValue(row[6])),
+      explanation: asString(toValue(row[7])),
+      bookId: asString(toValue(row[8])),
+      deathHijri: asNumber(toValue(row[9])),
       deathMiladi: asNumber(toValue(row[10])),
       century: asNumber(toValue(row[11])),
       madhab: asString(toValue(row[13])),
@@ -423,6 +508,7 @@ async function handleRow(table: string, row: Field[]) {
       originCountry: asString(toValue(row[15])),
       reputationScore: asNumber(toValue(row[16])),
       tafsirType1: asString(toValue(row[21])),
+      tafsirType2: asString(toValue(row[22])),
     });
     return;
   }

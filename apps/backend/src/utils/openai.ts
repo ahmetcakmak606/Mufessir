@@ -46,7 +46,8 @@ export async function generateTafsirStream(
       messages: [
         {
           role: "system",
-          content: "You are an expert Islamic scholar and linguist. Provide accurate, scholarly tafsir based on the provided context."
+          content:
+            "You are an expert Islamic scholar and linguist. Provide accurate, scholarly tafsir based only on provided context and keep evidence traceable to cited scholars."
         },
         {
           role: "user",
@@ -114,7 +115,8 @@ export async function generateTafsirNonStreaming(
       messages: [
         {
           role: "system",
-          content: "You are an expert Islamic scholar and linguist. Provide accurate, scholarly tafsir based on the provided context."
+          content:
+            "You are an expert Islamic scholar and linguist. Provide accurate, scholarly tafsir based only on provided context and keep evidence traceable to cited scholars."
         },
         {
           role: "user",
