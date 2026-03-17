@@ -1,10 +1,12 @@
 import { PrismaClient } from "@prisma/client";
 import OpenAI from "openai";
 
-  const aiDisabled = process.env.AI_MODE === "off" || process.env.OPENAI_DISABLED === "1";
-  const openai = process.env.OPENAI_API_KEY && !aiDisabled
-  ? (new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as OpenAI)
-  : null;
+const aiDisabled =
+  process.env.AI_MODE === "off" || process.env.OPENAI_DISABLED === "1";
+const openai =
+  process.env.OPENAI_API_KEY && !aiDisabled
+    ? (new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as OpenAI)
+    : null;
 
 export interface SimilaritySearchOptions {
   query: string;
@@ -37,7 +39,11 @@ export interface SimilaritySearchResult {
 
 export async function createQueryEmbedding(text: string): Promise<number[]> {
   if (!openai) {
-    throw new Error(aiDisabled ? "OpenAI disabled by environment" : "OpenAI API key not configured");
+    throw new Error(
+      aiDisabled
+        ? "OpenAI disabled by environment"
+        : "OpenAI API key not configured",
+    );
   }
 
   try {
@@ -46,7 +52,9 @@ export async function createQueryEmbedding(text: string): Promise<number[]> {
       input: text,
     });
 
-    const embedding = (response as any).data?.[0]?.embedding as number[] | undefined;
+    const embedding = (response as any).data?.[0]?.embedding as
+      | number[]
+      | undefined;
     if (!embedding) throw new Error("No embedding returned");
     return embedding;
   } catch (error) {
@@ -57,17 +65,19 @@ export async function createQueryEmbedding(text: string): Promise<number[]> {
 
 export async function performSimilaritySearch(
   prisma: PrismaClient,
-  options: SimilaritySearchOptions
+  options: SimilaritySearchOptions,
 ): Promise<SimilaritySearchResult[]> {
   const limit = options.limit || 10;
   const minSimilarity = options.minSimilarity || 0.5;
 
   // Development cost-saver: skip embeddings even if OpenAI is configured
-  if (process.env.SIMILARITY_MODE === 'sample') {
+  if (process.env.SIMILARITY_MODE === "sample") {
     const whereClause: any = {};
     if (options.verseId) whereClause.verseId = options.verseId;
-    if (options.scholarIds && options.scholarIds.length > 0) whereClause.scholarId = { in: options.scholarIds };
-    if (options.excludeScholarIds && options.excludeScholarIds.length > 0) whereClause.scholarId = { notIn: options.excludeScholarIds };
+    if (options.scholarIds && options.scholarIds.length > 0)
+      whereClause.scholarId = { in: options.scholarIds };
+    if (options.excludeScholarIds && options.excludeScholarIds.length > 0)
+      whereClause.scholarId = { notIn: options.excludeScholarIds };
 
     const sampleTafsirs = await prisma.tafsir.findMany({
       where: whereClause,
@@ -99,7 +109,7 @@ export async function performSimilaritySearch(
   // If no OpenAI API key, return sample tafsirs
   if (!openai) {
     console.warn("OpenAI API not configured, using sample tafsirs");
-    
+
     let whereClause: any = {};
     if (options.verseId) {
       whereClause.verseId = options.verseId;
@@ -142,10 +152,61 @@ export async function performSimilaritySearch(
   }
 
   try {
+    // Check if any tafsirs have embeddings using raw query (since embedding is Unsupported type)
+    const embeddingCountResult = await prisma.$queryRawUnsafe<
+      [{ count: bigint }]
+    >(`SELECT COUNT(*) as count FROM "Tafsir" WHERE embedding IS NOT NULL`);
+    const embeddingCount = Number(embeddingCountResult[0]?.count || 0);
+
+    // If no embeddings exist, fall back to regular query
+    if (embeddingCount === 0) {
+      console.warn("No embeddings found in database, using fallback query");
+
+      let whereClause: any = {};
+      if (options.verseId) {
+        whereClause.verseId = options.verseId;
+      }
+      if (options.scholarIds && options.scholarIds.length > 0) {
+        whereClause.scholarId = { in: options.scholarIds };
+      }
+      if (options.excludeScholarIds && options.excludeScholarIds.length > 0) {
+        whereClause.scholarId = { notIn: options.excludeScholarIds };
+      }
+
+      const sampleTafsirs = await prisma.tafsir.findMany({
+        where: whereClause,
+        include: {
+          scholar: true,
+          verse: true,
+        },
+        take: limit,
+      });
+
+      return sampleTafsirs.map((tafsir: any) => ({
+        tafsirId: tafsir.id,
+        scholarName: tafsir.scholar.name,
+        tafsirText: tafsir.tafsirText,
+        similarityScore: 0.8, // Default score since no embeddings
+        verseId: tafsir.verseId,
+        surahNumber: tafsir.verse.surahNumber,
+        verseNumber: tafsir.verse.verseNumber,
+        scholar: {
+          id: tafsir.scholar.id,
+          name: tafsir.scholar.name,
+          century: tafsir.scholar.century,
+          madhab: tafsir.scholar.madhab,
+          period: tafsir.scholar.period,
+          environment: tafsir.scholar.environment,
+          originCountry: tafsir.scholar.originCountry,
+          reputationScore: tafsir.scholar.reputationScore,
+        },
+      }));
+    }
+
     // Create embedding for the query
     const queryEmbedding = await createQueryEmbedding(options.query);
     // pgvector expects a vector-typed parameter; pass as a string literal and cast
-    const vectorLiteral = `[${queryEmbedding.join(',')}]`;
+    const vectorLiteral = `[${queryEmbedding.join(",")}]`;
 
     // Build the WHERE clause for scholar filtering
     let whereClause = "WHERE t.embedding IS NOT NULL";
@@ -195,7 +256,10 @@ export async function performSimilaritySearch(
     params.push(limit);
 
     // Use prisma.$queryRawUnsafe to pass dynamic SQL string with parameters safely
-    const results = await prisma.$queryRawUnsafe(query as string, ...params as any[]);
+    const results = await prisma.$queryRawUnsafe(
+      query as string,
+      ...(params as any[]),
+    );
 
     // Filter by minimum similarity and format results
     return (results as any[])
@@ -223,4 +287,4 @@ export async function performSimilaritySearch(
     console.error("Similarity search error:", error);
     throw new Error("Failed to perform similarity search");
   }
-} 
+}

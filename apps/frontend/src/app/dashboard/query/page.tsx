@@ -75,6 +75,8 @@ export default function QueryWorkspacePage() {
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [streamContent, setStreamContent] = useState("");
+  const [arabicTafsir, setArabicTafsir] = useState<string | undefined>();
+  const [turkishTafsir, setTurkishTafsir] = useState<string | undefined>();
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
 
@@ -228,6 +230,8 @@ export default function QueryWorkspacePage() {
     setFilters({ ...defaultFilters, ...(detail.filters || {}) });
 
     setStreamContent(detail.aiResponse || "");
+    setArabicTafsir(detail.arabicTafsir);
+    setTurkishTafsir(detail.turkishTafsir);
     setConfidence(detail.confidence);
     setProvenance(detail.provenance);
     setCitations(detail.citations || []);
@@ -326,6 +330,14 @@ export default function QueryWorkspacePage() {
             setSourceExcerpts(
               Array.isArray(evt.sourceExcerpts) ? evt.sourceExcerpts : [],
             );
+
+            // Store Arabic and Turkish tafsir for language toggle
+            if (evt.arabicTafsir) {
+              setArabicTafsir(evt.arabicTafsir);
+            }
+            if (evt.turkishTafsir) {
+              setTurkishTafsir(evt.turkishTafsir);
+            }
 
             const run = normalizeTafseerResponseToRun(
               {
@@ -612,6 +624,8 @@ export default function QueryWorkspacePage() {
             <ResultStream
               title={dashboard.resultTitle}
               streamContent={streamContent}
+              arabicTafsir={arabicTafsir}
+              turkishTafsir={turkishTafsir}
               placeholder={dashboard.resultHelp}
               isAnalyzing={isAnalyzing}
               startedAt={startedAt}
@@ -625,6 +639,8 @@ export default function QueryWorkspacePage() {
                 perfFirstByte: dashboard.perfFirstByte,
                 perfTotal: dashboard.perfTotal,
                 perfTokens: dashboard.perfTokens,
+                arabic: dashboard.arabic || "Arabic",
+                turkish: dashboard.turkish || "Turkish",
               }}
             />
           </div>

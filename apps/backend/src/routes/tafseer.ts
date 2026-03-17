@@ -22,6 +22,7 @@ import {
   type Citation,
   type SourceExcerpt,
 } from "../utils/citations.js";
+import { translateToTurkish } from "../utils/translation.js";
 
 const router: Router = Router();
 
@@ -536,6 +537,14 @@ router.post(
         );
       }
 
+      // Check if we have any sources to generate tafsir from
+      if (similarTafsirs.length === 0) {
+        return res.status(404).json({
+          error: "Bu ayet için seçilen alimlerin tefsiri bulunmamaktadır.",
+          verseId,
+        });
+      }
+
       // Build prompt options (clip excerpts for cost and speed)
       const citations = await loadCitations(prisma, similarTafsirs);
       const sourceExcerpts = buildSourceExcerpts(similarTafsirs);
@@ -861,10 +870,32 @@ router.post(
               },
             );
 
-            aiResponse = finalizeResponse(
+            // AI generates in Arabic
+            const arabicTafsir = finalizeResponse(
               result.content,
               lengthScale,
-              filters?.language,
+              "Arabic",
+            );
+
+            // Translate to Turkish
+            let turkishTafsir = "";
+            try {
+              const translation = await translateToTurkish(arabicTafsir);
+              turkishTafsir = translation.translatedText;
+            } catch (translateErr) {
+              console.error("Translation error:", translateErr);
+              turkishTafsir = arabicTafsir;
+            }
+
+            // Send Turkish translation to user (if requested)
+            const requestedLang = filters?.language || "Turkish";
+            const displayTafsir =
+              requestedLang === "Turkish" ? turkishTafsir : arabicTafsir;
+
+            aiResponse = finalizeResponse(
+              displayTafsir,
+              lengthScale,
+              requestedLang,
             );
 
             if (lengthScale <= 3) {
@@ -874,9 +905,9 @@ router.post(
               );
             }
 
-            // Calculate similarity to existing tafsirs
+            // Calculate similarity to existing tafsirs (use Arabic for matching)
             const mostSimilar = await findMostSimilarTafsir(
-              aiResponse,
+              arabicTafsir,
               similarTafsirs.map((t: any) => ({
                 tafsirId: t.tafsirId,
                 tafsirText: t.tafsirText,
@@ -897,7 +928,7 @@ router.post(
                 data: {
                   searchId: search.id,
                   tafsirId: saveTafsirId,
-                  aiResponse: aiResponse,
+                  aiResponse: arabicTafsir,
                   citations: citations as unknown as Prisma.InputJsonValue,
                   confidenceScore: confidence,
                   similarityScore: mostSimilar?.similarityScore || null,
@@ -905,7 +936,7 @@ router.post(
               });
             }
 
-            // Send completion event
+            // Send completion event with both Arabic and Turkish
             res.write(
               `data: ${JSON.stringify({
                 type: "complete",
@@ -916,6 +947,8 @@ router.post(
                 provenance,
                 citations,
                 sourceExcerpts,
+                arabicTafsir,
+                turkishTafsir,
               })}\n\n`,
             );
           } catch (streamError) {
@@ -944,26 +977,45 @@ router.post(
             promptOptions,
             maxTokens,
           });
+
+          // The AI now generates in Arabic
+          const arabicTafsir = finalizeResponse(
+            result.content,
+            lengthScale,
+            "Arabic",
+          );
+
+          // Translate Arabic to Turkish
+          let turkishTafsir = "";
+          try {
+            const translation = await translateToTurkish(arabicTafsir);
+            turkishTafsir = translation.translatedText;
+          } catch (translateErr) {
+            console.error("Translation error:", translateErr);
+            // If translation fails, use Arabic as fallback
+            turkishTafsir = arabicTafsir;
+          }
+
+          // Build response based on requested language
           const requestedLang = filters?.language || "Turkish";
           const translationLabel =
             requestedLang === "Turkish" ? "Meal" : "Meaning";
           const tafsirHeader =
             requestedLang === "Turkish" ? "Tefsir" : "Tafsir";
+
+          // Use Turkish if requested, otherwise Arabic
+          const displayTafsir =
+            requestedLang === "Turkish" ? turkishTafsir : arabicTafsir;
           const preface =
             `Arabic: ${verse.arabicText}\n` +
             (verse.translation
               ? `${translationLabel}: ${verse.translation}\n\n${tafsirHeader}:\n`
               : `\n${tafsirHeader}:\n`);
-          const finalized = finalizeResponse(
-            result.content,
-            lengthScale,
-            filters?.language,
-          );
-          aiResponse = preface + finalized;
+          aiResponse = preface + displayTafsir;
 
           // Calculate similarity to existing tafsirs
           const mostSimilar = await findMostSimilarTafsir(
-            finalized,
+            arabicTafsir,
             similarTafsirs.map((t: any) => ({
               tafsirId: t.tafsirId,
               tafsirText: t.tafsirText,
@@ -984,7 +1036,7 @@ router.post(
               data: {
                 searchId: search.id,
                 tafsirId: saveTafsirId,
-                aiResponse: finalized,
+                aiResponse: arabicTafsir,
                 citations: citations as unknown as Prisma.InputJsonValue,
                 confidenceScore: confidence,
                 similarityScore: mostSimilar?.similarityScore || null,
@@ -1003,6 +1055,8 @@ router.post(
             },
             filters,
             aiResponse: aiResponse,
+            arabicTafsir,
+            turkishTafsir,
             similarityScore: mostSimilar?.similarityScore || null,
             confidence,
             provenance,

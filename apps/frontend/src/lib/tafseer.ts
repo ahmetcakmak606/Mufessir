@@ -1,4 +1,4 @@
-import { API_BASE_URL, apiRequest } from '@/lib/api-client';
+import { API_BASE_URL, apiRequest } from "@/lib/api-client";
 
 export interface Filters {
   scholars?: string[];
@@ -80,7 +80,7 @@ export interface SourceExcerpt {
   excerpt: string;
 }
 
-export type ProvenanceIndicator = 'PRIMARY' | 'MIXED' | 'NONE';
+export type ProvenanceIndicator = "PRIMARY" | "MIXED" | "NONE";
 
 export interface TafseerRequestBody {
   verseId: string;
@@ -101,13 +101,19 @@ export interface TafseerResponse {
   verse: VersePayload;
   filters?: RunDraftFilters;
   aiResponse: string;
+  arabicTafsir?: string;
+  turkishTafsir?: string;
   confidence?: number | null;
   provenance?: ProvenanceIndicator | null;
   citations?: Citation[];
   sourceExcerpts?: SourceExcerpt[];
   searchId?: string;
   runId?: string;
-  usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number } | null;
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  } | null;
   cached?: boolean;
   fallback?: boolean;
 }
@@ -118,6 +124,8 @@ export interface TafseerRun {
   verse: VersePayload;
   filters: RunDraftFilters;
   aiResponse: string;
+  arabicTafsir?: string;
+  turkishTafsir?: string;
   confidence: number | null;
   provenance: ProvenanceIndicator | null;
   citations: Citation[];
@@ -132,7 +140,7 @@ export interface TafseerRun {
 export interface RunSummary {
   runId: string;
   searchId: string;
-  verse: Pick<VersePayload, 'id' | 'surahNumber' | 'surahName' | 'verseNumber'>;
+  verse: Pick<VersePayload, "id" | "surahNumber" | "surahName" | "verseNumber">;
   filters: RunDraftFilters;
   title: string | null;
   notes: string | null;
@@ -170,7 +178,7 @@ export function serializeReplayPayload(payload: ReplayPayload): string {
 export function deserializeReplayPayload(raw: string): ReplayPayload | null {
   try {
     const parsed = JSON.parse(raw) as ReplayPayload;
-    if (typeof parsed?.verseId !== 'string') return null;
+    if (typeof parsed?.verseId !== "string") return null;
     return { verseId: parsed.verseId, filters: parsed.filters || {} };
   } catch {
     return null;
@@ -179,7 +187,9 @@ export function deserializeReplayPayload(raw: string): ReplayPayload | null {
 
 export function normalizeTafseerResponseToRun(
   response: TafseerResponse,
-  defaults?: Partial<Pick<TafseerRun, 'createdAt' | 'updatedAt' | 'title' | 'notes' | 'starred'>>
+  defaults?: Partial<
+    Pick<TafseerRun, "createdAt" | "updatedAt" | "title" | "notes" | "starred">
+  >,
 ): TafseerRun {
   const runId = response.runId || response.searchId || `local-${Date.now()}`;
   return {
@@ -188,10 +198,13 @@ export function normalizeTafseerResponseToRun(
     verse: response.verse,
     filters: response.filters || {},
     aiResponse: response.aiResponse,
-    confidence: typeof response.confidence === 'number' ? response.confidence : null,
+    confidence:
+      typeof response.confidence === "number" ? response.confidence : null,
     provenance: response.provenance || null,
     citations: Array.isArray(response.citations) ? response.citations : [],
-    sourceExcerpts: Array.isArray(response.sourceExcerpts) ? response.sourceExcerpts : [],
+    sourceExcerpts: Array.isArray(response.sourceExcerpts)
+      ? response.sourceExcerpts
+      : [],
     createdAt: defaults?.createdAt || new Date().toISOString(),
     updatedAt: defaults?.updatedAt || new Date().toISOString(),
     title: defaults?.title || null,
@@ -201,51 +214,62 @@ export function normalizeTafseerResponseToRun(
 }
 
 export async function fetchFilters(): Promise<FiltersResponse> {
-  return apiRequest<FiltersResponse>('/filters');
+  return apiRequest<FiltersResponse>("/filters");
 }
 
-export async function fetchVerseByNumbers(surahNumber: number, verseNumber: number): Promise<VersePayload> {
-  return apiRequest<VersePayload>(`/verses?surahNumber=${surahNumber}&verseNumber=${verseNumber}`);
+export async function fetchVerseByNumbers(
+  surahNumber: number,
+  verseNumber: number,
+): Promise<VersePayload> {
+  return apiRequest<VersePayload>(
+    `/verses?surahNumber=${surahNumber}&verseNumber=${verseNumber}`,
+  );
 }
 
 export type StreamEvent = {
-  type: 'start' | 'chunk' | 'complete' | 'error';
+  type: "start" | "chunk" | "complete" | "error";
   content?: string;
   searchId?: string;
   runId?: string;
   error?: string;
-  usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  };
   confidence?: number;
   provenance?: ProvenanceIndicator;
   citations?: Citation[];
   sourceExcerpts?: SourceExcerpt[];
   cached?: boolean;
+  arabicTafsir?: string;
+  turkishTafsir?: string;
 };
 
 export async function startTafseerStream(
   body: TafseerRequestBody,
   token: string,
-  onEvent: (evt: StreamEvent) => void
+  onEvent: (evt: StreamEvent) => void,
 ) {
   const res = await fetch(`${API_BASE_URL}/tafseer`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ ...body, stream: true }),
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(err.error || 'Request failed');
+    const err = await res.json().catch(() => ({ error: "Request failed" }));
+    throw new Error(err.error || "Request failed");
   }
 
   const reader = res.body?.getReader();
-  if (!reader) throw new Error('No stream');
+  if (!reader) throw new Error("No stream");
 
-  const decoder = new TextDecoder('utf-8');
-  let buffer = '';
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
 
   while (true) {
     const { value, done } = await reader.read();
@@ -253,10 +277,10 @@ export async function startTafseerStream(
     buffer += decoder.decode(value, { stream: true });
 
     let idx;
-    while ((idx = buffer.indexOf('\n\n')) !== -1) {
+    while ((idx = buffer.indexOf("\n\n")) !== -1) {
       const raw = buffer.slice(0, idx).trim();
       buffer = buffer.slice(idx + 2);
-      if (raw.startsWith('data:')) {
+      if (raw.startsWith("data:")) {
         const jsonStr = raw.slice(5).trim();
         try {
           const evt = JSON.parse(jsonStr);
@@ -269,9 +293,12 @@ export async function startTafseerStream(
   }
 }
 
-export async function requestTafseer(body: TafseerRequestBody, token: string): Promise<TafseerResponse> {
-  return apiRequest<TafseerResponse>('/tafseer', {
-    method: 'POST',
+export async function requestTafseer(
+  body: TafseerRequestBody,
+  token: string,
+): Promise<TafseerResponse> {
+  return apiRequest<TafseerResponse>("/tafseer", {
+    method: "POST",
     body: { ...body, stream: false },
     token,
   });
@@ -283,25 +310,32 @@ export async function fetchRunHistory(params?: {
   token?: string | null;
 }): Promise<{ items: RunSummary[]; nextCursor: string | null }> {
   const query = new URLSearchParams();
-  if (params?.cursor) query.set('cursor', params.cursor);
-  if (typeof params?.limit === 'number') query.set('limit', String(params.limit));
-  const suffix = query.toString() ? `?${query.toString()}` : '';
-  return apiRequest<{ items: RunSummary[]; nextCursor: string | null }>(`/tafseer/runs${suffix}`, {
-    token: params?.token,
-  });
+  if (params?.cursor) query.set("cursor", params.cursor);
+  if (typeof params?.limit === "number")
+    query.set("limit", String(params.limit));
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return apiRequest<{ items: RunSummary[]; nextCursor: string | null }>(
+    `/tafseer/runs${suffix}`,
+    {
+      token: params?.token,
+    },
+  );
 }
 
-export async function fetchRunDetail(runId: string, token?: string | null): Promise<RunDetail> {
+export async function fetchRunDetail(
+  runId: string,
+  token?: string | null,
+): Promise<RunDetail> {
   return apiRequest<RunDetail>(`/tafseer/runs/${runId}`, { token });
 }
 
 export async function updateRunMetadata(
   runId: string,
   payload: { title?: string | null; starred?: boolean; notes?: string | null },
-  token?: string | null
+  token?: string | null,
 ): Promise<RunSummary> {
   return apiRequest<RunSummary>(`/tafseer/runs/${runId}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: payload,
     token,
   });
