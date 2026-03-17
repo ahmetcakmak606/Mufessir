@@ -31,9 +31,15 @@ export interface PromptOptions {
 }
 
 export function buildTafsirPrompt(opts: PromptOptions): string {
-  const { verseText, translation, tafsirExcerpts, citations = [], userParams } = opts;
+  const {
+    verseText,
+    translation,
+    tafsirExcerpts,
+    citations = [],
+    userParams,
+  } = opts;
 
-  let prompt = `You are an expert Islamic scholar and linguist. Your task is to generate a tafsir (exegesis) for the following Quranic verse, using the provided context and scholar excerpts.\n\n`;
+  let prompt = `You are an expert Islamic scholar and linguist. Your task is to generate a tafsir (exegesis) for the following Quranic verse, using ONLY the provided context and scholar excerpts.\n\n`;
 
   prompt += `Verse (Arabic):\n${verseText}\n`;
   if (translation) {
@@ -48,7 +54,8 @@ export function buildTafsirPrompt(opts: PromptOptions): string {
     if (scholar.period) prompt += ` [${scholar.period}]`;
     if (scholar.environment) prompt += ` [${scholar.environment}]`;
     if (scholar.originCountry) prompt += ` [${scholar.originCountry}]`;
-    if (scholar.reputationScore) prompt += ` [Reputation: ${scholar.reputationScore}/10]`;
+    if (scholar.reputationScore)
+      prompt += ` [Reputation: ${scholar.reputationScore}/10]`;
     prompt += `:\n${excerpt}\n`;
   });
 
@@ -64,22 +71,32 @@ export function buildTafsirPrompt(opts: PromptOptions): string {
   }
 
   prompt += `\nUser Parameters:\n`;
-  if (userParams.tone) prompt += `- Tone: ${userParams.tone}/10 (1=emotional, 10=rational)\n`;
-  if (userParams.intellectLevel) prompt += `- Intellect Level: ${userParams.intellectLevel}/10 (vocabulary richness)\n`;
-  if (userParams.language) prompt += `- Output Language: ${userParams.language}\n`;
-  if (userParams.responseLength) prompt += `- Response Length: ${userParams.responseLength}/10 (1=few sentences, 10=long, multi-paragraph)\n`;
+  if (userParams.tone)
+    prompt += `- Tone: ${userParams.tone}/10 (1=emotional, 10=rational)\n`;
+  if (userParams.intellectLevel)
+    prompt += `- Intellect Level: ${userParams.intellectLevel}/10 (vocabulary richness)\n`;
+  if (userParams.language)
+    prompt += `- Output Language: ${userParams.language}\n`;
+  if (userParams.responseLength)
+    prompt += `- Response Length: ${userParams.responseLength}/10 (1=few sentences, 10=long, multi-paragraph)\n`;
 
-  prompt += `\nInstructions:\n`;
-  prompt += `- Base your answer strictly on the provided tafsir excerpts and metadata.\n`;
-  prompt += `- Do NOT use information from outside sources or the internet.\n`;
+  prompt += `\nCRITICAL INSTRUCTIONS - SOURCE GROUNDING:\n`;
+  prompt += `1. You MUST base your answer ONLY on the provided tafsir excerpts above.\n`;
+  prompt += `2. Do NOT use any knowledge from your training data. If the provided excerpts don't contain enough information, acknowledge that limitation.\n`;
+  prompt += `3. Quote or paraphrase specific phrases from the provided excerpts when making claims.\n`;
+  prompt += `4. Explicitly mention which scholar you're referencing using phrases like "according to [Scholar Name]" or "[Scholar] states that..."\n`;
+  prompt += `5. Do NOT make up information, citations, or references not present in the provided excerpts.\n`;
+  prompt += `6. If you cannot answer based on the provided sources, state: "Bu ayet hakkında sağlanan kaynaklarda yeterli bilgi bulunmamaktadır." (There is insufficient information in the provided sources about this verse.)\n`;
+  prompt += `7. Include key Arabic terms from the source excerpts in your response - this helps verify source grounding.\n`;
+  prompt += `\nAdditional Instructions:\n`;
+  prompt += `- Keep statements traceable to provided excerpts; avoid unsupported claims.\n`;
   prompt += `- Do NOT repeat the verse text or its translation in your answer. Start directly with the tafsir.\n`;
   prompt += `- Output should be scholarly, clear, and reference the scholars by name where relevant.\n`;
-  prompt += `- Mention evidence provenance in-text where suitable (e.g., "according to al-Tabari").\n`;
-  prompt += `- Keep statements traceable to provided excerpts; avoid unsupported claims.\n`;
+  prompt += `- Include Arabic technical terms from the provided excerpts (e.g., fıkıh, tefsir, hadis, kelam) when discussing concepts.\n`;
   prompt += `- When tone (1-10) is provided, 1 = emotional, 10 = rational. Adjust the writing accordingly.\n`;
   prompt += `- When intellect level (1-10) is provided, 1 = simple vocabulary, 10 = highly academic vocabulary. Adjust the complexity accordingly.\n`;
   prompt += `- When Response Length is provided, keep the output approximately within that scale: 1-3 sentences (1-3), 1-2 short paragraphs (4-6), 3-6 paragraphs (7-8), longer analytical essay (9-10).\n`;
   prompt += `- Always end with a complete sentence; do not stop mid-sentence even if the output is brief.\n`;
 
   return prompt;
-} 
+}

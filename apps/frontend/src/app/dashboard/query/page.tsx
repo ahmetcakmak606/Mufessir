@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
-import { useLang } from '@/context/LangContext';
-import { locales } from '@/locales';
-import { surahs } from '@/lib/surahs';
-import { tokenStorage } from '@/lib/auth';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import { useLang } from "@/context/LangContext";
+import { locales } from "@/locales";
+import { surahs } from "@/lib/surahs";
+import { tokenStorage } from "@/lib/auth";
 import {
   type Citation,
   type ComparisonRunModel,
@@ -17,23 +17,40 @@ import {
   fetchVerseByNumbers,
   normalizeTafseerResponseToRun,
   startTafseerStream,
-} from '@/lib/tafseer';
-import { formatFacetValue, formatProvenance } from '@/lib/metadata-labels';
-import { useFiltersQuery } from '@/hooks/use-filters-query';
-import { useRunDetailQuery, useUpdateRunMutation } from '@/hooks/use-run-history';
-import { QueryComposer } from '@/components/dashboard/QueryComposer';
-import { FilterFacets } from '@/components/dashboard/FilterFacets';
-import { ResultStream } from '@/components/dashboard/ResultStream';
-import { RunActions } from '@/components/dashboard/RunActions';
-import { CitationPanel } from '@/components/dashboard/CitationPanel';
-import { SourceSnippetPanel } from '@/components/dashboard/SourceSnippetPanel';
+} from "@/lib/tafseer";
+import { formatFacetValue, formatProvenance } from "@/lib/metadata-labels";
+import { useFiltersQuery } from "@/hooks/use-filters-query";
+import {
+  useRunDetailQuery,
+  useUpdateRunMutation,
+} from "@/hooks/use-run-history";
+import { QueryComposer } from "@/components/dashboard/QueryComposer";
+import { FilterFacets } from "@/components/dashboard/FilterFacets";
+import { ResultStream } from "@/components/dashboard/ResultStream";
+import { RunActions } from "@/components/dashboard/RunActions";
+import { CitationPanel } from "@/components/dashboard/CitationPanel";
+import { SourceSnippetPanel } from "@/components/dashboard/SourceSnippetPanel";
 
 const defaultFilters: RunDraftFilters = {
-  language: 'Turkish',
+  language: "Turkish",
   tone: 7,
   intellectLevel: 7,
   responseLength: 6,
 };
+
+function getConfidenceStatus(
+  confidence: number | null,
+): { level: "high" | "medium" | "low"; message: string } | null {
+  if (confidence === null) return null;
+  if (confidence >= 0.7)
+    return { level: "high", message: "Yüksek güvenilirlik" };
+  if (confidence >= 0.4)
+    return { level: "medium", message: "Orta güvenilirlik" };
+  return {
+    level: "low",
+    message: "Düşük güvenilirlik - kaynaklar sorgulanabilir",
+  };
+}
 
 export default function QueryWorkspacePage() {
   const { user, refreshUser } = useAuth();
@@ -42,30 +59,38 @@ export default function QueryWorkspacePage() {
   const dashboard = locales[lang].dashboard;
   const searchParams = useSearchParams();
 
-  const runIdParam = searchParams.get('runId') || undefined;
-  const shouldReplay = searchParams.get('replay') === '1';
+  const runIdParam = searchParams.get("runId") || undefined;
+  const shouldReplay = searchParams.get("replay") === "1";
 
   const [surahNumber, setSurahNumber] = useState(1);
   const [verseNumber, setVerseNumber] = useState(1);
-  const [verseId, setVerseId] = useState('');
-  const [surahName, setSurahName] = useState('');
-  const [revelationType, setRevelationType] = useState<'Mekki' | 'Medeni' | 'UNKNOWN'>('UNKNOWN');
+  const [verseId, setVerseId] = useState("");
+  const [surahName, setSurahName] = useState("");
+  const [revelationType, setRevelationType] = useState<
+    "Mekki" | "Medeni" | "UNKNOWN"
+  >("UNKNOWN");
 
   const [filters, setFilters] = useState<RunDraftFilters>(defaultFilters);
-  const [scholarQuery, setScholarQuery] = useState('');
+  const [scholarQuery, setScholarQuery] = useState("");
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [streamContent, setStreamContent] = useState('');
-  const [error, setError] = useState('');
-  const [status, setStatus] = useState('');
+  const [streamContent, setStreamContent] = useState("");
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
 
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [firstByteAt, setFirstByteAt] = useState<number | null>(null);
   const [completedAt, setCompletedAt] = useState<number | null>(null);
-  const [usage, setUsage] = useState<{ promptTokens?: number; completionTokens?: number; totalTokens?: number } | null>(null);
+  const [usage, setUsage] = useState<{
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  } | null>(null);
 
   const [confidence, setConfidence] = useState<number | null>(null);
-  const [provenance, setProvenance] = useState<ProvenanceIndicator | null>(null);
+  const [provenance, setProvenance] = useState<ProvenanceIndicator | null>(
+    null,
+  );
   const [citations, setCitations] = useState<Citation[]>([]);
   const [sourceExcerpts, setSourceExcerpts] = useState<SourceExcerpt[]>([]);
 
@@ -76,7 +101,9 @@ export default function QueryWorkspacePage() {
 
   const [currentRunId, setCurrentRunId] = useState<string | null>(null);
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
-  const [mobileResultTab, setMobileResultTab] = useState<'result' | 'citations' | 'snippets'>('result');
+  const [mobileResultTab, setMobileResultTab] = useState<
+    "result" | "citations" | "snippets"
+  >("result");
 
   const hydratedRunRef = useRef<string | null>(null);
   const replayedRef = useRef(false);
@@ -86,8 +113,14 @@ export default function QueryWorkspacePage() {
   const runDetailQuery = useRunDetailQuery(runIdParam);
   const updateRunMutation = useUpdateRunMutation();
 
-  const includeIds = useMemo(() => new Set(filters.scholars || []), [filters.scholars]);
-  const excludeIds = useMemo(() => new Set(filters.excludeScholars || []), [filters.excludeScholars]);
+  const includeIds = useMemo(
+    () => new Set(filters.scholars || []),
+    [filters.scholars],
+  );
+  const excludeIds = useMemo(
+    () => new Set(filters.excludeScholars || []),
+    [filters.excludeScholars],
+  );
 
   useEffect(() => {
     if (!availableFilters) return;
@@ -108,39 +141,54 @@ export default function QueryWorkspacePage() {
       items = items.filter((scholar) => scholar.name.toLowerCase().includes(q));
     }
     if (filters.periodCodes?.length) {
-      items = items.filter((scholar) => scholar.periodCode && filters.periodCodes?.includes(scholar.periodCode));
+      items = items.filter(
+        (scholar) =>
+          scholar.periodCode &&
+          filters.periodCodes?.includes(scholar.periodCode),
+      );
     }
     if (filters.madhabs?.length) {
-      items = items.filter((scholar) => scholar.madhab && filters.madhabs?.includes(scholar.madhab));
+      items = items.filter(
+        (scholar) =>
+          scholar.madhab && filters.madhabs?.includes(scholar.madhab),
+      );
     }
     if (filters.sourceAccessibilities?.length) {
       items = items.filter(
-        (scholar) => scholar.sourceAccessibility && filters.sourceAccessibilities?.includes(scholar.sourceAccessibility)
+        (scholar) =>
+          scholar.sourceAccessibility &&
+          filters.sourceAccessibilities?.includes(scholar.sourceAccessibility),
       );
     }
     if (filters.traditions?.length) {
       items = items.filter((scholar) =>
-        scholar.traditionAcceptance.some((tag) => filters.traditions?.includes(tag))
+        scholar.traditionAcceptance.some((tag) =>
+          filters.traditions?.includes(tag),
+        ),
       );
     }
     if (filters.tafsirTypes?.length) {
       items = items.filter((scholar) =>
         [scholar.tafsirType1, scholar.tafsirType2].some(
-          (typeValue) => typeof typeValue === 'string' && filters.tafsirTypes?.includes(typeValue)
-        )
+          (typeValue) =>
+            typeof typeValue === "string" &&
+            filters.tafsirTypes?.includes(typeValue),
+        ),
       );
     }
     return items;
   }, [availableFilters, scholarQuery, filters]);
 
-  const canAnalyze = Boolean(user && (user.dailyQuota ?? 0) > 0 && !isAnalyzing);
+  const canAnalyze = Boolean(
+    user && (user.dailyQuota ?? 0) > 0 && !isAnalyzing,
+  );
 
   const resolveVerse = useCallback(async () => {
     const verse = await fetchVerseByNumbers(surahNumber, verseNumber);
     setVerseId(verse.id);
     setSurahName(verse.surahName);
     const meta = surahs.find((surah) => surah.number === surahNumber);
-    setRevelationType(meta?.revelation || 'UNKNOWN');
+    setRevelationType(meta?.revelation || "UNKNOWN");
     return verse;
   }, [surahNumber, verseNumber]);
 
@@ -153,12 +201,12 @@ export default function QueryWorkspacePage() {
         setVerseId(verse.id);
         setSurahName(verse.surahName);
         const meta = surahs.find((surah) => surah.number === surahNumber);
-        setRevelationType(meta?.revelation || 'UNKNOWN');
+        setRevelationType(meta?.revelation || "UNKNOWN");
       } catch {
         if (cancelled) return;
-        setVerseId('');
-        setSurahName('');
-        setRevelationType('UNKNOWN');
+        setVerseId("");
+        setSurahName("");
+        setRevelationType("UNKNOWN");
       }
     })();
 
@@ -179,7 +227,7 @@ export default function QueryWorkspacePage() {
     setSurahName(detail.verse.surahName);
     setFilters({ ...defaultFilters, ...(detail.filters || {}) });
 
-    setStreamContent(detail.aiResponse || '');
+    setStreamContent(detail.aiResponse || "");
     setConfidence(detail.confidence);
     setProvenance(detail.provenance);
     setCitations(detail.citations || []);
@@ -203,7 +251,7 @@ export default function QueryWorkspacePage() {
         title: detail.title,
         notes: detail.notes,
         starred: detail.starred,
-      }
+      },
     );
 
     setComparisonRuns((prev) => ({ ...prev, primaryRun: run }));
@@ -212,10 +260,10 @@ export default function QueryWorkspacePage() {
   const handleAnalyze = useCallback(async () => {
     if (!user) return;
 
-    setError('');
-    setStatus('');
+    setError("");
+    setStatus("");
     setIsAnalyzing(true);
-    setStreamContent('');
+    setStreamContent("");
     setUsage(null);
     setStartedAt(null);
     setFirstByteAt(null);
@@ -225,10 +273,12 @@ export default function QueryWorkspacePage() {
     setCitations([]);
     setSourceExcerpts([]);
 
-    let accumulated = '';
+    let accumulated = "";
 
     try {
-      const verse = verseId ? { id: verseId, surahNumber, surahName, verseNumber } : await resolveVerse();
+      const verse = verseId
+        ? { id: verseId, surahNumber, surahName, verseNumber }
+        : await resolveVerse();
       const token = tokenStorage.get();
       if (!token) throw new Error(dashboard.notAuthenticated);
 
@@ -237,40 +287,45 @@ export default function QueryWorkspacePage() {
           verseId: verse.id,
           filters: {
             ...filters,
-            language: filters.language || (lang === 'tr' ? 'Turkish' : 'English'),
+            language:
+              filters.language || (lang === "tr" ? "Turkish" : "English"),
           },
           stream: true,
         },
         token,
         (evt) => {
-          if (evt.type === 'start') {
+          if (evt.type === "start") {
             setStartedAt(performance.now());
             if (evt.runId || evt.searchId) {
               setCurrentRunId(evt.runId || evt.searchId || null);
             }
           }
 
-          if (evt.type === 'chunk' && evt.content) {
+          if (evt.type === "chunk" && evt.content) {
             accumulated += evt.content;
             setFirstByteAt((prev) => prev ?? performance.now());
             setStreamContent((prev) => prev + evt.content);
           }
 
-          if (evt.type === 'error') {
+          if (evt.type === "error") {
             setError(evt.error || dashboard.streamingError);
           }
 
-          if (evt.type === 'complete') {
+          if (evt.type === "complete") {
             void refreshUser();
             setCompletedAt(performance.now());
             setUsage(evt.usage || null);
 
             const nextRunId = evt.runId || evt.searchId || currentRunId || null;
             setCurrentRunId(nextRunId);
-            setConfidence(typeof evt.confidence === 'number' ? evt.confidence : null);
+            setConfidence(
+              typeof evt.confidence === "number" ? evt.confidence : null,
+            );
             setProvenance(evt.provenance || null);
             setCitations(Array.isArray(evt.citations) ? evt.citations : []);
-            setSourceExcerpts(Array.isArray(evt.sourceExcerpts) ? evt.sourceExcerpts : []);
+            setSourceExcerpts(
+              Array.isArray(evt.sourceExcerpts) ? evt.sourceExcerpts : [],
+            );
 
             const run = normalizeTafseerResponseToRun(
               {
@@ -292,12 +347,12 @@ export default function QueryWorkspacePage() {
               {
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
-              }
+              },
             );
 
             setComparisonRuns((prev) => ({ ...prev, primaryRun: run }));
           }
-        }
+        },
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : dashboard.analysisFailed);
@@ -329,7 +384,10 @@ export default function QueryWorkspacePage() {
   const saveCurrentRun = async () => {
     if (!currentRunId) return;
     try {
-      await updateRunMutation.mutateAsync({ runId: currentRunId, payload: { starred: true } });
+      await updateRunMutation.mutateAsync({
+        runId: currentRunId,
+        payload: { starred: true },
+      });
       setStatus(t.runSaved);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.runSaveFailed);
@@ -344,15 +402,17 @@ export default function QueryWorkspacePage() {
     const citationText = citations
       .map((citation) => {
         const extras = [
-          citation.volume ? `${dashboard.volumeShort} ${citation.volume}` : null,
+          citation.volume
+            ? `${dashboard.volumeShort} ${citation.volume}`
+            : null,
           citation.page ? `${dashboard.pageShort} ${citation.page}` : null,
           citation.edition || null,
         ]
           .filter(Boolean)
-          .join(' · ');
-        return `${citation.scholarName} — ${citation.sourceTitle}${extras ? ` (${extras})` : ''}`;
+          .join(" · ");
+        return `${citation.scholarName} — ${citation.sourceTitle}${extras ? ` (${extras})` : ""}`;
       })
-      .join('\n');
+      .join("\n");
 
     await navigator.clipboard.writeText(citationText);
     setStatus(t.citationsCopied);
@@ -373,7 +433,11 @@ export default function QueryWorkspacePage() {
     next.add(id);
     const nextExclude = new Set(filters.excludeScholars || []);
     nextExclude.delete(id);
-    setFilters((prev) => ({ ...prev, scholars: Array.from(next), excludeScholars: Array.from(nextExclude) }));
+    setFilters((prev) => ({
+      ...prev,
+      scholars: Array.from(next),
+      excludeScholars: Array.from(nextExclude),
+    }));
   };
 
   const excludeScholar = (id: string) => {
@@ -381,7 +445,11 @@ export default function QueryWorkspacePage() {
     next.add(id);
     const nextInclude = new Set(filters.scholars || []);
     nextInclude.delete(id);
-    setFilters((prev) => ({ ...prev, excludeScholars: Array.from(next), scholars: Array.from(nextInclude) }));
+    setFilters((prev) => ({
+      ...prev,
+      excludeScholars: Array.from(next),
+      scholars: Array.from(nextInclude),
+    }));
   };
 
   const resetScholar = (id: string) => {
@@ -389,7 +457,11 @@ export default function QueryWorkspacePage() {
     const nextExclude = new Set(filters.excludeScholars || []);
     nextInclude.delete(id);
     nextExclude.delete(id);
-    setFilters((prev) => ({ ...prev, scholars: Array.from(nextInclude), excludeScholars: Array.from(nextExclude) }));
+    setFilters((prev) => ({
+      ...prev,
+      scholars: Array.from(nextInclude),
+      excludeScholars: Array.from(nextExclude),
+    }));
   };
 
   const includeAll = () => {
@@ -407,9 +479,9 @@ export default function QueryWorkspacePage() {
   };
 
   const revelationLabel =
-    revelationType === 'Mekki'
+    revelationType === "Mekki"
       ? dashboard.mekki
-      : revelationType === 'Medeni'
+      : revelationType === "Medeni"
         ? dashboard.medeni
         : dashboard.unknownRevelation;
   const noValueLabel = t.notAvailable;
@@ -420,7 +492,11 @@ export default function QueryWorkspacePage() {
       <QueryComposer
         surahNumber={surahNumber}
         verseNumber={verseNumber}
-        surahName={surahName || surahs.find((surah) => surah.number === surahNumber)?.nameTr || ''}
+        surahName={
+          surahName ||
+          surahs.find((surah) => surah.number === surahNumber)?.nameTr ||
+          ""
+        }
         revelationLabel={revelationLabel}
         surahOptions={surahs}
         filters={filters}
@@ -475,7 +551,9 @@ export default function QueryWorkspacePage() {
         availableFilters={availableFilters}
         filters={filters}
         onChange={setFilters}
-        getOptionLabel={(filterKey, value) => formatFacetValue(lang, filterKey, value)}
+        getOptionLabel={(filterKey, value) =>
+          formatFacetValue(lang, filterKey, value)
+        }
         labels={{
           title: t.facetTitle,
           periodCodes: t.facetPeriodCodes,
@@ -491,10 +569,16 @@ export default function QueryWorkspacePage() {
 
   return (
     <div className="space-y-4">
-      {status && <p className="ui-panel rounded-lg px-3 py-2 text-sm ui-muted">{status}</p>}
+      {status && (
+        <p className="ui-panel rounded-lg px-3 py-2 text-sm ui-muted">
+          {status}
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <aside className="hidden xl:col-span-3 xl:block">{queryComposerNode}</aside>
+        <aside className="hidden xl:col-span-3 xl:block">
+          {queryComposerNode}
+        </aside>
 
         <main className="space-y-4 xl:col-span-6">
           <div className="ui-panel-strong px-4 py-4 sm:px-5">
@@ -550,59 +634,89 @@ export default function QueryWorkspacePage() {
               <button
                 type="button"
                 className="ui-button-ghost"
-                data-active={mobileResultTab === 'result'}
-                onClick={() => setMobileResultTab('result')}
+                data-active={mobileResultTab === "result"}
+                onClick={() => setMobileResultTab("result")}
               >
                 {t.mobileResultTab}
               </button>
               <button
                 type="button"
                 className="ui-button-ghost"
-                data-active={mobileResultTab === 'citations'}
-                onClick={() => setMobileResultTab('citations')}
+                data-active={mobileResultTab === "citations"}
+                onClick={() => setMobileResultTab("citations")}
               >
                 {t.mobileCitationsTab}
               </button>
               <button
                 type="button"
                 className="ui-button-ghost"
-                data-active={mobileResultTab === 'snippets'}
-                onClick={() => setMobileResultTab('snippets')}
+                data-active={mobileResultTab === "snippets"}
+                onClick={() => setMobileResultTab("snippets")}
               >
                 {t.mobileSnippetsTab}
               </button>
             </div>
 
-            {mobileResultTab === 'result' && (
+            {mobileResultTab === "result" && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="ui-kpi">
-                  <div className="ui-muted text-xs">{dashboard.metricConfidence}</div>
-                  <div className="text-xl font-semibold text-[var(--brand-dark)]">
-                    {typeof confidence === 'number' ? `${Math.round(confidence * 100)}%` : noValueLabel}
+                  <div className="ui-muted text-xs">
+                    {dashboard.metricConfidence}
+                  </div>
+                  <div
+                    className={`text-xl font-semibold ${
+                      getConfidenceStatus(confidence)?.level === "low"
+                        ? "text-red-600"
+                        : "text-[var(--brand-dark)]"
+                    }`}
+                  >
+                    {typeof confidence === "number"
+                      ? `${Math.round(confidence * 100)}%`
+                      : noValueLabel}
+                  </div>
+                  {getConfidenceStatus(confidence)?.level === "low" && (
+                    <div className="text-xs text-red-600 mt-1">
+                      {getConfidenceStatus(confidence)?.message}
+                    </div>
+                  )}
+                </div>
+                <div className="ui-kpi">
+                  <div className="ui-muted text-xs">
+                    {dashboard.metricProvenance}
+                  </div>
+                  <div className="text-base font-medium text-[var(--text-strong)]">
+                    {provenanceLabel}
                   </div>
                 </div>
                 <div className="ui-kpi">
-                  <div className="ui-muted text-xs">{dashboard.metricProvenance}</div>
-                  <div className="text-base font-medium text-[var(--text-strong)]">{provenanceLabel}</div>
-                </div>
-                <div className="ui-kpi">
-                  <div className="ui-muted text-xs">{dashboard.metricCitations}</div>
-                  <div className="text-base font-medium text-[var(--text-strong)]">{citations.length}</div>
+                  <div className="ui-muted text-xs">
+                    {dashboard.metricCitations}
+                  </div>
+                  <div className="text-base font-medium text-[var(--text-strong)]">
+                    {citations.length}
+                  </div>
                 </div>
               </div>
             )}
 
-            {mobileResultTab === 'citations' && (
+            {mobileResultTab === "citations" && (
               <CitationPanel
                 title={dashboard.academicCitationsTitle}
                 empty={t.emptyCitations}
                 citations={citations}
-                labels={{ volumeShort: dashboard.volumeShort, pageShort: dashboard.pageShort }}
+                labels={{
+                  volumeShort: dashboard.volumeShort,
+                  pageShort: dashboard.pageShort,
+                }}
               />
             )}
 
-            {mobileResultTab === 'snippets' && (
-              <SourceSnippetPanel title={dashboard.snippetsTitle} empty={t.emptySnippets} excerpts={sourceExcerpts} />
+            {mobileResultTab === "snippets" && (
+              <SourceSnippetPanel
+                title={dashboard.snippetsTitle}
+                empty={t.emptySnippets}
+                excerpts={sourceExcerpts}
+              />
             )}
           </div>
         </main>
@@ -610,27 +724,57 @@ export default function QueryWorkspacePage() {
         <aside className="hidden space-y-4 xl:col-span-3 xl:block">
           <div className="grid grid-cols-1 gap-3">
             <div className="ui-kpi">
-              <div className="ui-muted text-xs">{dashboard.metricConfidence}</div>
-              <div className="text-xl font-semibold text-[var(--brand-dark)]">
-                {typeof confidence === 'number' ? `${Math.round(confidence * 100)}%` : noValueLabel}
+              <div className="ui-muted text-xs">
+                {dashboard.metricConfidence}
+              </div>
+              <div
+                className={`text-xl font-semibold ${
+                  getConfidenceStatus(confidence)?.level === "low"
+                    ? "text-red-600"
+                    : "text-[var(--brand-dark)]"
+                }`}
+              >
+                {typeof confidence === "number"
+                  ? `${Math.round(confidence * 100)}%`
+                  : noValueLabel}
+              </div>
+              {getConfidenceStatus(confidence)?.level === "low" && (
+                <div className="text-xs text-red-600 mt-1">
+                  {getConfidenceStatus(confidence)?.message}
+                </div>
+              )}
+            </div>
+            <div className="ui-kpi">
+              <div className="ui-muted text-xs">
+                {dashboard.metricProvenance}
+              </div>
+              <div className="text-base font-medium text-[var(--text-strong)]">
+                {provenanceLabel}
               </div>
             </div>
             <div className="ui-kpi">
-              <div className="ui-muted text-xs">{dashboard.metricProvenance}</div>
-              <div className="text-base font-medium text-[var(--text-strong)]">{provenanceLabel}</div>
-            </div>
-            <div className="ui-kpi">
-              <div className="ui-muted text-xs">{dashboard.metricCitations}</div>
-              <div className="text-base font-medium text-[var(--text-strong)]">{citations.length}</div>
+              <div className="ui-muted text-xs">
+                {dashboard.metricCitations}
+              </div>
+              <div className="text-base font-medium text-[var(--text-strong)]">
+                {citations.length}
+              </div>
             </div>
           </div>
 
-          <SourceSnippetPanel title={dashboard.snippetsTitle} empty={t.emptySnippets} excerpts={sourceExcerpts} />
+          <SourceSnippetPanel
+            title={dashboard.snippetsTitle}
+            empty={t.emptySnippets}
+            excerpts={sourceExcerpts}
+          />
           <CitationPanel
             title={dashboard.academicCitationsTitle}
             empty={t.emptyCitations}
             citations={citations}
-            labels={{ volumeShort: dashboard.volumeShort, pageShort: dashboard.pageShort }}
+            labels={{
+              volumeShort: dashboard.volumeShort,
+              pageShort: dashboard.pageShort,
+            }}
           />
         </aside>
       </div>
@@ -667,14 +811,23 @@ export default function QueryWorkspacePage() {
       </div>
 
       {mobileControlsOpen && (
-        <div className="fixed inset-0 z-40 bg-black/45 xl:hidden" onClick={() => setMobileControlsOpen(false)}>
+        <div
+          className="fixed inset-0 z-40 bg-black/45 xl:hidden"
+          onClick={() => setMobileControlsOpen(false)}
+        >
           <div
             className="absolute inset-x-0 bottom-0 max-h-[88vh] overflow-auto rounded-t-2xl border border-[var(--border-soft)] bg-white p-4"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="ui-title text-lg font-semibold">{t.mobileControlsTitle}</h2>
-              <button type="button" className="ui-button-secondary px-3 py-1.5 text-xs" onClick={() => setMobileControlsOpen(false)}>
+              <h2 className="ui-title text-lg font-semibold">
+                {t.mobileControlsTitle}
+              </h2>
+              <button
+                type="button"
+                className="ui-button-secondary px-3 py-1.5 text-xs"
+                onClick={() => setMobileControlsOpen(false)}
+              >
                 {t.closeControls}
               </button>
             </div>
@@ -685,11 +838,19 @@ export default function QueryWorkspacePage() {
 
       <section className="ui-panel-strong overflow-hidden">
         <div className="space-y-2 px-4 py-4 sm:px-5">
-          <h3 className="ui-title text-base font-semibold">{t.comparisonPlaceholderTitle}</h3>
+          <h3 className="ui-title text-base font-semibold">
+            {t.comparisonPlaceholderTitle}
+          </h3>
           <p className="ui-muted text-sm">{t.comparisonPlaceholderText}</p>
           <p className="ui-muted text-xs">
-            {t.primaryRunLabel}: {comparisonRuns.primaryRun ? comparisonRuns.primaryRun.runId : noValueLabel} · {t.secondaryRunLabel}:{' '}
-            {comparisonRuns.secondaryRun ? comparisonRuns.secondaryRun.runId : noValueLabel}
+            {t.primaryRunLabel}:{" "}
+            {comparisonRuns.primaryRun
+              ? comparisonRuns.primaryRun.runId
+              : noValueLabel}{" "}
+            · {t.secondaryRunLabel}:{" "}
+            {comparisonRuns.secondaryRun
+              ? comparisonRuns.secondaryRun.runId
+              : noValueLabel}
           </p>
         </div>
       </section>

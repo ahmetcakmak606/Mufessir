@@ -2,9 +2,16 @@ import { Router } from "express";
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
-import { authenticateJWT, enforceQuota, decrementQuota } from "../middleware/auth.js";
+import {
+  authenticateJWT,
+  enforceQuota,
+  decrementQuota,
+} from "../middleware/auth.js";
 import { Prisma, PrismaClient } from "@prisma/client";
-import { generateTafsirStream, generateTafsirNonStreaming } from "../utils/openai.js";
+import {
+  generateTafsirStream,
+  generateTafsirNonStreaming,
+} from "../utils/openai.js";
 import { buildTafsirPrompt, type ScholarMeta } from "../utils/prompt.js";
 import { finalizeResponse } from "../utils/text.js";
 import { performSimilaritySearch } from "../utils/similarity-search.js";
@@ -24,16 +31,22 @@ if (!(global as any).prisma) (global as any).prisma = prisma;
 // Optional DEMO mode: serve precomputed tafsir for selected verses
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const demoMode = process.env.DEMO_MODE === '1';
+const demoMode = process.env.DEMO_MODE === "1";
 let demoMap: Record<string, { language: string; content: string }[]> = {};
 if (demoMode) {
   try {
     const demoPath = resolve(__dirname, "../..", "scripts", "demo-tafsir.json");
     const raw = readFileSync(demoPath, "utf8");
     demoMap = JSON.parse(raw);
-    console.log("DEMO_MODE enabled. Loaded", Object.keys(demoMap).length, "precomputed entries");
+    console.log(
+      "DEMO_MODE enabled. Loaded",
+      Object.keys(demoMap).length,
+      "precomputed entries",
+    );
   } catch (e) {
-    console.warn("DEMO_MODE enabled but demo-tafsir.json not found or invalid.");
+    console.warn(
+      "DEMO_MODE enabled but demo-tafsir.json not found or invalid.",
+    );
   }
 }
 
@@ -57,7 +70,9 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function extractFiltersFromQuery(queryValue: Prisma.JsonValue | null): Record<string, unknown> {
+function extractFiltersFromQuery(
+  queryValue: Prisma.JsonValue | null,
+): Record<string, unknown> {
   const queryObj = asRecord(queryValue);
   return asRecord(queryObj.filters);
 }
@@ -77,16 +92,25 @@ function parseStoredCitations(value: Prisma.JsonValue | null): Citation[] {
   if (!Array.isArray(value)) return [];
   return value
     .map((item) => asRecord(item))
-    .filter((row) => typeof row.scholarId === "string" && typeof row.scholarName === "string")
+    .filter(
+      (row) =>
+        typeof row.scholarId === "string" &&
+        typeof row.scholarName === "string",
+    )
     .map((row) => ({
       scholarId: String(row.scholarId),
       scholarName: String(row.scholarName),
-      sourceType: typeof row.sourceType === "string" ? row.sourceType : "UNKNOWN",
-      sourceTitle: typeof row.sourceTitle === "string" ? row.sourceTitle : "Unknown source",
+      sourceType:
+        typeof row.sourceType === "string" ? row.sourceType : "UNKNOWN",
+      sourceTitle:
+        typeof row.sourceTitle === "string"
+          ? row.sourceTitle
+          : "Unknown source",
       volume: typeof row.volume === "string" ? row.volume : null,
       page: typeof row.page === "string" ? row.page : null,
       edition: typeof row.edition === "string" ? row.edition : null,
-      citationText: typeof row.citationText === "string" ? row.citationText : null,
+      citationText:
+        typeof row.citationText === "string" ? row.citationText : null,
       provenance: typeof row.provenance === "string" ? row.provenance : null,
       isPrimary: Boolean(row.isPrimary),
     }));
@@ -114,7 +138,10 @@ function buildRunSummary(search: any) {
       typeof latest?.aiResponse === "string"
         ? latest.aiResponse.slice(0, 220).trim()
         : null,
-    confidence: typeof latest?.confidenceScore === "number" ? latest.confidenceScore : null,
+    confidence:
+      typeof latest?.confidenceScore === "number"
+        ? latest.confidenceScore
+        : null,
     provenance: deriveProvenanceIndicator(citations),
     citationsCount: citations.length,
     createdAt: search.createdAt,
@@ -125,7 +152,8 @@ function buildRunSummary(search: any) {
 router.get("/runs", authenticateJWT, async (req, res) => {
   try {
     const userId = (req as any).user?.id as string;
-    const cursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
+    const cursor =
+      typeof req.query.cursor === "string" ? req.query.cursor : undefined;
     const parsedLimit = Number(req.query.limit ?? 20);
     const limit = Number.isFinite(parsedLimit)
       ? Math.min(50, Math.max(1, Math.floor(parsedLimit)))
@@ -163,7 +191,9 @@ router.get("/runs", authenticateJWT, async (req, res) => {
 
     res.json({
       items: pageItems.map(buildRunSummary),
-      nextCursor: hasMore ? pageItems[pageItems.length - 1]?.id ?? null : null,
+      nextCursor: hasMore
+        ? (pageItems[pageItems.length - 1]?.id ?? null)
+        : null,
     });
   } catch (error) {
     console.error("Runs list error:", error);
@@ -213,9 +243,12 @@ router.get("/runs/:runId", authenticateJWT, async (req, res) => {
     }
 
     const latest = search.results[0];
-    const citations = parseStoredCitations((latest?.citations ?? null) as Prisma.JsonValue | null);
+    const citations = parseStoredCitations(
+      (latest?.citations ?? null) as Prisma.JsonValue | null,
+    );
     const runMeta = extractRunMeta(search.query as Prisma.JsonValue | null);
-    const updatedAt = runMeta.updatedAt || latest?.createdAt || search.createdAt;
+    const updatedAt =
+      runMeta.updatedAt || latest?.createdAt || search.createdAt;
     const sourceExcerpts: SourceExcerpt[] =
       latest?.tafsir?.tafsirText && latest?.tafsir?.scholar
         ? [
@@ -239,7 +272,10 @@ router.get("/runs/:runId", authenticateJWT, async (req, res) => {
       notes: runMeta.notes,
       starred: runMeta.starred,
       aiResponse: latest?.aiResponse ?? "",
-      confidence: typeof latest?.confidenceScore === "number" ? latest.confidenceScore : null,
+      confidence:
+        typeof latest?.confidenceScore === "number"
+          ? latest.confidenceScore
+          : null,
       provenance: deriveProvenanceIndicator(citations),
       citations,
       sourceExcerpts,
@@ -294,10 +330,20 @@ router.patch("/runs/:runId", authenticateJWT, async (req, res) => {
     const nextMeta: RunMeta = {
       ...currentMeta,
       ...(hasTitle
-        ? { title: typeof title === "string" ? title.trim().slice(0, 120) || null : null }
+        ? {
+            title:
+              typeof title === "string"
+                ? title.trim().slice(0, 120) || null
+                : null,
+          }
         : {}),
       ...(hasNotes
-        ? { notes: typeof notes === "string" ? notes.trim().slice(0, 4000) || null : null }
+        ? {
+            notes:
+              typeof notes === "string"
+                ? notes.trim().slice(0, 4000) || null
+                : null,
+          }
         : {}),
       ...(hasStarred ? { starred: Boolean(starred) } : {}),
       updatedAt: new Date().toISOString(),
@@ -351,8 +397,13 @@ function buildSourceExcerpts(similarTafsirs: any[]): SourceExcerpt[] {
   }));
 }
 
-async function loadCitations(prismaClient: PrismaClient, similarTafsirs: any[]): Promise<Citation[]> {
-  const scholarIds = [...new Set(similarTafsirs.map((result: any) => result.scholar.id))];
+async function loadCitations(
+  prismaClient: PrismaClient,
+  similarTafsirs: any[],
+): Promise<Citation[]> {
+  const scholarIds = [
+    ...new Set(similarTafsirs.map((result: any) => result.scholar.id)),
+  ];
   if (!scholarIds.length) return [];
 
   const rows = await prismaClient.scholarReference.findMany({
@@ -362,7 +413,11 @@ async function loadCitations(prismaClient: PrismaClient, similarTafsirs: any[]):
         select: { id: true, name: true },
       },
     },
-    orderBy: [{ isPrimary: "desc" }, { sourceType: "asc" }, { sourceTitle: "asc" }],
+    orderBy: [
+      { isPrimary: "desc" },
+      { sourceType: "asc" },
+      { sourceTitle: "asc" },
+    ],
     take: 20,
   });
 
@@ -381,13 +436,18 @@ async function loadCitations(prismaClient: PrismaClient, similarTafsirs: any[]):
 }
 
 // Protected endpoint that requires auth and enforces quota
-router.post("/", 
-  authenticateJWT, 
-  enforceQuota(prisma), 
+router.post(
+  "/",
+  authenticateJWT,
+  enforceQuota(prisma),
   decrementQuota(prisma),
   async (req, res) => {
     try {
-      const { verseId, filters, stream = false } = req.body as {
+      const {
+        verseId,
+        filters,
+        stream = false,
+      } = req.body as {
         verseId: string;
         filters?: {
           scholars?: string[];
@@ -406,23 +466,24 @@ router.post("/",
 
       // Get verse details
       const verse = await prisma.verse.findUnique({
-        where: { id: verseId }
+        where: { id: verseId },
       });
 
       if (!verse) {
         return res.status(404).json({ error: "Verse not found" });
       }
 
+      // Build search query from verse text
+      const searchQuery =
+        `${verse.arabicText} ${verse.translation || ""}`.trim();
+
       // Perform vector similarity search to find relevant tafsirs
+      // ALWAYS filter by verseId - semantic search should only find tafsirs FOR the queried verse
       let similarTafsirs = [];
       try {
-        const hasScholarFilter =
-          (filters?.scholars?.length ?? 0) > 0 ||
-          (filters?.excludeScholars?.length ?? 0) > 0;
-        const searchQuery = `${verse.arabicText} ${verse.translation || ""}`.trim();
         similarTafsirs = await performSimilaritySearch(prisma, {
           query: searchQuery,
-          verseId: hasScholarFilter ? undefined : verseId, // Only filter by verse if no scholar filtering
+          verseId: verseId, // Always filter by verseId to prevent cross-verse retrieval
           scholarIds: filters?.scholars,
           excludeScholarIds: filters?.excludeScholars,
           limit: 5,
@@ -439,7 +500,7 @@ router.post("/",
           },
           take: 3,
         });
-        
+
         similarTafsirs = sampleTafsirs.map((tafsir: any) => ({
           tafsirId: tafsir.id,
           scholarName: tafsir.scholar.name,
@@ -461,6 +522,20 @@ router.post("/",
         }));
       }
 
+      // Validate that retrieved sources are from the queried verse
+      // This catches edge cases where vector search might return wrong results
+      const sourceVerseMatch = similarTafsirs.every(
+        (t: any) => t.verseId === verseId,
+      );
+
+      // Log warning if source-verse mismatch detected
+      if (!sourceVerseMatch) {
+        console.warn(
+          `Source-verse mismatch detected! Query verse: ${verseId}, ` +
+            `Retrieved verses: ${[...new Set(similarTafsirs.map((t: any) => t.verseId))].join(", ")}`,
+        );
+      }
+
       // Build prompt options (clip excerpts for cost and speed)
       const citations = await loadCitations(prisma, similarTafsirs);
       const sourceExcerpts = buildSourceExcerpts(similarTafsirs);
@@ -479,9 +554,10 @@ router.post("/",
             originCountry: result.scholar.originCountry || undefined,
             reputationScore: result.scholar.reputationScore || undefined,
           } as ScholarMeta,
-          excerpt: result.tafsirText.length > 300 
-            ? result.tafsirText.substring(0, 300) + "..." 
-            : result.tafsirText,
+          excerpt:
+            result.tafsirText.length > 300
+              ? result.tafsirText.substring(0, 300) + "..."
+              : result.tafsirText,
         })),
         citations: citations.slice(0, 8).map((citation) => ({
           scholarName: citation.scholarName,
@@ -493,7 +569,7 @@ router.post("/",
         userParams: {
           tone: filters?.tone,
           intellectLevel: filters?.intellectLevel,
-          language: filters?.language || 'Turkish',
+          language: filters?.language || "Turkish",
         },
       };
 
@@ -515,17 +591,19 @@ router.post("/",
         },
         include: {
           results: {
-            orderBy: { createdAt: 'desc' },
+            orderBy: { createdAt: "desc" },
             take: 1,
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
       });
 
       // If we have a recent cached result (within 1 hour), return it
-      if (existingSearch?.results[0] && 
-          new Date().getTime() - existingSearch.createdAt.getTime() < 60 * 60 * 1000) {
-        
+      if (
+        existingSearch?.results[0] &&
+        new Date().getTime() - existingSearch.createdAt.getTime() <
+          60 * 60 * 1000
+      ) {
         const cachedResult = existingSearch.results[0];
         const cachedCitations = Array.isArray(cachedResult.citations)
           ? (cachedResult.citations as unknown as Citation[])
@@ -537,29 +615,36 @@ router.post("/",
                 similarityScores: [cachedResult.similarityScore || 0],
                 citationCount: cachedCitations.length,
                 excerptCount: sourceExcerpts.length,
+                sourceVerseMatch: true, // Cached results assumed valid
               });
         const cachedProvenance = deriveProvenanceIndicator(cachedCitations);
         console.log("Returning cached result for search:", existingSearch.id);
-        
+
         if (stream) {
-          res.setHeader('Content-Type', 'text/event-stream');
-          res.setHeader('Cache-Control', 'no-cache');
-          res.setHeader('Connection', 'keep-alive');
-          res.setHeader('Access-Control-Allow-Origin', '*');
-          res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
-          
-          res.write(`data: ${JSON.stringify({ type: 'start', searchId: existingSearch.id, runId: existingSearch.id, cached: true })}\n\n`);
-          res.write(`data: ${JSON.stringify({ type: 'chunk', content: cachedResult.aiResponse })}\n\n`);
-          res.write(`data: ${JSON.stringify({
-            type: 'complete',
-            searchId: existingSearch.id,
-            runId: existingSearch.id,
-            cached: true,
-            confidence: cachedConfidence,
-            provenance: cachedProvenance,
-            citations: cachedCitations,
-            sourceExcerpts,
-          })}\n\n`);
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          res.setHeader("Access-Control-Allow-Headers", "Cache-Control");
+
+          res.write(
+            `data: ${JSON.stringify({ type: "start", searchId: existingSearch.id, runId: existingSearch.id, cached: true })}\n\n`,
+          );
+          res.write(
+            `data: ${JSON.stringify({ type: "chunk", content: cachedResult.aiResponse })}\n\n`,
+          );
+          res.write(
+            `data: ${JSON.stringify({
+              type: "complete",
+              searchId: existingSearch.id,
+              runId: existingSearch.id,
+              cached: true,
+              confidence: cachedConfidence,
+              provenance: cachedProvenance,
+              citations: cachedCitations,
+              sourceExcerpts,
+            })}\n\n`,
+          );
           res.end();
         } else {
           return res.json({
@@ -569,7 +654,7 @@ router.post("/",
               surahName: verse.surahName,
               verseNumber: verse.verseNumber,
               arabicText: verse.arabicText,
-              translation: verse.translation
+              translation: verse.translation,
             },
             filters,
             aiResponse: cachedResult.aiResponse,
@@ -590,47 +675,67 @@ router.post("/",
       // DEMO mode: if precomputed exists, short-circuit with cached content
       if (demoMode) {
         const items = demoMap[verseId];
-        const targetLang = (filters?.language || 'Turkish').toLowerCase();
-        const match = items?.find((x) => (x.language || 'Turkish').toLowerCase() === targetLang) || items?.[0];
+        const targetLang = (filters?.language || "Turkish").toLowerCase();
+        const match =
+          items?.find(
+            (x) => (x.language || "Turkish").toLowerCase() === targetLang,
+          ) || items?.[0];
         if (match) {
           const confidence = computeConfidenceScore({
-            similarityScores: similarTafsirs.map((item: any) => item.similarityScore || 0),
+            similarityScores: similarTafsirs.map(
+              (item: any) => item.similarityScore || 0,
+            ),
             citationCount: citations.length,
             excerptCount: sourceExcerpts.length,
+            sourceVerseMatch,
           });
           if (stream) {
-            res.setHeader('Content-Type', 'text/event-stream');
-            res.setHeader('Cache-Control', 'no-cache');
-            res.setHeader('Connection', 'keep-alive');
-            res.setHeader('Access-Control-Allow-Origin', '*');
-            res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
+            res.setHeader("Content-Type", "text/event-stream");
+            res.setHeader("Cache-Control", "no-cache");
+            res.setHeader("Connection", "keep-alive");
+            res.setHeader("Access-Control-Allow-Origin", "*");
+            res.setHeader("Access-Control-Allow-Headers", "Cache-Control");
 
-            res.write(`data: ${JSON.stringify({ type: 'start', searchId: 'demo', runId: 'demo' })}\n\n`);
+            res.write(
+              `data: ${JSON.stringify({ type: "start", searchId: "demo", runId: "demo" })}\n\n`,
+            );
 
-            const requestedLang = filters?.language || 'Turkish';
-            const translationLabel = requestedLang === 'Turkish' ? 'Meal' : 'Meaning';
-            const tafsirHeader = requestedLang === 'Turkish' ? 'Tefsir' : 'Tafsir';
+            const requestedLang = filters?.language || "Turkish";
+            const translationLabel =
+              requestedLang === "Turkish" ? "Meal" : "Meaning";
+            const tafsirHeader =
+              requestedLang === "Turkish" ? "Tefsir" : "Tafsir";
             const prefaceLines = [
               `Arabic: ${verse.arabicText}`,
-              verse.translation ? `${translationLabel}: ${verse.translation}` : undefined,
-              '',
+              verse.translation
+                ? `${translationLabel}: ${verse.translation}`
+                : undefined,
+              "",
               `${tafsirHeader}:`,
-              '',
-            ].filter(Boolean).join('\n');
-            res.write(`data: ${JSON.stringify({ type: 'chunk', content: prefaceLines + "\n" })}\n\n`);
+              "",
+            ]
+              .filter(Boolean)
+              .join("\n");
+            res.write(
+              `data: ${JSON.stringify({ type: "chunk", content: prefaceLines + "\n" })}\n\n`,
+            );
 
-            res.write(`data: ${JSON.stringify({ type: 'chunk', content: match.content })}\n\n`);
-            res.write(`data: ${JSON.stringify({
-              type: 'complete',
-              searchId: 'demo',
-              runId: 'demo',
-              cached: true,
-              usage: { totalTokens: 0 },
-              confidence,
-              provenance,
-              citations,
-              sourceExcerpts,
-            })}\n\n`);
+            res.write(
+              `data: ${JSON.stringify({ type: "chunk", content: match.content })}\n\n`,
+            );
+            res.write(
+              `data: ${JSON.stringify({
+                type: "complete",
+                searchId: "demo",
+                runId: "demo",
+                cached: true,
+                usage: { totalTokens: 0 },
+                confidence,
+                provenance,
+                citations,
+                sourceExcerpts,
+              })}\n\n`,
+            );
             res.end();
             return;
           } else {
@@ -641,7 +746,7 @@ router.post("/",
                 surahName: verse.surahName,
                 verseNumber: verse.verseNumber,
                 arabicText: verse.arabicText,
-                translation: verse.translation
+                translation: verse.translation,
               },
               filters,
               aiResponse: match.content,
@@ -650,8 +755,8 @@ router.post("/",
               provenance,
               citations,
               sourceExcerpts,
-              searchId: 'demo',
-              runId: 'demo',
+              searchId: "demo",
+              runId: "demo",
               usage: { totalTokens: 0 },
               cached: true,
               demo: true,
@@ -665,7 +770,12 @@ router.post("/",
         data: {
           userId: (req as any).user!.id,
           verseId,
-          query: { filters, verseId, cacheKey, timestamp: new Date().toISOString() },
+          query: {
+            filters,
+            verseId,
+            cacheKey,
+            timestamp: new Date().toISOString(),
+          },
         },
       });
 
@@ -675,33 +785,46 @@ router.post("/",
       try {
         if (stream) {
           // Stream the response using Server-Sent Events
-          res.setHeader('Content-Type', 'text/event-stream');
-          res.setHeader('Cache-Control', 'no-cache');
-          res.setHeader('Connection', 'keep-alive');
-          res.setHeader('Access-Control-Allow-Origin', '*');
-          res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          res.setHeader("Access-Control-Allow-Headers", "Cache-Control");
 
           // Send initial data
-          res.write(`data: ${JSON.stringify({ type: 'start', searchId: search.id, runId: search.id })}\n\n`);
+          res.write(
+            `data: ${JSON.stringify({ type: "start", searchId: search.id, runId: search.id })}\n\n`,
+          );
 
           // Send verse preface first: Arabic, then translation line, then Tefsir/Tafsir header
-          const requestedLang = filters?.language || 'Turkish';
-          const translationLabel = requestedLang === 'Turkish' ? 'Meal' : 'Meaning';
-          const tafsirHeader = requestedLang === 'Turkish' ? 'Tefsir' : 'Tafsir';
+          const requestedLang = filters?.language || "Turkish";
+          const translationLabel =
+            requestedLang === "Turkish" ? "Meal" : "Meaning";
+          const tafsirHeader =
+            requestedLang === "Turkish" ? "Tefsir" : "Tafsir";
           const prefaceLines = [
             `Arabic: ${verse.arabicText}`,
-            verse.translation ? `${translationLabel}: ${verse.translation}` : undefined,
-            '',
+            verse.translation
+              ? `${translationLabel}: ${verse.translation}`
+              : undefined,
+            "",
             `${tafsirHeader}:`,
-            '',
-          ].filter(Boolean).join('\n');
-          res.write(`data: ${JSON.stringify({ type: 'chunk', content: prefaceLines + "\n" })}\n\n`);
+            "",
+          ]
+            .filter(Boolean)
+            .join("\n");
+          res.write(
+            `data: ${JSON.stringify({ type: "chunk", content: prefaceLines + "\n" })}\n\n`,
+          );
 
           let streamContent = "";
-          
+
           try {
             // Scale max tokens by desired response length (1-10)
-            const lengthScale = typeof filters?.responseLength === 'number' ? filters.responseLength : 6;
+            const lengthScale =
+              typeof filters?.responseLength === "number"
+                ? filters.responseLength
+                : 6;
             const envMax = Number(process.env.OPENAI_MAX_TOKENS ?? 800);
             const maxTokens = Math.min(envMax, 200 + lengthScale * 100);
 
@@ -713,16 +836,24 @@ router.post("/",
                   streamContent += chunk;
                 } else {
                   streamContent += chunk;
-                  res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`);
+                  res.write(
+                    `data: ${JSON.stringify({ type: "chunk", content: chunk })}\n\n`,
+                  );
                 }
-              }
+              },
             );
 
-            aiResponse = finalizeResponse(result.content, lengthScale, filters?.language);
+            aiResponse = finalizeResponse(
+              result.content,
+              lengthScale,
+              filters?.language,
+            );
 
             if (lengthScale <= 3) {
               // Emit finalized short content now
-              res.write(`data: ${JSON.stringify({ type: 'chunk', content: aiResponse })}\n\n`);
+              res.write(
+                `data: ${JSON.stringify({ type: "chunk", content: aiResponse })}\n\n`,
+              );
             }
 
             // Calculate similarity to existing tafsirs
@@ -731,16 +862,18 @@ router.post("/",
               similarTafsirs.map((t: any) => ({
                 tafsirId: t.tafsirId,
                 tafsirText: t.tafsirText,
-                scholarName: t.scholarName
-              }))
+                scholarName: t.scholarName,
+              })),
             );
             const confidence = computeConfidenceScore({
               similarityScores: [mostSimilar?.similarityScore || 0],
               citationCount: citations.length,
               excerptCount: sourceExcerpts.length,
+              sourceVerseMatch,
             });
 
-            const saveTafsirId = mostSimilar?.tafsirId || similarTafsirs[0]?.tafsirId;
+            const saveTafsirId =
+              mostSimilar?.tafsirId || similarTafsirs[0]?.tafsirId;
             if (saveTafsirId) {
               await prisma.searchResult.create({
                 data: {
@@ -755,36 +888,59 @@ router.post("/",
             }
 
             // Send completion event
-            res.write(`data: ${JSON.stringify({ 
-              type: 'complete', 
-              searchId: search.id,
-              runId: search.id,
-              usage: result.usage,
-              confidence,
-              provenance,
-              citations,
-              sourceExcerpts,
-            })}\n\n`);
+            res.write(
+              `data: ${JSON.stringify({
+                type: "complete",
+                searchId: search.id,
+                runId: search.id,
+                usage: result.usage,
+                confidence,
+                provenance,
+                citations,
+                sourceExcerpts,
+              })}\n\n`,
+            );
           } catch (streamError) {
             // Handle streaming errors
-            res.write(`data: ${JSON.stringify({ 
-              type: 'error', 
-              error: streamError instanceof Error ? streamError.message : 'Streaming failed' 
-            })}\n\n`);
+            res.write(
+              `data: ${JSON.stringify({
+                type: "error",
+                error:
+                  streamError instanceof Error
+                    ? streamError.message
+                    : "Streaming failed",
+              })}\n\n`,
+            );
           }
 
           res.end();
         } else {
           // Non-streaming response
-          const lengthScale = typeof filters?.responseLength === 'number' ? filters.responseLength : 6;
+          const lengthScale =
+            typeof filters?.responseLength === "number"
+              ? filters.responseLength
+              : 6;
           const envMax = Number(process.env.OPENAI_MAX_TOKENS ?? 800);
           const maxTokens = Math.min(envMax, 200 + lengthScale * 100);
-          const result = await generateTafsirNonStreaming({ promptOptions, maxTokens });
-          const requestedLang = filters?.language || 'Turkish';
-          const translationLabel = requestedLang === 'Turkish' ? 'Meal' : 'Meaning';
-          const tafsirHeader = requestedLang === 'Turkish' ? 'Tefsir' : 'Tafsir';
-          const preface = `Arabic: ${verse.arabicText}\n` + (verse.translation ? `${translationLabel}: ${verse.translation}\n\n${tafsirHeader}:\n` : `\n${tafsirHeader}:\n`);
-          const finalized = finalizeResponse(result.content, lengthScale, filters?.language);
+          const result = await generateTafsirNonStreaming({
+            promptOptions,
+            maxTokens,
+          });
+          const requestedLang = filters?.language || "Turkish";
+          const translationLabel =
+            requestedLang === "Turkish" ? "Meal" : "Meaning";
+          const tafsirHeader =
+            requestedLang === "Turkish" ? "Tefsir" : "Tafsir";
+          const preface =
+            `Arabic: ${verse.arabicText}\n` +
+            (verse.translation
+              ? `${translationLabel}: ${verse.translation}\n\n${tafsirHeader}:\n`
+              : `\n${tafsirHeader}:\n`);
+          const finalized = finalizeResponse(
+            result.content,
+            lengthScale,
+            filters?.language,
+          );
           aiResponse = preface + finalized;
 
           // Calculate similarity to existing tafsirs
@@ -793,16 +949,18 @@ router.post("/",
             similarTafsirs.map((t: any) => ({
               tafsirId: t.tafsirId,
               tafsirText: t.tafsirText,
-              scholarName: t.scholarName
-            }))
+              scholarName: t.scholarName,
+            })),
           );
           const confidence = computeConfidenceScore({
             similarityScores: [mostSimilar?.similarityScore || 0],
             citationCount: citations.length,
             excerptCount: sourceExcerpts.length,
+            sourceVerseMatch,
           });
 
-          const saveTafsirId = mostSimilar?.tafsirId || similarTafsirs[0]?.tafsirId;
+          const saveTafsirId =
+            mostSimilar?.tafsirId || similarTafsirs[0]?.tafsirId;
           if (saveTafsirId) {
             await prisma.searchResult.create({
               data: {
@@ -823,7 +981,7 @@ router.post("/",
               surahName: verse.surahName,
               verseNumber: verse.verseNumber,
               arabicText: verse.arabicText,
-              translation: verse.translation
+              translation: verse.translation,
             },
             filters,
             aiResponse: aiResponse,
@@ -840,25 +998,28 @@ router.post("/",
         }
       } catch (openaiError) {
         console.error("OpenAI error:", openaiError);
-        
+
         // Provide a more informative fallback response
         const fallbackResponse = `**Fallback Response** (OpenAI API not available)
 
 **Verse Analysis:** ${verse.surahName} ${verse.verseNumber}
 **Arabic:** ${verse.arabicText}
-**Translation:** ${verse.translation || 'Not available'}
+**Translation:** ${verse.translation || "Not available"}
 
 **Available Scholar Excerpts:**
-${similarTafsirs.map((result: any, index: number) => 
-  `${index + 1}. **${result.scholar.name}** (${result.scholar.century}th century, ${result.scholar.madhab || 'Unknown'} school):
-  ${result.tafsirText.substring(0, 200)}...`
-).join('\n\n')}
+${similarTafsirs
+  .map(
+    (result: any, index: number) =>
+      `${index + 1}. **${result.scholar.name}** (${result.scholar.century}th century, ${result.scholar.madhab || "Unknown"} school):
+  ${result.tafsirText.substring(0, 200)}...`,
+  )
+  .join("\n\n")}
 
 **Requested Parameters:**
-- Tone: ${filters?.tone || 'Not specified'}/10 (1=emotional, 10=rational)
-- Intellect Level: ${filters?.intellectLevel || 'Not specified'}/10
-- Language: ${filters?.language || 'Not specified'}
-- Response Length: ${filters?.responseLength || 'Not specified'}/10
+- Tone: ${filters?.tone || "Not specified"}/10 (1=emotional, 10=rational)
+- Intellect Level: ${filters?.intellectLevel || "Not specified"}/10
+- Language: ${filters?.language || "Not specified"}
+- Response Length: ${filters?.responseLength || "Not specified"}/10
 
 *This is a fallback response. In production, this would be an AI-generated tafsir based on the provided scholar excerpts and your specified parameters.*`;
 
@@ -868,6 +1029,7 @@ ${similarTafsirs.map((result: any, index: number) =>
           citationCount: citations.length,
           excerptCount: sourceExcerpts.length,
           fallback: true,
+          sourceVerseMatch,
         });
 
         const saveTafsirId = similarTafsirs[0]?.tafsirId;
@@ -885,16 +1047,20 @@ ${similarTafsirs.map((result: any, index: number) =>
         }
 
         if (stream) {
-          res.write(`data: ${JSON.stringify({ type: 'chunk', content: fallbackResponse })}\n\n`);
-          res.write(`data: ${JSON.stringify({
-            type: 'complete',
-            searchId: search.id,
-            runId: search.id,
-            confidence,
-            provenance,
-            citations,
-            sourceExcerpts,
-          })}\n\n`);
+          res.write(
+            `data: ${JSON.stringify({ type: "chunk", content: fallbackResponse })}\n\n`,
+          );
+          res.write(
+            `data: ${JSON.stringify({
+              type: "complete",
+              searchId: search.id,
+              runId: search.id,
+              confidence,
+              provenance,
+              citations,
+              sourceExcerpts,
+            })}\n\n`,
+          );
           res.end();
         } else {
           res.json({
@@ -904,7 +1070,7 @@ ${similarTafsirs.map((result: any, index: number) =>
               surahName: verse.surahName,
               verseNumber: verse.verseNumber,
               arabicText: verse.arabicText,
-              translation: verse.translation
+              translation: verse.translation,
             },
             filters,
             aiResponse: fallbackResponse,
@@ -924,7 +1090,7 @@ ${similarTafsirs.map((result: any, index: number) =>
       console.error("Tafseer error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
-  }
+  },
 );
 
-export default router; 
+export default router;

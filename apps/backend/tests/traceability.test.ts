@@ -25,8 +25,14 @@ const REPO_ROOT = resolve(__dirname, "../../..");
 
 const BOARD_PATH = resolve(REPO_ROOT, "MufessirAI_Project_Board_1.xlsx");
 const CLAUDE_PDF_PATH = resolve(REPO_ROOT, "Claude.pdf");
-const BOARD_EXTRACTOR = resolve(REPO_ROOT, "apps/backend/scripts/extract_board_items.py");
-const PDF_EXTRACTOR = resolve(REPO_ROOT, "apps/backend/scripts/extract_claude_pdf_text.py");
+const BOARD_EXTRACTOR = resolve(
+  REPO_ROOT,
+  "apps/backend/scripts/extract_board_items.py",
+);
+const PDF_EXTRACTOR = resolve(
+  REPO_ROOT,
+  "apps/backend/scripts/extract_claude_pdf_text.py",
+);
 
 const TARGET_BOARD_STATUSES = new Set(["DONE", "IN PROGRESS"]);
 
@@ -44,17 +50,23 @@ function parseJsonFile(relativePath: string): any {
 }
 
 function expectFileExists(relativePath: string): void {
-  expect(existsSync(resolve(REPO_ROOT, relativePath)), `${relativePath} should exist`).toBe(true);
+  expect(
+    existsSync(resolve(REPO_ROOT, relativePath)),
+    `${relativePath} should exist`,
+  ).toBe(true);
 }
 
 function expectFileContains(relativePath: string, needle: string): void {
-  expect(readRepoFile(relativePath), `${relativePath} should include: ${needle}`).toContain(needle);
+  expect(
+    readRepoFile(relativePath),
+    `${relativePath} should include: ${needle}`,
+  ).toContain(needle);
 }
 
 function expectFileMatches(relativePath: string, pattern: RegExp): void {
   expect(
     pattern.test(readRepoFile(relativePath)),
-    `${relativePath} should match: ${pattern.toString()}`
+    `${relativePath} should match: ${pattern.toString()}`,
   ).toBe(true);
 }
 
@@ -94,8 +106,14 @@ const checks: Record<string, () => void> = {
   },
 
   jwt_auth_routes_and_tokens() {
-    expectFileContains("apps/backend/src/routes/auth.ts", 'router.post("/register"');
-    expectFileContains("apps/backend/src/routes/auth.ts", 'router.post("/login"');
+    expectFileContains(
+      "apps/backend/src/routes/auth.ts",
+      'router.post("/register"',
+    );
+    expectFileContains(
+      "apps/backend/src/routes/auth.ts",
+      'router.post("/login"',
+    );
     expectFileContains("apps/backend/src/routes/auth.ts", 'router.get("/me"');
     expectFileContains("apps/backend/src/routes/auth.ts", "jwt.sign(");
     expectFileContains("apps/backend/src/middleware/auth.ts", "jwt.verify(");
@@ -104,47 +122,73 @@ const checks: Record<string, () => void> = {
   openai_gpt4omini_integration() {
     expectFileContains("apps/backend/src/utils/openai.ts", "new OpenAI");
     expectFileContains("apps/backend/src/utils/openai.ts", "gpt-4o-mini");
-    expectFileContains("apps/backend/src/utils/openai.ts", "generateTafsirStream");
-    expectFileContains("apps/backend/src/utils/openai.ts", "generateTafsirNonStreaming");
+    expectFileContains(
+      "apps/backend/src/utils/openai.ts",
+      "generateTafsirStream",
+    );
+    expectFileContains(
+      "apps/backend/src/utils/openai.ts",
+      "generateTafsirNonStreaming",
+    );
   },
 
   sse_streaming_enabled() {
-    expectFileContains("apps/backend/src/routes/tafseer.ts", "text/event-stream");
-    expectFileContains("apps/backend/src/routes/tafseer.ts", "res.write(`data:");
+    expectFileContains(
+      "apps/backend/src/routes/tafseer.ts",
+      "text/event-stream",
+    );
+    // Check for SSE data format - supports both single-line and multi-line JSON.stringify
+    const route = readRepoFile("apps/backend/src/routes/tafseer.ts");
+    expect(route).toMatch(/res\.write\(\s*`data:/);
   },
 
   pgvector_schema_and_migration() {
     expectFileContains(
       "packages/database/prisma/schema.prisma",
-      'embedding      Unsupported("vector(1536)")?'
+      'embedding      Unsupported("vector(1536)")?',
     );
     expectFileContains(
       "packages/database/prisma/migrations/20250713215944_add_embedding_column/migration.sql",
-      "CREATE EXTENSION IF NOT EXISTS vector;"
+      "CREATE EXTENSION IF NOT EXISTS vector;",
     );
     expectFileContains(
       "packages/database/prisma/migrations/20250713215944_add_embedding_column/migration.sql",
-      "vector(1536)"
+      "vector(1536)",
     );
   },
 
   sample_data_and_route_tests_present() {
     expectFileExists("apps/backend/scripts/insert-sample-data.js");
-    expectFileContains("apps/backend/tests/app.test.ts", "describe('Filters & Verses'");
+    expectFileContains(
+      "apps/backend/tests/app.test.ts",
+      "describe('Filters & Verses'",
+    );
     expectFileContains("apps/backend/tests/app.test.ts", "describe('Tafseer'");
   },
 
   scholar_model_and_import_pipeline_present() {
-    expectFileContains("packages/database/prisma/schema.prisma", "model Scholar {");
-    expectFileContains("packages/database/prisma/schema.prisma", "model Tafsir {");
+    expectFileContains(
+      "packages/database/prisma/schema.prisma",
+      "model Scholar {",
+    );
+    expectFileContains(
+      "packages/database/prisma/schema.prisma",
+      "model Tafsir {",
+    );
     expectFileExists("apps/backend/scripts/import-mysql-dump.ts");
   },
 
   dashboard_queries_filters_and_tafseer() {
     expectFileContains("apps/frontend/src/lib/tafseer.ts", "/filters");
     expectFileContains("apps/frontend/src/lib/tafseer.ts", "/tafseer");
-    expectFileContains("apps/frontend/src/app/dashboard/query/page.tsx", "tone");
-    expectFileContains("apps/frontend/src/app/dashboard/query/page.tsx", "intellectLevel");
+    expectFileContains(
+      "apps/frontend/src/app/dashboard/query/page.tsx",
+      "tone",
+    );
+    expectFileContains(
+      "apps/frontend/src/app/dashboard/query/page.tsx",
+      "intellectLevel",
+    );
   },
 
   tr_en_language_support_present() {
@@ -168,20 +212,35 @@ const checks: Record<string, () => void> = {
   },
 
   ip01_bilmen_csv_pipeline_evidence() {
-    expectFileContains("MufessirAI_Metadata_Framework.md", "IP01 kapsamında CSV'ye aktarılıyor");
+    expectFileContains(
+      "MufessirAI_Metadata_Framework.md",
+      "IP01 kapsamında CSV'ye aktarılıyor",
+    );
     expectFileExists("apps/backend/scripts/import-mysql-dump.ts");
   },
 
   ip02_validation_and_consolidation_scripts() {
     expectFileExists("apps/backend/scripts/import-mysql-dump.ts");
     expectFileExists("apps/backend/scripts/check-scholar-data-quality.ts");
-    expectFileContains("apps/backend/scripts/check-scholar-data-quality.ts", "dependencyReport");
+    expectFileContains(
+      "apps/backend/scripts/check-scholar-data-quality.ts",
+      "dependencyReport",
+    );
   },
 
   ip03_prompt_system_traceability_rules() {
-    expectFileContains("apps/backend/src/utils/prompt.ts", "Academic Source Hints");
-    expectFileContains("apps/backend/src/utils/prompt.ts", "Keep statements traceable");
-    expectFileContains("apps/backend/src/utils/openai.ts", "traceable to cited scholars");
+    expectFileContains(
+      "apps/backend/src/utils/prompt.ts",
+      "Academic Source Hints",
+    );
+    expectFileContains(
+      "apps/backend/src/utils/prompt.ts",
+      "Keep statements traceable",
+    );
+    expectFileContains(
+      "apps/backend/src/utils/openai.ts",
+      "traceable to cited scholars",
+    );
   },
 
   scholar_metadata_fields_in_schema() {
@@ -246,30 +305,57 @@ const checks: Record<string, () => void> = {
   },
 
   scholar_reference_model_and_usage() {
-    expectFileContains("packages/database/prisma/schema.prisma", "model ScholarReference {");
+    expectFileContains(
+      "packages/database/prisma/schema.prisma",
+      "model ScholarReference {",
+    );
     expectFileContains("apps/backend/src/routes/tafseer.ts", "loadCitations");
-    expectFileContains("apps/backend/src/routes/tafseer.ts", "scholarReference.findMany");
+    expectFileContains(
+      "apps/backend/src/routes/tafseer.ts",
+      "scholarReference.findMany",
+    );
   },
 
   search_result_citations_confidence_schema() {
-    expectFileContains("packages/database/prisma/schema.prisma", "citations       Json?");
-    expectFileContains("packages/database/prisma/schema.prisma", "confidenceScore Float?");
+    expectFileContains(
+      "packages/database/prisma/schema.prisma",
+      "citations       Json?",
+    );
+    expectFileContains(
+      "packages/database/prisma/schema.prisma",
+      "confidenceScore Float?",
+    );
     expectFileContains(
       "packages/database/prisma/migrations/20260305213023_citable_core_schema/migration.sql",
-      'ALTER TABLE "SearchResult" ADD COLUMN     "citations" JSONB'
+      'ALTER TABLE "SearchResult" ADD COLUMN     "citations" JSONB',
     );
   },
 
   deterministic_derivation_functions_present() {
-    expectFileContains("apps/backend/src/utils/scholar-metadata.ts", "deriveCenturyFromHijri");
-    expectFileContains("apps/backend/src/utils/scholar-metadata.ts", "derivePeriodCode");
-    expectFileContains("apps/backend/src/utils/scholar-metadata.ts", "deriveSourceAccessibility");
-    expectFileContains("apps/backend/scripts/derive-scholar-metadata.ts", "computeCompatibilityReputationScore");
+    expectFileContains(
+      "apps/backend/src/utils/scholar-metadata.ts",
+      "deriveCenturyFromHijri",
+    );
+    expectFileContains(
+      "apps/backend/src/utils/scholar-metadata.ts",
+      "derivePeriodCode",
+    );
+    expectFileContains(
+      "apps/backend/src/utils/scholar-metadata.ts",
+      "deriveSourceAccessibility",
+    );
+    expectFileContains(
+      "apps/backend/scripts/derive-scholar-metadata.ts",
+      "computeCompatibilityReputationScore",
+    );
   },
 
   filters_api_exposes_normalized_dimensions() {
     expectFileContains("apps/backend/src/routes/filters.ts", "periodCodes");
-    expectFileContains("apps/backend/src/routes/filters.ts", "sourceAccessibilities");
+    expectFileContains(
+      "apps/backend/src/routes/filters.ts",
+      "sourceAccessibilities",
+    );
     expectFileContains("apps/backend/src/routes/filters.ts", "traditions");
     expectFileContains("apps/backend/src/routes/filters.ts", "tafsirTypes");
     expectFileContains("apps/backend/src/routes/filters.ts", "deathHijriRange");
@@ -277,22 +363,32 @@ const checks: Record<string, () => void> = {
 
   tafseer_payload_includes_citations_confidence_stream_and_json() {
     const route = readRepoFile("apps/backend/src/routes/tafseer.ts");
-    expect(route).toContain("type: 'complete'");
+    expect(route).toContain('type: "complete"');
     expect(route).toContain("confidence");
     expect(route).toContain("citations");
     expect(route).toContain("sourceExcerpts");
   },
 
   compatibility_reputation_score_computation_present() {
-    expectFileContains("apps/backend/src/utils/scholar-metadata.ts", "computeCompatibilityReputationScore");
-    expectFileContains("apps/backend/src/utils/scholar-metadata.ts", "return Number(avg.toFixed(1));");
+    expectFileContains(
+      "apps/backend/src/utils/scholar-metadata.ts",
+      "computeCompatibilityReputationScore",
+    );
+    expectFileContains(
+      "apps/backend/src/utils/scholar-metadata.ts",
+      "return Number(avg.toFixed(1));",
+    );
   },
 
   ci_minimal_path_present() {
     const ci = readRepoFile(".github/workflows/ci.yml");
-    ["Run migrations", "Seed sample data", "Lint", "Type-check", "Backend tests"].forEach((step) =>
-      expect(ci).toContain(step)
-    );
+    [
+      "Run migrations",
+      "Seed sample data",
+      "Lint",
+      "Type-check",
+      "Backend tests",
+    ].forEach((step) => expect(ci).toContain(step));
   },
 
   managed_db_handoff_artifacts_present() {
@@ -335,13 +431,25 @@ const PDF_REQUIREMENTS: Array<{
   {
     id: "PDF-01",
     title: "Scholar metadata expansion",
-    keywords: ["mufassir_tr", "mufassir_name_long", "tafsir_type1", "detail_information", "book_id"],
+    keywords: [
+      "mufassir_tr",
+      "mufassir_name_long",
+      "tafsir_type1",
+      "detail_information",
+      "book_id",
+    ],
     checks: ["scholar_metadata_fields_in_schema"],
   },
   {
     id: "PDF-02",
     title: "Period model enums and codes",
-    keywords: ["foundation", "classical_early", "classical_mature", "post_classical", "contemporary"],
+    keywords: [
+      "foundation",
+      "classical_early",
+      "classical_mature",
+      "post_classical",
+      "contemporary",
+    ],
     checks: ["scholar_period_enum_values"],
   },
   {
@@ -353,7 +461,13 @@ const PDF_REQUIREMENTS: Array<{
   {
     id: "PDF-04",
     title: "Source accessibility model",
-    keywords: ["source_accessibility", "full_digital", "partial_digital", "manuscript_only", "lost"],
+    keywords: [
+      "source_accessibility",
+      "full_digital",
+      "partial_digital",
+      "manuscript_only",
+      "lost",
+    ],
     checks: ["source_accessibility_enum_values"],
   },
   {
@@ -421,14 +535,19 @@ describe("Traceability - Board Coverage", () => {
 
   beforeAll(() => {
     boardItems = runPythonJson<BoardItem[]>(BOARD_EXTRACTOR, [BOARD_PATH]);
-    targetItems = boardItems.filter((item) => TARGET_BOARD_STATUSES.has(item.status));
+    targetItems = boardItems.filter((item) =>
+      TARGET_BOARD_STATUSES.has(item.status),
+    );
   });
 
   it("covers every DONE / IN PROGRESS board item with at least one check", () => {
     expect(targetItems.length).toBeGreaterThan(0);
     for (const item of targetItems) {
       const checkNames = BOARD_ITEM_CHECKS[item.id];
-      expect(checkNames, `Missing check mapping for board item ${item.id}: ${item.task}`).toBeDefined();
+      expect(
+        checkNames,
+        `Missing check mapping for board item ${item.id}: ${item.task}`,
+      ).toBeDefined();
       if (!checkNames) {
         continue;
       }
@@ -439,7 +558,10 @@ describe("Traceability - Board Coverage", () => {
   it("runs mapped checks for each DONE / IN PROGRESS board item", () => {
     for (const item of targetItems) {
       const checkNames = BOARD_ITEM_CHECKS[item.id];
-      expect(checkNames, `No checks defined for ${item.id}: ${item.task}`).toBeDefined();
+      expect(
+        checkNames,
+        `No checks defined for ${item.id}: ${item.task}`,
+      ).toBeDefined();
       if (!checkNames) {
         continue;
       }
@@ -470,7 +592,7 @@ describe("Traceability - Claude PDF Coverage", () => {
       for (const keyword of req.keywords) {
         expect(
           normalizedPdf.includes(normalizeForMatch(keyword)),
-          `PDF keyword missing for ${req.id}: ${keyword}`
+          `PDF keyword missing for ${req.id}: ${keyword}`,
         ).toBe(true);
       }
       for (const checkName of req.checks) {
