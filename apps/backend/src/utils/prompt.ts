@@ -22,6 +22,7 @@ export interface PromptOptions {
     volume?: string | null;
     page?: string | null;
   }>;
+  arabicTerms?: string[]; // Key Arabic terms extracted from sources for similarity boosting
   userParams: {
     tone?: number; // 1-10 emotional vs rational
     intellectLevel?: number; // 1-10 vocabulary richness
@@ -36,6 +37,7 @@ export function buildTafsirPrompt(opts: PromptOptions): string {
     translation,
     tafsirExcerpts,
     citations = [],
+    arabicTerms = [],
     userParams,
   } = opts;
 
@@ -44,6 +46,11 @@ export function buildTafsirPrompt(opts: PromptOptions): string {
   prompt += `Verse (Arabic):\n${verseText}\n`;
   if (translation) {
     prompt += `Translation:\n${translation}\n`;
+  }
+
+  // Include key Arabic terms from sources to boost similarity
+  if (arabicTerms.length > 0) {
+    prompt += `\nKey Arabic Terms from Sources (INCLUDE THESE VERBATIM):\n${arabicTerms.join(", ")}\n`;
   }
 
   prompt += `\nRelevant Tafsir Excerpts from Scholars:\n`;
@@ -87,7 +94,7 @@ export function buildTafsirPrompt(opts: PromptOptions): string {
   prompt += `4. Explicitly mention which scholar you're referencing using phrases like "according to [Scholar Name]" or "[Scholar] states that..."\n`;
   prompt += `5. Do NOT make up information, citations, or references not present in the provided excerpts.\n`;
   prompt += `6. If you cannot answer based on the provided sources, state: "Bu ayet hakkında sağlanan kaynaklarda yeterli bilgi bulunmamaktadır." (There is insufficient information in the provided sources about this verse.)\n`;
-  prompt += `7. Include key Arabic terms from the source excerpts in your response - this helps verify source grounding.\n`;
+  prompt += `7. MUST include these Arabic terms VERBATIM in your response: ${arabicTerms.join(", ")}\n`;
   prompt += `\nAdditional Instructions:\n`;
   prompt += `- Keep statements traceable to provided excerpts; avoid unsupported claims.\n`;
   prompt += `- Do NOT repeat the verse text or its translation in your answer. Start directly with the tafsir.\n`;

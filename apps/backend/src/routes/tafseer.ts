@@ -541,6 +541,23 @@ router.post(
       const sourceExcerpts = buildSourceExcerpts(similarTafsirs);
       const provenance = deriveProvenanceIndicator(citations);
 
+      // Extract Arabic terms/phrases from source excerpts for similarity boosting
+      // These will be included in prompt to encourage verbatim usage
+      const extractArabicTerms = (text: string): string[] => {
+        const arabicPattern = /[\u0600-\u06FF]+/g;
+        const matches = text.match(arabicPattern) || [];
+        // Filter for meaningful terms (3+ chars, not just particles)
+        const meaningfulTerms = matches.filter((t) => t.length >= 3);
+        // Get unique terms, preferring longer ones
+        const unique = [...new Set(meaningfulTerms)];
+        return unique.sort((a, b) => b.length - a.length).slice(0, 10);
+      };
+
+      const allArabicTerms = similarTafsirs.flatMap((t: any) =>
+        extractArabicTerms(t.tafsirText),
+      );
+      const keyArabicTerms = [...new Set(allArabicTerms)].slice(0, 15);
+
       const promptOptions = {
         verseText: verse.arabicText,
         translation: verse.translation || undefined,
@@ -566,6 +583,7 @@ router.post(
           volume: citation.volume,
           page: citation.page,
         })),
+        arabicTerms: keyArabicTerms,
         userParams: {
           tone: filters?.tone,
           intellectLevel: filters?.intellectLevel,
