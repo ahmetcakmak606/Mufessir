@@ -257,8 +257,8 @@ router.get("/runs/:runId", authenticateJWT, async (req, res) => {
               scholarId: latest.tafsir.scholar.id,
               scholarName: latest.tafsir.scholar.name,
               excerpt:
-                latest.tafsir.tafsirText.length > 240
-                  ? `${latest.tafsir.tafsirText.slice(0, 240)}...`
+                latest.tafsir.tafsirText.length > 500
+                  ? `${latest.tafsir.tafsirText.slice(0, 500)}...`
                   : latest.tafsir.tafsirText,
             },
           ]
@@ -388,14 +388,20 @@ router.patch("/runs/:runId", authenticateJWT, async (req, res) => {
 });
 
 function buildSourceExcerpts(similarTafsirs: any[]): SourceExcerpt[] {
-  return similarTafsirs.slice(0, 3).map((result: any) => ({
+  return similarTafsirs.slice(0, 5).map((result: any) => ({
     scholarId: result.scholar.id,
     scholarName: result.scholar.name,
     excerpt:
-      result.tafsirText.length > 240
-        ? `${result.tafsirText.slice(0, 240)}...`
+      result.tafsirText.length > 500
+        ? `${result.tafsirText.slice(0, 500)}...`
         : result.tafsirText,
   }));
+}
+
+function extractReputationScores(similarTafsirs: any[]): number[] {
+  return similarTafsirs
+    .map((t: any) => t.scholar?.reputationScore || 5)
+    .filter((score: number) => typeof score === "number");
 }
 
 async function loadCitations(
@@ -570,7 +576,7 @@ router.post(
       const promptOptions = {
         verseText: verse.arabicText,
         translation: verse.translation || undefined,
-        tafsirExcerpts: similarTafsirs.slice(0, 3).map((result: any) => ({
+        tafsirExcerpts: similarTafsirs.slice(0, 5).map((result: any) => ({
           scholar: {
             name: result.scholar.name,
             century: result.scholar.century,
@@ -581,8 +587,8 @@ router.post(
             reputationScore: result.scholar.reputationScore || undefined,
           } as ScholarMeta,
           excerpt:
-            result.tafsirText.length > 300
-              ? result.tafsirText.substring(0, 300) + "..."
+            result.tafsirText.length > 500
+              ? result.tafsirText.substring(0, 500) + "..."
               : result.tafsirText,
         })),
         citations: citations.slice(0, 8).map((citation) => ({
@@ -715,6 +721,7 @@ router.post(
             citationCount: citations.length,
             excerptCount: sourceExcerpts.length,
             sourceVerseMatch,
+            scholarReputationScores: extractReputationScores(similarTafsirs),
           });
           if (stream) {
             res.setHeader("Content-Type", "text/event-stream");
@@ -919,6 +926,7 @@ router.post(
               citationCount: citations.length,
               excerptCount: sourceExcerpts.length,
               sourceVerseMatch,
+              scholarReputationScores: extractReputationScores(similarTafsirs),
             });
 
             const saveTafsirId =
@@ -1027,6 +1035,7 @@ router.post(
             citationCount: citations.length,
             excerptCount: sourceExcerpts.length,
             sourceVerseMatch,
+            scholarReputationScores: extractReputationScores(similarTafsirs),
           });
 
           const saveTafsirId =
@@ -1102,6 +1111,7 @@ ${similarTafsirs
           excerptCount: sourceExcerpts.length,
           fallback: true,
           sourceVerseMatch,
+          scholarReputationScores: extractReputationScores(similarTafsirs),
         });
 
         const saveTafsirId = similarTafsirs[0]?.tafsirId;
