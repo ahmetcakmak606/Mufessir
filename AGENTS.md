@@ -182,8 +182,8 @@ cd apps/frontend && npx vitest run --testNamePattern "disables save"
 
 ```
 Version: v1.1.0 → v1.2.0
-Phase: 1 (Snapshot System)
-Next: Add AcademicSnapshot model to schema
+Phase: 1 (Snapshot System) - IN PROGRESS
+Next: Update tafsir route to record snapshots on each query
 ```
 
 ### Quick Resume
