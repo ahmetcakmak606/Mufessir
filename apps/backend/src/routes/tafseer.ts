@@ -2,6 +2,7 @@ import { Router } from "express";
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import { createHash } from "crypto";
 import {
   authenticateJWT,
   enforceQuota,
@@ -25,6 +26,83 @@ import {
 import { translateToTurkish } from "../utils/translation.js";
 
 const router: Router = Router();
+
+const CURRENT_VERSION = "1.2";
+const EMBEDDING_MODEL = "text-embedding-3-small";
+const LLM_MODEL = "gpt-4o";
+
+function generateSnapshotId(): string {
+  const dateStr = new Date().toISOString().split("T")[0] ?? "19700101";
+  const date = dateStr.replace(/-/g, "");
+  const randomPart = Math.random().toString(36).substring(2, 7);
+  return `MU-${date}-${randomPart}`;
+}
+
+function generateCitationKey(snapshotId: string): string {
+  const today = new Date().toISOString().split("T")[0];
+  return `MufessirAI, v${CURRENT_VERSION}, ${today}, #${snapshotId.slice(-5)}`;
+}
+
+function computePromptHash(promptOptions: any): string {
+  if (!promptOptions) return "empty-prompt";
+  const normalized = JSON.stringify(
+    promptOptions,
+    Object.keys(promptOptions ?? {}).sort(),
+  );
+  return createHash("sha256").update(normalized).digest("hex").slice(0, 12);
+}
+
+async function createAcademicSnapshot(params: {
+  verseId: string;
+  searchQuery: string;
+  promptOptions: any;
+  aiResponse: string;
+  arabicTafsir?: string;
+  turkishTafsir?: string;
+  similarTafsirs: any[];
+  confidence: number;
+  provenance: string;
+  citations: any[];
+  searchId: string;
+}): Promise<any | null> {
+  try {
+    const snapshotId = generateSnapshotId();
+    const promptHash = computePromptHash(params.promptOptions);
+    const citationKey = generateCitationKey(snapshotId);
+
+    const retrievedSources = params.similarTafsirs.map((t: any) => ({
+      tafsirId: t.tafsirId,
+      scholarName: t.scholarName,
+      scholarId: t.scholar?.id,
+      similarityScore: t.similarityScore,
+      verseId: t.verseId,
+    }));
+
+    return await prisma.academicSnapshot.create({
+      data: {
+        snapshotId,
+        verseId: params.verseId,
+        queryText: params.searchQuery,
+        corpusVersion: "1.0",
+        embeddingModel: EMBEDDING_MODEL,
+        llmModel: LLM_MODEL,
+        promptHash,
+        aiResponse: params.aiResponse,
+        arabicTafsir: params.arabicTafsir,
+        turkishTafsir: params.turkishTafsir,
+        retrievedSources,
+        confidence: params.confidence,
+        provenance: params.provenance,
+        citations: params.citations as unknown as Prisma.InputJsonValue,
+        citationKey,
+        searchId: params.searchId,
+      },
+    });
+  } catch (snapshotError) {
+    console.error("Failed to create academic snapshot:", snapshotError);
+    return null;
+  }
+}
 
 const prisma: PrismaClient = (global as any).prisma || new PrismaClient();
 if (!(global as any).prisma) (global as any).prisma = prisma;
@@ -942,6 +1020,20 @@ router.post(
                   similarityScore: mostSimilar?.similarityScore || null,
                 },
               });
+
+              await createAcademicSnapshot({
+                verseId,
+                searchQuery,
+                promptOptions,
+                aiResponse: arabicTafsir,
+                arabicTafsir,
+                turkishTafsir,
+                similarTafsirs,
+                confidence,
+                provenance,
+                citations,
+                searchId: search.id,
+              });
             }
 
             // Send completion event with both Arabic and Turkish
@@ -1051,6 +1143,20 @@ router.post(
                 similarityScore: mostSimilar?.similarityScore || null,
               },
             });
+
+            await createAcademicSnapshot({
+              verseId,
+              searchQuery,
+              promptOptions,
+              aiResponse: displayTafsir,
+              arabicTafsir,
+              turkishTafsir,
+              similarTafsirs,
+              confidence,
+              provenance,
+              citations,
+              searchId: search.id,
+            });
           }
 
           res.json({
@@ -1125,6 +1231,18 @@ ${similarTafsirs
               confidenceScore: confidence,
               similarityScore: similarTafsirs[0]?.similarityScore || null,
             },
+          });
+
+          await createAcademicSnapshot({
+            verseId,
+            searchQuery,
+            promptOptions,
+            aiResponse: fallbackResponse,
+            similarTafsirs,
+            confidence,
+            provenance,
+            citations,
+            searchId: search.id,
           });
         }
 

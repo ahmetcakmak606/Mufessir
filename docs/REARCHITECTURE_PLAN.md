@@ -289,7 +289,7 @@ Each phase is independent. Skip ahead when complete, but do phases in order.
 
 1. [x] Add AcademicSnapshot model to schema (schema.prisma)
 2. [x] Create migration: `npx prisma migrate dev --name add_academic_snapshot`
-3. [ ] Update backend route to record snapshots on each query
+3. [x] Update backend route to record snapshots on each query
 4. [ ] Generate stable citationKey format: `MufessirAI, v{version}, {YYYY-MM-DD}, #{hash}`
 5. [ ] Expose in API response
 6. [ ] Test end-to-end: make query → get citation key → retrieve by key
