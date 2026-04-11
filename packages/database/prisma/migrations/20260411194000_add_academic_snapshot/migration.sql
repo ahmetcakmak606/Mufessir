@@ -24,4 +24,4 @@ CREATE TABLE "AcademicSnapshot" (
 -- Create index for faster lookups
 CREATE INDEX "AcademicSnapshot_searchId_idx" ON "AcademicSnapshot" ("searchId");
 CREATE INDEX "AcademicSnapshot_verseId_idx" ON "AcademicSnapshot" ("verseId");
-CREATE INDEX "AcademicSnapshot_citationKey_idx" ON "AcademicSnapshot" ("citationKey"");
+CREATE INDEX "AcademicSnapshot_citationKey_idx" ON "AcademicSnapshot" ("citationKey");
