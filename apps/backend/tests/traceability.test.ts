@@ -175,11 +175,11 @@ const checks: Record<string, () => void> = {
     expectFileContains("apps/frontend/src/lib/tafseer.ts", "/tafseer");
     expectFileContains(
       "apps/frontend/src/app/dashboard/query/page.tsx",
-      "tone",
+      "methodTags",
     );
     expectFileContains(
-      "apps/frontend/src/app/dashboard/query/page.tsx",
-      "intellectLevel",
+      "apps/frontend/src/components/dashboard/QueryComposer.tsx",
+      "MethodologyPanel",
     );
   },
 

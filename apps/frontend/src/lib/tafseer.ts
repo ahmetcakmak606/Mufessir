@@ -3,8 +3,7 @@ import { API_BASE_URL, apiRequest } from "@/lib/api-client";
 export interface Filters {
   scholars?: string[];
   excludeScholars?: string[];
-  tone?: number;
-  intellectLevel?: number;
+  methodTags?: string[];
   language?: string;
   responseLength?: number;
   periodCodes?: string[];

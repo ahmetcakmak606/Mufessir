@@ -33,8 +33,7 @@ import { SourceSnippetPanel } from "@/components/dashboard/SourceSnippetPanel";
 
 const defaultFilters: RunDraftFilters = {
   language: "Turkish",
-  tone: 7,
-  intellectLevel: 7,
+  methodTags: [],
   responseLength: 6,
 };
 
@@ -543,8 +542,7 @@ export default function QueryWorkspacePage() {
           verseLabel: dashboard.verseLabel,
           revelationType: dashboard.revelationType,
           filtersTitle: dashboard.filtersTitle,
-          toneLabel: dashboard.toneLabel,
-          intellectLabel: dashboard.intellectLabel,
+          methodLabel: dashboard.methodLabel,
           lengthLabel: dashboard.lengthLabel,
           languageLabel: dashboard.languageLabel,
           includeAll: dashboard.includeAll,

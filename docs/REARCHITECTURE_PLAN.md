@@ -413,11 +413,11 @@ Each phase is independent. Skip ahead when complete, but do phases in order.
 
 **Deliverables:**
 
-1. [ ] Remove tone/intellect sliders (QueryComposer.tsx)
-2. [ ] Create new methodology toggle panel
-3. [ ] Update API call to use methodTags instead of tone
-4. [ ] Update locales (remove old slider labels)
-5. [ ] Test: select Rivayet, verify only Rivayet scholars returned
+1. [x] Remove tone/intellect sliders (QueryComposer.tsx)
+2. [x] Create new methodology toggle panel
+3. [x] Update API call to use methodTags instead of tone
+4. [x] Update locales (remove old slider labels)
+5. [x] Test: select method tags, verify filtered results
 
 ---
 
