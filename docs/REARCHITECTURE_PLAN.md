@@ -358,7 +358,7 @@ Each phase is independent. Skip ahead when complete, but do phases in order.
 
 1. [x] Add methodTags to Tafsir model (schema.prisma)
 2. [x] Create migration: `npx prisma migrate dev --name add_method_tags`
-3. [ ] Populate methodTags from scholar.tafsirType1/2 (seed script or manual)
+3. [x] Populate methodTags from scholar.tafsirType1/2 (seed script or manual)
 4. [x] Update similarity search to accept methodTags filter
 5. [x] Remove tone/intellect from PROMPT (prompt.ts)
 6. [x] Remove tone/intellect from API (tafseer.ts route)
