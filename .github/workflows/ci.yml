@@ -6,6 +6,36 @@ on:
   pull_request:
 
 jobs:
+  commit-message:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check commit messages
+        run: |
+          # regex pattern from Conventional Commits
+          PATTERN="^(feat|fix|refactor|docs|chore)(\([[:alnum:]_-]+\))?: .+"
+
+          # Get commit range - for PRs compare against main, for push use last commit
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            COMMITS=$(git log origin/main..HEAD --format=%s)
+          else
+            COMMITS=$(git log HEAD~1..HEAD --format=%s)
+          fi
+
+          echo "Checking commits..."
+          echo "$COMMITS" | while read -r msg; do
+            if [[ -n "$msg" ]] && ! [[ "$msg" =~ $PATTERN ]]; then
+              echo "Invalid commit message: '$msg'"
+              echo "Expected format: <type>(<scope>): <description>"
+              echo "Types: feat, fix, refactor, docs, chore"
+              exit 1
+            fi
+            echo "✓ $msg"
+          done
+
   backend-core:
     runs-on: ubuntu-latest
     services:

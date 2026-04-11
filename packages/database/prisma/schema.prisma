@@ -118,7 +118,7 @@ model Tafsir {
   keywords       String[]
   languageLevel  Int?      // 1-10 arası (entelektüel seviye)
   emotionalRatio Float?    // 0-1 arası (duygusal/rasyonel oranı)
-  embedding      Unsupported("vector(1536)")? // OpenAI text-embedding-3-small embedding
+  // embedding field removed temporarily - will add back after fix
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   verse          Verse     @relation(fields: [verseId], references: [id])
@@ -195,4 +195,25 @@ model ScholarReference {
 
   @@index([scholarId])
   @@index([sourceType])
+}
+
+model AcademicSnapshot {
+  id               String    @id @default(cuid())
+  snapshotId       String    @unique
+  verseId          String
+  queryText        String
+  corpusVersion   String
+  embeddingModel  String
+  llmModel        String
+  promptHash      String
+  aiResponse      String    @db.Text
+  arabicTafsir    String?   @db.Text
+  turkishTafsir   String?   @db.Text
+  retrievedSources Json?
+  confidence     Float?
+  provenance     String?
+  citations     Json?
+  generatedAt    DateTime  @default(now())
+  citationKey    String
+  searchId       String?
 }

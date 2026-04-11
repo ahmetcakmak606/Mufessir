@@ -171,3 +171,53 @@ cd apps/frontend && npx vitest run --testNamePattern "disables save"
 - Required env vars documented in `.env.example` (create if missing)
 - Never commit `.env` files
 - Use `process.env.VAR_NAME` with type assertion: `process.env.JWT_SECRET as string`
+
+---
+
+## Active Work: Rearchitecture
+
+**Location:** `docs/REARCHITECTURE_PLAN.md`
+
+### Current Status
+
+```
+Version: v1.1.0 → v1.2.0
+Phase: 1 (Snapshot System)
+Next: Add AcademicSnapshot model to schema
+```
+
+### Quick Resume
+
+If continuing this work:
+
+1. Read `docs/REARCHITECTURE_PLAN.md`
+2. Find first unchecked `[ ]` in current phase
+3. Follow step-by-step instructions
+4. Run tests before commit
+5. Update plan marking `[ ]` → `[x]`
+
+### What's Being Built
+
+1. **Snapshot System** - Academic reproducibility with citation keys
+2. **Filter Redesign** - Replace broken sliders with methodology tags
+3. **Method Tags** - Multi-dimensional filtering
+
+### Key Context
+
+- **Problem:** tone/intellect sliders don't affect retrieval (only prompt)
+- **Fix:** methodTags filter at DB level
+- **Also:** AcademicSnapshot for citation keys
+
+### Pre-commit Checklist
+
+```bash
+npm run lint
+npm run check-types
+npm run test
+```
+
+### Version Control (For Reference)
+
+- Commit format: `feat(<scope>): <description>`
+- Tag releases: `git tag -a v1.2.0 -m "Release v1.2.0"`
+- Push: `git push && git push --tags`
