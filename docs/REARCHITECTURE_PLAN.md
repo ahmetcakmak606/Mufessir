@@ -293,7 +293,7 @@ Each phase is independent. Skip ahead when complete, but do phases in order.
 4. [x] Generate stable citationKey format: `MufessirAI, v{version}, {YYYY-MM-DD}, #{hash}`
 5. [x] Expose in API response
 6. [x] Create `/snapshots/:id` endpoint for retrieval
-7. [ ] Update frontend to show citation key on result
+7. [x] Update frontend to show citation key on result
 
 **Note:** Database pushed directly - Railway doesn't have pgvector extension, embedding removed temporarily
 

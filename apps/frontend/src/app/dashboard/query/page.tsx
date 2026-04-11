@@ -95,6 +95,7 @@ export default function QueryWorkspacePage() {
   );
   const [citations, setCitations] = useState<Citation[]>([]);
   const [sourceExcerpts, setSourceExcerpts] = useState<SourceExcerpt[]>([]);
+  const [citationKey, setCitationKey] = useState<string | null>(null);
 
   const [comparisonRuns, setComparisonRuns] = useState<ComparisonRunModel>({
     primaryRun: null,
@@ -276,6 +277,7 @@ export default function QueryWorkspacePage() {
     setProvenance(null);
     setCitations([]);
     setSourceExcerpts([]);
+    setCitationKey(null);
 
     let accumulated = "";
 
@@ -337,6 +339,9 @@ export default function QueryWorkspacePage() {
             }
             if (evt.turkishTafsir) {
               setTurkishTafsir(evt.turkishTafsir);
+            }
+            if (evt.citationKey) {
+              setCitationKey(evt.citationKey);
             }
 
             const run = normalizeTafseerResponseToRun(
@@ -643,6 +648,22 @@ export default function QueryWorkspacePage() {
                 turkish: dashboard.turkish || "Turkish",
               }}
             />
+            {citationKey && (
+              <div className="mt-2 flex items-center gap-2 px-4">
+                <span className="ui-muted text-xs">Citation:</span>
+                <code className="ui-badge text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                  {citationKey}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard.writeText(citationKey)}
+                  className="ui-button-ghost text-xs px-2 py-1"
+                  title="Copy citation"
+                >
+                  Copy
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="ui-panel-strong px-4 py-4 xl:hidden">

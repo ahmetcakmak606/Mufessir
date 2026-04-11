@@ -244,6 +244,7 @@ export type StreamEvent = {
   cached?: boolean;
   arabicTafsir?: string;
   turkishTafsir?: string;
+  citationKey?: string;
 };
 
 export async function startTafseerStream(
