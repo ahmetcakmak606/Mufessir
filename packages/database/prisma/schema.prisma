@@ -116,9 +116,7 @@ model Tafsir {
   tafsirText     String    @db.Text
   tafsirType     String?   // Filolojik, İşari, vb.
   keywords       String[]
-  languageLevel  Int?      // 1-10 arası (entelektüel seviye)
-  emotionalRatio Float?    // 0-1 arası (duygusal/rasyonel oranı)
-  // embedding field removed temporarily - will add back after fix
+  methodTags     String[]  @default(["MIXED"])
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   verse          Verse     @relation(fields: [verseId], references: [id])

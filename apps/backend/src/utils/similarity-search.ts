@@ -15,6 +15,7 @@ export interface SimilaritySearchOptions {
   scholarIds?: string[];
   excludeScholarIds?: string[];
   minSimilarity?: number;
+  methodTags?: string[];
 }
 
 export interface SimilaritySearchResult {
@@ -78,6 +79,8 @@ export async function performSimilaritySearch(
       whereClause.scholarId = { in: options.scholarIds };
     if (options.excludeScholarIds && options.excludeScholarIds.length > 0)
       whereClause.scholarId = { notIn: options.excludeScholarIds };
+    if (options.methodTags && options.methodTags.length > 0)
+      whereClause.methodTags = { hasSome: options.methodTags };
 
     const sampleTafsirs = await prisma.tafsir.findMany({
       where: whereClause,
@@ -119,6 +122,9 @@ export async function performSimilaritySearch(
     }
     if (options.excludeScholarIds && options.excludeScholarIds.length > 0) {
       whereClause.scholarId = { notIn: options.excludeScholarIds };
+    }
+    if (options.methodTags && options.methodTags.length > 0) {
+      whereClause.methodTags = { hasSome: options.methodTags };
     }
 
     const sampleTafsirs = await prisma.tafsir.findMany({
@@ -171,6 +177,9 @@ export async function performSimilaritySearch(
       }
       if (options.excludeScholarIds && options.excludeScholarIds.length > 0) {
         whereClause.scholarId = { notIn: options.excludeScholarIds };
+      }
+      if (options.methodTags && options.methodTags.length > 0) {
+        whereClause.methodTags = { hasSome: options.methodTags };
       }
 
       const sampleTafsirs = await prisma.tafsir.findMany({

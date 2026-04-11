@@ -537,8 +537,7 @@ router.post(
         filters?: {
           scholars?: string[];
           excludeScholars?: string[];
-          tone?: number; // 1-10 emotional vs rational
-          intellectLevel?: number; // 1-10 vocabulary richness
+          methodTags?: string[];
           language?: string;
           responseLength?: number; // 1-10 desired length (short->long)
         };
@@ -571,6 +570,7 @@ router.post(
           verseId: verseId, // Always filter by verseId to prevent cross-verse retrieval
           scholarIds: filters?.scholars,
           excludeScholarIds: filters?.excludeScholars,
+          methodTags: filters?.methodTags,
           limit: 5,
           minSimilarity: 0.3,
         });
@@ -678,8 +678,7 @@ router.post(
         })),
         arabicTerms: keyArabicTerms,
         userParams: {
-          tone: filters?.tone,
-          intellectLevel: filters?.intellectLevel,
+          methodTags: filters?.methodTags,
           language: filters?.language || "Turkish",
         },
       };
@@ -1225,8 +1224,7 @@ ${similarTafsirs
   .join("\n\n")}
 
 **Requested Parameters:**
-- Tone: ${filters?.tone || "Not specified"}/10 (1=emotional, 10=rational)
-- Intellect Level: ${filters?.intellectLevel || "Not specified"}/10
+- Methodology Tags: ${filters?.methodTags?.join(", ") || "Not specified"}
 - Language: ${filters?.language || "Not specified"}
 - Response Length: ${filters?.responseLength || "Not specified"}/10
 
