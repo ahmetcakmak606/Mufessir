@@ -1033,24 +1033,41 @@ router.post(
                 provenance,
                 citations,
                 searchId: search.id,
+              }).then((snapshot) => {
+                if (snapshot) {
+                  res.write(
+                    `data: ${JSON.stringify({
+                      type: "complete",
+                      searchId: search.id,
+                      runId: search.id,
+                      usage: result.usage,
+                      confidence,
+                      provenance,
+                      citations,
+                      sourceExcerpts,
+                      arabicTafsir,
+                      turkishTafsir,
+                      citationKey: snapshot.citationKey,
+                    })}\n\n`,
+                  );
+                } else {
+                  res.write(
+                    `data: ${JSON.stringify({
+                      type: "complete",
+                      searchId: search.id,
+                      runId: search.id,
+                      usage: result.usage,
+                      confidence,
+                      provenance,
+                      citations,
+                      sourceExcerpts,
+                      arabicTafsir,
+                      turkishTafsir,
+                    })}\n\n`,
+                  );
+                }
               });
             }
-
-            // Send completion event with both Arabic and Turkish
-            res.write(
-              `data: ${JSON.stringify({
-                type: "complete",
-                searchId: search.id,
-                runId: search.id,
-                usage: result.usage,
-                confidence,
-                provenance,
-                citations,
-                sourceExcerpts,
-                arabicTafsir,
-                turkishTafsir,
-              })}\n\n`,
-            );
           } catch (streamError) {
             // Handle streaming errors
             res.write(
@@ -1130,6 +1147,7 @@ router.post(
             scholarReputationScores: extractReputationScores(similarTafsirs),
           });
 
+          let citationKey: string | null = null;
           const saveTafsirId =
             mostSimilar?.tafsirId || similarTafsirs[0]?.tafsirId;
           if (saveTafsirId) {
@@ -1144,7 +1162,7 @@ router.post(
               },
             });
 
-            await createAcademicSnapshot({
+            const snapshot = await createAcademicSnapshot({
               verseId,
               searchQuery,
               promptOptions,
@@ -1157,6 +1175,9 @@ router.post(
               citations,
               searchId: search.id,
             });
+            if (snapshot) {
+              citationKey = snapshot.citationKey;
+            }
           }
 
           res.json({
@@ -1181,6 +1202,7 @@ router.post(
             searchId: search.id,
             runId: search.id,
             usage: result.usage,
+            citationKey,
           });
         }
       } catch (openaiError) {
@@ -1292,5 +1314,96 @@ ${similarTafsirs
     }
   },
 );
+
+router.get("/snapshots/:snapshotId", authenticateJWT, async (req, res) => {
+  try {
+    const userId = (req as any).user?.id as string;
+    const snapshotId = req.params.snapshotId;
+
+    if (!snapshotId) {
+      return res.status(400).json({ error: "snapshotId is required" });
+    }
+
+    const snapshot = await prisma.academicSnapshot.findUnique({
+      where: {
+        snapshotId,
+      },
+    });
+
+    if (!snapshot) {
+      return res.status(404).json({ error: "Snapshot not found" });
+    }
+
+    if (!snapshot.searchId) {
+      return res.json({
+        snapshotId: snapshot.snapshotId,
+        citationKey: snapshot.citationKey,
+        verse: null,
+        queryText: snapshot.queryText,
+        aiResponse: snapshot.aiResponse,
+        arabicTafsir: snapshot.arabicTafsir,
+        turkishTafsir: snapshot.turkishTafsir,
+        retrievedSources: snapshot.retrievedSources,
+        confidence: snapshot.confidence,
+        provenance: snapshot.provenance,
+        citations: snapshot.citations,
+        generatedAt: snapshot.generatedAt,
+        systemInfo: {
+          corpusVersion: snapshot.corpusVersion,
+          embeddingModel: snapshot.embeddingModel,
+          llmModel: snapshot.llmModel,
+          promptHash: snapshot.promptHash,
+        },
+      });
+    }
+
+    const search = await prisma.search.findFirst({
+      where: {
+        id: snapshot.searchId,
+        userId,
+      },
+      include: {
+        verse: {
+          select: {
+            id: true,
+            surahNumber: true,
+            surahName: true,
+            verseNumber: true,
+            arabicText: true,
+            translation: true,
+          },
+        },
+      },
+    });
+
+    if (!search) {
+      return res.status(404).json({ error: "Snapshot not found" });
+    }
+
+    return res.json({
+      snapshotId: snapshot.snapshotId,
+      citationKey: snapshot.citationKey,
+      verse: search.verse,
+      queryText: snapshot.queryText,
+      aiResponse: snapshot.aiResponse,
+      arabicTafsir: snapshot.arabicTafsir,
+      turkishTafsir: snapshot.turkishTafsir,
+      retrievedSources: snapshot.retrievedSources,
+      confidence: snapshot.confidence,
+      provenance: snapshot.provenance,
+      citations: snapshot.citations,
+      generatedAt: snapshot.generatedAt,
+      systemInfo: {
+        corpusVersion: snapshot.corpusVersion,
+        embeddingModel: snapshot.embeddingModel,
+        llmModel: snapshot.llmModel,
+        promptHash: snapshot.promptHash,
+      },
+    });
+  } catch (error) {
+    console.error("Snapshot retrieval error:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 export default router;
