@@ -1,6 +1,7 @@
-'use client';
+"use client";
 
-import type { Citation } from '@/lib/tafseer';
+import { formatScholarName } from "@/lib/metadata-labels";
+import type { Citation } from "@/lib/tafseer";
 
 interface CitationPanelProps {
   title: string;
@@ -12,9 +13,14 @@ interface CitationPanelProps {
   };
 }
 
-export function CitationPanel({ title, empty, citations, labels }: CitationPanelProps) {
-  const volumeShort = labels?.volumeShort || 'Vol';
-  const pageShort = labels?.pageShort || 'p.';
+export function CitationPanel({
+  title,
+  empty,
+  citations,
+  labels,
+}: CitationPanelProps) {
+  const volumeShort = labels?.volumeShort || "Vol";
+  const pageShort = labels?.pageShort || "p.";
 
   return (
     <section className="ui-panel-strong overflow-hidden">
@@ -23,16 +29,25 @@ export function CitationPanel({ title, empty, citations, labels }: CitationPanel
         {!citations.length && <p className="ui-muted text-sm">{empty}</p>}
         <div className="space-y-2">
           {citations.map((citation, index) => (
-            <article key={`${citation.scholarId}-${index}`} className="ui-panel rounded-xl p-3 text-sm">
-              <p className="font-semibold text-[var(--text-strong)]">{citation.scholarName}</p>
-              <p className="text-[var(--text-strong)]">{citation.sourceTitle}</p>
+            <article
+              key={`${citation.scholarId}-${index}`}
+              className="ui-panel rounded-xl p-3 text-sm"
+            >
+              <p className="font-semibold text-[var(--text-strong)]">
+                {formatScholarName(citation.scholarName)}
+              </p>
+              <p className="text-[var(--text-strong)]">
+                {citation.sourceTitle}
+              </p>
               <p className="ui-muted text-xs">
                 {citation.sourceType}
-                {citation.volume ? ` · ${volumeShort} ${citation.volume}` : ''}
-                {citation.page ? ` · ${pageShort} ${citation.page}` : ''}
-                {citation.edition ? ` · ${citation.edition}` : ''}
+                {citation.volume ? ` · ${volumeShort} ${citation.volume}` : ""}
+                {citation.page ? ` · ${pageShort} ${citation.page}` : ""}
+                {citation.edition ? ` · ${citation.edition}` : ""}
               </p>
-              {citation.citationText && <p className="ui-muted mt-1 text-xs">{citation.citationText}</p>}
+              {citation.citationText && (
+                <p className="ui-muted mt-1 text-xs">{citation.citationText}</p>
+              )}
             </article>
           ))}
         </div>

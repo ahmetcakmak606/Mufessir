@@ -109,7 +109,7 @@ export const locales = {
       clear: "Temizle",
       includeAll: "Tümünü dahil et",
       excludeAll: "Tümünü hariç tut",
-      resetSelections: "Seçimleri sıfırla",
+      resetSelections: "Seçimleri temizle",
       analyze: "Analiz et",
       analyzing: "Analiz ediliyor…",
       quotaExhausted: "Kota bitti",

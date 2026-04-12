@@ -1,5 +1,6 @@
 "use client";
 
+import { useLang } from "@/context/LangContext";
 import type {
   FiltersResponse,
   RunDraftFilters,
@@ -7,6 +8,11 @@ import type {
 } from "@/lib/tafseer";
 import type { SurahMeta } from "@/lib/surahs";
 import { MethodologyPanel } from "@/components/dashboard/MethodologyPanel";
+import { ScholarGroupPanel } from "@/components/dashboard/ScholarGroupPanel";
+import {
+  FilterPresets,
+  type FilterPreset,
+} from "@/components/dashboard/FilterPresets";
 
 interface QueryComposerProps {
   surahNumber: number;
@@ -33,7 +39,6 @@ interface QueryComposerProps {
   onResetScholar: (id: string) => void;
   onIncludeAll: () => void;
   onExcludeAll: () => void;
-  onResetSelections: () => void;
   onAnalyze: () => void;
   labels: {
     verseTitle: string;
@@ -86,10 +91,10 @@ export function QueryComposer({
   onResetScholar,
   onIncludeAll,
   onExcludeAll,
-  onResetSelections,
   onAnalyze,
   labels,
 }: QueryComposerProps) {
+  const { lang } = useLang();
   const selectedLanguage = filters.language || "Turkish";
 
   return (
@@ -154,6 +159,23 @@ export function QueryComposer({
             }
             label={labels.methodLabel}
           />
+          <FilterPresets
+            onApplyPreset={(preset: FilterPreset) => {
+              onFilterChange({
+                ...filters,
+                periodCodes: preset.filters.periodCodes,
+                madhabs: preset.filters.madhabs,
+                traditions: preset.filters.traditions,
+                tafsirTypes: preset.filters.tafsirTypes,
+              });
+            }}
+            currentFilters={{
+              periodCodes: filters.periodCodes,
+              madhabs: filters.madhabs,
+              traditions: filters.traditions,
+              tafsirTypes: filters.tafsirTypes,
+            }}
+          />
           <div>
             <div className="mb-1 flex items-center justify-between">
               <label className="ui-muted block text-xs font-semibold uppercase tracking-[0.08em]">
@@ -201,6 +223,91 @@ export function QueryComposer({
           </div>
 
           <div className="space-y-2">
+            <input
+              type="text"
+              value={scholarQuery}
+              placeholder={labels.scholarSearchPlaceholder}
+              onChange={(e) => onScholarQueryChange(e.target.value)}
+              className="ui-input"
+            />
+
+            {availableFilters?.filterOptions && (
+              <div className="space-y-2">
+                {availableFilters.filterOptions.madhabs.length > 0 && (
+                  <div>
+                    <p className="ui-muted mb-1 text-[10px] font-semibold uppercase tracking-[0.08em]">
+                      {lang === "tr" ? "Mezhep" : "Madhab"}
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {availableFilters.filterOptions.madhabs
+                        .slice(0, 6)
+                        .map((madhab) => {
+                          const isSelected = filters.madhabs?.includes(madhab);
+                          return (
+                            <button
+                              key={madhab}
+                              type="button"
+                              onClick={() => {
+                                const current = filters.madhabs || [];
+                                const next = isSelected
+                                  ? current.filter((m) => m !== madhab)
+                                  : [...current, madhab];
+                                onFilterChange({ ...filters, madhabs: next });
+                              }}
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-all ${
+                                isSelected
+                                  ? "bg-[var(--brand)] text-white"
+                                  : "border border-[var(--border-soft)] bg-white text-[var(--text-muted)] hover:border-[var(--brand)]"
+                              }`}
+                            >
+                              {madhab}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+                {availableFilters.filterOptions.tafsirTypes.length > 0 && (
+                  <div>
+                    <p className="ui-muted mb-1 text-[10px] font-semibold uppercase tracking-[0.08em]">
+                      {lang === "tr" ? "Tefsir Turu" : "Tafsir Type"}
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {availableFilters.filterOptions.tafsirTypes
+                        .slice(0, 6)
+                        .map((type) => {
+                          const isSelected =
+                            filters.tafsirTypes?.includes(type);
+                          return (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => {
+                                const current = filters.tafsirTypes || [];
+                                const next = isSelected
+                                  ? current.filter((t) => t !== type)
+                                  : [...current, type];
+                                onFilterChange({
+                                  ...filters,
+                                  tafsirTypes: next,
+                                });
+                              }}
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-all ${
+                                isSelected
+                                  ? "bg-[var(--brand)] text-white"
+                                  : "border border-[var(--border-soft)] bg-white text-[var(--text-muted)] hover:border-[var(--brand)]"
+                              }`}
+                            >
+                              {type}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <button
                 type="button"
@@ -216,98 +323,52 @@ export function QueryComposer({
               >
                 {labels.excludeAll}
               </button>
-              <button
-                type="button"
-                onClick={onResetSelections}
-                className="ui-button-secondary px-2.5 py-1"
-              >
-                {labels.resetSelections}
-              </button>
             </div>
 
-            <input
-              type="text"
-              value={scholarQuery}
-              placeholder={labels.scholarSearchPlaceholder}
-              onChange={(e) => onScholarQueryChange(e.target.value)}
-              className="ui-input"
+            <ScholarGroupPanel
+              filteredScholars={filteredScholars}
+              includeIds={includeIds}
+              excludeIds={excludeIds}
+              onInclude={onInclude}
+              onExclude={onExclude}
+              onResetScholar={onResetScholar}
+              onIncludePeriod={(periodCode) => {
+                const ids = filteredScholars
+                  .filter((s) => s.periodCode === periodCode)
+                  .map((s) => s.id);
+                const nextInclude = new Set([
+                  ...(filters.scholars || []),
+                  ...ids,
+                ]);
+                onFilterChange({
+                  ...filters,
+                  scholars: Array.from(nextInclude),
+                  excludeScholars: [],
+                });
+              }}
+              onExcludePeriod={(periodCode) => {
+                const ids = filteredScholars
+                  .filter((s) => s.periodCode === periodCode)
+                  .map((s) => s.id);
+                const nextExclude = new Set([
+                  ...(filters.excludeScholars || []),
+                  ...ids,
+                ]);
+                onFilterChange({
+                  ...filters,
+                  scholars: [],
+                  excludeScholars: Array.from(nextExclude),
+                });
+              }}
+              labels={{
+                include: labels.actionInclude,
+                exclude: labels.actionExclude,
+                reset: labels.actionReset,
+                includeAll: labels.includeAll,
+                excludeAll: labels.excludeAll,
+                resetAll: labels.resetSelections,
+              }}
             />
-
-            <div className="max-h-72 overflow-auto rounded-xl border border-[var(--border-soft)]">
-              <table className="min-w-full table-fixed text-sm">
-                <colgroup>
-                  <col className="w-1/2" />
-                  <col className="w-1/5" />
-                  <col className="w-3/10" />
-                </colgroup>
-                <thead className="ui-table-head">
-                  <tr>
-                    <th className="px-2 py-2 text-left">
-                      {labels.tableScholar}
-                    </th>
-                    <th className="px-2 py-2 text-left">{labels.tableDeath}</th>
-                    <th className="px-2 py-2 text-right">
-                      {labels.tableSelection}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredScholars.map((scholar) => {
-                    const included = includeIds.has(scholar.id);
-                    const excluded = excludeIds.has(scholar.id);
-                    return (
-                      <tr
-                        key={scholar.id}
-                        className="ui-table-row border-t border-[var(--border-soft)]"
-                      >
-                        <td
-                          className="truncate px-2 py-1.5"
-                          title={scholar.name}
-                        >
-                          {scholar.name}
-                        </td>
-                        <td className="px-2 py-1.5">
-                          {scholar.deathYear ?? "-"}
-                        </td>
-                        <td className="space-x-1 px-2 py-1.5 text-right">
-                          <button
-                            type="button"
-                            className={`rounded-md border px-2 py-0.5 text-xs ${
-                              included
-                                ? "border-[var(--brand)] bg-[var(--brand)] text-white"
-                                : "border-[rgba(14,122,105,0.35)] text-[var(--brand-dark)]"
-                            }`}
-                            onClick={() => onInclude(scholar.id)}
-                          >
-                            {labels.actionInclude}
-                          </button>
-                          <button
-                            type="button"
-                            className={`rounded-md border px-2 py-0.5 text-xs ${
-                              excluded
-                                ? "border-[var(--danger-text)] bg-[var(--danger-text)] text-white"
-                                : "border-[rgba(150,47,47,0.35)] text-[var(--danger-text)]"
-                            }`}
-                            onClick={() => onExclude(scholar.id)}
-                          >
-                            {labels.actionExclude}
-                          </button>
-                          {(included || excluded) && (
-                            <button
-                              type="button"
-                              className="rounded-md border border-[var(--border-strong)] px-2 py-0.5 text-xs text-[var(--text-muted)]"
-                              onClick={() => onResetScholar(scholar.id)}
-                            >
-                              {labels.actionReset}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
           </div>
 
           <button

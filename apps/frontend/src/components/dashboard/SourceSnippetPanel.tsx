@@ -1,6 +1,7 @@
-'use client';
+"use client";
 
-import type { SourceExcerpt } from '@/lib/tafseer';
+import { formatScholarName } from "@/lib/metadata-labels";
+import type { SourceExcerpt } from "@/lib/tafseer";
 
 interface SourceSnippetPanelProps {
   title: string;
@@ -8,7 +9,11 @@ interface SourceSnippetPanelProps {
   excerpts: SourceExcerpt[];
 }
 
-export function SourceSnippetPanel({ title, empty, excerpts }: SourceSnippetPanelProps) {
+export function SourceSnippetPanel({
+  title,
+  empty,
+  excerpts,
+}: SourceSnippetPanelProps) {
   return (
     <section className="ui-panel-strong overflow-hidden">
       <div className="space-y-3 px-4 py-5 sm:p-6">
@@ -16,9 +21,16 @@ export function SourceSnippetPanel({ title, empty, excerpts }: SourceSnippetPane
         {!excerpts.length && <p className="ui-muted text-sm">{empty}</p>}
         <div className="space-y-2">
           {excerpts.map((excerpt, index) => (
-            <article key={`${excerpt.scholarId}-${index}`} className="ui-panel rounded-xl p-3">
-              <p className="ui-muted mb-1 text-xs font-semibold">{excerpt.scholarName}</p>
-              <p className="whitespace-pre-wrap text-sm text-[var(--text-strong)]">{excerpt.excerpt}</p>
+            <article
+              key={`${excerpt.scholarId}-${index}`}
+              className="ui-panel rounded-xl p-3"
+            >
+              <p className="ui-muted mb-1 text-xs font-semibold">
+                {formatScholarName(excerpt.scholarName)}
+              </p>
+              <p className="whitespace-pre-wrap text-sm text-[var(--text-strong)]">
+                {excerpt.excerpt}
+              </p>
             </article>
           ))}
         </div>

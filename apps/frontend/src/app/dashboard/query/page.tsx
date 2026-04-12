@@ -30,6 +30,7 @@ import { ResultStream } from "@/components/dashboard/ResultStream";
 import { RunActions } from "@/components/dashboard/RunActions";
 import { CitationPanel } from "@/components/dashboard/CitationPanel";
 import { SourceSnippetPanel } from "@/components/dashboard/SourceSnippetPanel";
+import { QueryBar } from "@/components/dashboard/QueryBar";
 
 const defaultFilters: RunDraftFilters = {
   language: "Turkish",
@@ -490,10 +491,6 @@ export default function QueryWorkspacePage() {
     setFilters((prev) => ({ ...prev, scholars: [], excludeScholars: ids }));
   };
 
-  const resetSelections = () => {
-    setFilters((prev) => ({ ...prev, scholars: [], excludeScholars: [] }));
-  };
-
   const revelationLabel =
     revelationType === "Mekki"
       ? dashboard.mekki
@@ -534,7 +531,6 @@ export default function QueryWorkspacePage() {
         onResetScholar={resetScholar}
         onIncludeAll={includeAll}
         onExcludeAll={excludeAll}
-        onResetSelections={resetSelections}
         onAnalyze={() => void handleAnalyze()}
         labels={{
           verseTitle: dashboard.verseTitle,
@@ -582,10 +578,30 @@ export default function QueryWorkspacePage() {
     </div>
   );
 
+  const activeFilterCount =
+    (filters.methodTags?.length || 0) +
+    (filters.periodCodes?.length || 0) +
+    (filters.madhabs?.length || 0) +
+    (filters.traditions?.length || 0) +
+    (filters.sourceAccessibilities?.length || 0);
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-0">
+      <QueryBar
+        surahNumber={surahNumber}
+        verseNumber={verseNumber}
+        surahOptions={surahs}
+        onSurahChange={setSurahNumber}
+        onVerseChange={setVerseNumber}
+        onOpenFilters={() => setMobileControlsOpen(true)}
+        onAnalyze={() => void handleAnalyze()}
+        activeFilterCount={activeFilterCount}
+        canAnalyze={canAnalyze}
+        analyzing={isAnalyzing}
+      />
+
       {status && (
-        <p className="ui-panel rounded-lg px-3 py-2 text-sm ui-muted">
+        <p className="mx-auto max-w-4xl px-4 py-2 text-center text-sm text-[var(--text-muted)]">
           {status}
         </p>
       )}
