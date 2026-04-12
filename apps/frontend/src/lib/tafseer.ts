@@ -115,6 +115,9 @@ export interface TafseerResponse {
   } | null;
   cached?: boolean;
   fallback?: boolean;
+  noTafsirForSelectedScholars?: boolean;
+  noTafsirMessage?: string;
+  missingScholarNames?: string[];
 }
 
 export interface TafseerRun {
@@ -244,6 +247,9 @@ export type StreamEvent = {
   arabicTafsir?: string;
   turkishTafsir?: string;
   citationKey?: string;
+  noTafsirForSelectedScholars?: boolean;
+  noTafsirMessage?: string;
+  missingScholarNames?: string[];
 };
 
 export async function startTafseerStream(

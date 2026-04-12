@@ -84,10 +84,10 @@ describe("Scholar Filter Fallback Fix", () => {
     console.log(`[Fix Test] Excerpts: ${res.body.sourceExcerpts?.length || 0}`);
     console.log(`[Fix Test] Error: ${res.body.error || "none"}`);
 
-    // BEFORE FIX: This would return 404
-    // AFTER FIX: Should return 200 with fallback results
+    // AFTER FIX: Should return 200 with info message (no fallback)
     expect(res.status).toBe(200);
-    expect(res.body.sourceExcerpts?.length).toBeGreaterThan(0);
+    expect(res.body.noTafsirForSelectedScholars).toBe(true);
+    expect(res.body.missingScholarNames?.length).toBeGreaterThan(0);
   });
 
   it("fix: should still respect scholar filter when they have tafsir", async () => {

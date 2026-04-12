@@ -17,6 +17,8 @@ interface ResultStreamProps {
     completionTokens?: number;
     totalTokens?: number;
   } | null;
+  noTafsirMessage?: string | null;
+  missingScholars?: string[];
   labels: {
     analyzing: string;
     perfTitle: string;
@@ -40,6 +42,8 @@ export function ResultStream({
   firstByteAt,
   completedAt,
   usage,
+  noTafsirMessage,
+  missingScholars,
   labels,
 }: ResultStreamProps) {
   const [displayLang, setDisplayLang] = useState<"tr" | "ar">("tr");
@@ -110,7 +114,16 @@ export function ResultStream({
           className="ui-panel min-h-64 whitespace-pre-wrap p-4 text-sm leading-relaxed text-[var(--text-strong)] sm:text-[0.95rem]"
           dir={displayLang === "ar" ? "rtl" : "ltr"}
         >
-          {displayContent ? (
+          {noTafsirMessage ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800">
+              <p className="font-medium">⚠️ {noTafsirMessage}</p>
+              {missingScholars && missingScholars.length > 0 && (
+                <p className="mt-2 text-sm text-amber-700">
+                  Tefsiri olmayan alimler: {missingScholars.join(", ")}
+                </p>
+              )}
+            </div>
+          ) : displayContent ? (
             displayContent
           ) : (
             <p className="ui-muted">{placeholder}</p>

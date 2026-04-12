@@ -93,6 +93,8 @@ export default function QueryWorkspacePage() {
   const [provenance, setProvenance] = useState<ProvenanceIndicator | null>(
     null,
   );
+  const [noTafsirMessage, setNoTafsirMessage] = useState<string | null>(null);
+  const [missingScholars, setMissingScholars] = useState<string[]>([]);
   const [citations, setCitations] = useState<Citation[]>([]);
   const [sourceExcerpts, setSourceExcerpts] = useState<SourceExcerpt[]>([]);
   const [citationKey, setCitationKey] = useState<string | null>(null);
@@ -342,6 +344,21 @@ export default function QueryWorkspacePage() {
             }
             if (evt.citationKey) {
               setCitationKey(evt.citationKey);
+            }
+
+            // Handle case where selected scholars have no tafsir for this verse
+            if (evt.noTafsirForSelectedScholars) {
+              setNoTafsirMessage(
+                evt.noTafsirMessage ||
+                  "Seçilen alimlerin bu ayet için tefsiri bulunmamaktadır.",
+              );
+              setMissingScholars(evt.missingScholarNames || []);
+              setStreamContent("");
+              setArabicTafsir(undefined);
+              setTurkishTafsir(undefined);
+            } else {
+              setNoTafsirMessage(null);
+              setMissingScholars([]);
             }
 
             const run = normalizeTafseerResponseToRun(
@@ -651,6 +668,8 @@ export default function QueryWorkspacePage() {
               firstByteAt={firstByteAt}
               completedAt={completedAt}
               usage={usage}
+              noTafsirMessage={noTafsirMessage}
+              missingScholars={missingScholars}
               labels={{
                 analyzing: dashboard.analyzing,
                 perfTitle: dashboard.perfTitle,

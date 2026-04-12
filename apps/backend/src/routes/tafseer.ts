@@ -586,24 +586,54 @@ router.post(
         console.error("Similarity search error:", searchError);
       }
 
-      // If scholar filter was used but returned no results, try without scholar filter
-      // This handles the case where selected scholars don't have tafsir for this verse
+      // If scholar filter was used but returned no results, return info message
+      // instead of showing results from unselected scholars
       if (similarTafsirs.length === 0 && hasScholarFilter) {
-        console.log(
-          `[Tafseer] No tafsirs found with scholar filter, falling back to any scholar for verse ${verseId}`,
+        const requestedScholarIds = filters?.scholars || [];
+
+        // Find which of the requested scholars have tafsir for this verse
+        const existingTafsirs = await prisma.tafsir.findMany({
+          where: { verseId, scholarId: { in: requestedScholarIds } },
+          select: { scholarId: true, scholar: { select: { name: true } } },
+        });
+
+        const scholarsWithTafsir = [
+          ...new Set(existingTafsirs.map((t) => t.scholarId)),
+        ];
+        const scholarsWithoutTafsir = requestedScholarIds.filter(
+          (id) => !scholarsWithTafsir.includes(id),
         );
-        try {
-          similarTafsirs = await performSimilaritySearch(prisma, {
-            query: searchQuery,
-            verseId: verseId,
-            methodTags: filters?.methodTags,
-            limit: 5,
-            minSimilarity: 0.3,
-          });
-        } catch (fallbackError) {
-          console.error("Fallback search also failed:", fallbackError);
-        }
+
+        // Get scholar names for the response
+        const allScholars = await prisma.scholar.findMany({
+          where: { id: { in: scholarsWithoutTafsir } },
+          select: { id: true, name: true, mufassirTr: true },
+        });
+
+        const missingNames = allScholars
+          .map((s) => s.mufassirTr || s.name)
+          .join(", ");
+
+        return res.status(200).json({
+          verse,
+          filters: filters || {},
+          aiResponse: "",
+          arabicTafsir: null,
+          turkishTafsir: null,
+          confidence: null,
+          provenance: null,
+          citations: [],
+          sourceExcerpts: [],
+          runId: null,
+          searchId: null,
+          noTafsirForSelectedScholars: true,
+          noTafsirMessage: `Seçilen alimlerin bu ayet için tefsiri bulunmamaktadır. Şu alimlerin tefsiri yok: ${missingNames}`,
+          missingScholarNames: allScholars.map((s) => s.mufassirTr || s.name),
+        });
       }
+
+      // For streaming: send noTafsir message to client
+      // This is handled in the stream response below - check if similarTafsirs is empty
 
       // Final fallback: get any tafsirs for this verse (no similarity search)
       if (similarTafsirs.length === 0) {
@@ -653,10 +683,39 @@ router.post(
 
       // Check if we have any sources to generate tafsir from
       if (similarTafsirs.length === 0) {
-        return res.status(404).json({
-          error: "Bu ayet için seçilen alimlerin tefsiri bulunmamaktadır.",
-          verseId,
-        });
+        // No tafsir data at all for this verse
+        if (stream) {
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          res.setHeader("Access-Control-Allow-Headers", "Cache-Control");
+
+          res.write(`data: ${JSON.stringify({ type: "start" })}\n\n`);
+          res.write(
+            `data: ${JSON.stringify({
+              type: "complete",
+              noTafsirForSelectedScholars: true,
+              noTafsirMessage:
+                "Bu ayet için hiç tefsir verisi bulunmamaktadır.",
+              missingScholarNames: [],
+            })}\n\n`,
+          );
+          res.end();
+        } else {
+          return res.status(200).json({
+            verse,
+            filters: filters || {},
+            aiResponse: "",
+            confidence: null,
+            provenance: null,
+            citations: [],
+            sourceExcerpts: [],
+            noTafsirForSelectedScholars: true,
+            noTafsirMessage: "Bu ayet için hiç tefsir verisi bulunmamaktadır.",
+          });
+        }
+        return;
       }
 
       // Build prompt options (clip excerpts for cost and speed)
