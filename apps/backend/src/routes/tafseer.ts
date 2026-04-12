@@ -563,20 +563,50 @@ router.post(
 
       // Perform vector similarity search to find relevant tafsirs
       // ALWAYS filter by verseId - semantic search should only find tafsirs FOR the queried verse
-      let similarTafsirs = [];
+      let similarTafsirs: any[] = [];
+      let usedScholarFilter = false;
+
+      // Check if user specified scholar filters
+      const hasScholarFilter =
+        (filters?.scholars && filters.scholars.length > 0) ||
+        (filters?.excludeScholars && filters.excludeScholars.length > 0);
+
       try {
         similarTafsirs = await performSimilaritySearch(prisma, {
           query: searchQuery,
-          verseId: verseId, // Always filter by verseId to prevent cross-verse retrieval
+          verseId: verseId,
           scholarIds: filters?.scholars,
           excludeScholarIds: filters?.excludeScholars,
           methodTags: filters?.methodTags,
           limit: 5,
           minSimilarity: 0.3,
         });
+        usedScholarFilter = hasScholarFilter === true;
       } catch (searchError) {
         console.error("Similarity search error:", searchError);
-        // If similarity search fails, get sample tafsirs as fallback
+      }
+
+      // If scholar filter was used but returned no results, try without scholar filter
+      // This handles the case where selected scholars don't have tafsir for this verse
+      if (similarTafsirs.length === 0 && hasScholarFilter) {
+        console.log(
+          `[Tafseer] No tafsirs found with scholar filter, falling back to any scholar for verse ${verseId}`,
+        );
+        try {
+          similarTafsirs = await performSimilaritySearch(prisma, {
+            query: searchQuery,
+            verseId: verseId,
+            methodTags: filters?.methodTags,
+            limit: 5,
+            minSimilarity: 0.3,
+          });
+        } catch (fallbackError) {
+          console.error("Fallback search also failed:", fallbackError);
+        }
+      }
+
+      // Final fallback: get any tafsirs for this verse (no similarity search)
+      if (similarTafsirs.length === 0) {
         const sampleTafsirs = await prisma.tafsir.findMany({
           where: { verseId },
           include: {
