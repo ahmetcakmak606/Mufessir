@@ -22,11 +22,18 @@ export interface PromptOptions {
     volume?: string | null;
     page?: string | null;
   }>;
-  arabicTerms?: string[]; // Key Arabic terms extracted from sources for similarity boosting
+  arabicTerms?: string[];
   userParams: {
     methodTags?: string[];
     language?: string;
-    responseLength?: number; // 1-10 desired length (short -> long)
+    responseLength?: number;
+  };
+  scholarAnalysis?: {
+    dominantMadhab: string | null;
+    dominantPeriod: string | null;
+    totalScholars: number;
+    hasMultipleMadhhabs: boolean;
+    scholarContext: string;
   };
 }
 
@@ -38,6 +45,7 @@ export function buildTafsirPrompt(opts: PromptOptions): string {
     citations = [],
     arabicTerms = [],
     userParams,
+    scholarAnalysis,
   } = opts;
 
   let prompt = `You are an expert Islamic scholar and linguist. Your task is to generate a tafsir (exegesis) for the following Quranic verse, using ONLY the provided context and scholar excerpts.\n\n`;
@@ -50,6 +58,11 @@ export function buildTafsirPrompt(opts: PromptOptions): string {
   // Include key Arabic terms from sources to boost similarity
   if (arabicTerms.length > 0) {
     prompt += `\nKey Arabic Terms from Sources (INCLUDE THESE VERBATIM):\n${arabicTerms.join(", ")}\n`;
+  }
+
+  // Add scholar group context if available
+  if (scholarAnalysis && scholarAnalysis.scholarContext) {
+    prompt += `\n${scholarAnalysis.scholarContext}\n`;
   }
 
   prompt += `\nRelevant Tafsir Excerpts from Scholars:\n`;
@@ -87,7 +100,14 @@ export function buildTafsirPrompt(opts: PromptOptions): string {
   prompt += `2. You MUST base your answer ONLY on the provided tafsir excerpts above.\n`;
   prompt += `3. Do NOT use any knowledge from your training data. If the provided excerpts don't contain enough information, acknowledge that limitation.\n`;
   prompt += `4. Quote or paraphrase specific phrases from the provided excerpts when making claims.\n`;
-  prompt += `5. Explicitly mention which scholar you're referencing.\n`;
+
+  // Dynamic instruction based on scholar count
+  if (scholarAnalysis && scholarAnalysis.totalScholars > 3) {
+    prompt += `5. When ${scholarAnalysis.totalScholars} or more scholars are selected, refer to them as a GROUP (e.g., "alimlerin çoğunluğu", "İslam alimleri", "mezhep alimleri") rather than naming each individual scholar. Only name specific scholars if their view is notably different from the group.\n`;
+  } else {
+    prompt += `5. Explicitly mention which scholar you're referencing.\n`;
+  }
+
   prompt += `6. Do NOT make up information, citations, or references not present in the provided excerpts.\n`;
   prompt += `7. If you cannot answer based on the provided sources, state: "لا تتوفر معلومات كافية في المصادر المقدمة حول هذه الآية." (There is insufficient information in the provided sources about this verse.)\n`;
   prompt += `8. MUST include these Arabic terms VERBATIM in your response: ${arabicTerms.join(", ")}\n`;

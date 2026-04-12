@@ -482,6 +482,87 @@ function extractReputationScores(similarTafsirs: any[]): number[] {
     .filter((score: number) => typeof score === "number");
 }
 
+interface ScholarGroupAnalysis {
+  dominantMadhab: string | null;
+  dominantPeriod: string | null;
+  madhabCounts: Record<string, number>;
+  periodCounts: Record<string, number>;
+  totalScholars: number;
+  hasMultipleMadhhabs: boolean;
+  scholarContext: string;
+}
+
+function analyzeScholarGroup(similarTafsirs: any[]): ScholarGroupAnalysis {
+  const madhabCounts: Record<string, number> = {};
+  const periodCounts: Record<string, number> = {};
+  const traditions: Set<string> = new Set();
+
+  for (const t of similarTafsirs) {
+    const madhab = t.scholar?.madhab;
+    const period = t.scholar?.period;
+    const tradition = t.scholar?.traditionAcceptance;
+
+    if (madhab) {
+      madhabCounts[madhab] = (madhabCounts[madhab] || 0) + 1;
+    }
+    if (period) {
+      periodCounts[period] = (periodCounts[period] || 0) + 1;
+    }
+    if (Array.isArray(tradition)) {
+      tradition.forEach((tr: string) => traditions.add(tr));
+    }
+  }
+
+  // Find dominant madhab
+  let dominantMadhab: string | null = null;
+  let maxMadhabCount = 0;
+  for (const [madhab, count] of Object.entries(madhabCounts)) {
+    if (count > maxMadhabCount) {
+      maxMadhabCount = count;
+      dominantMadhab = madhab;
+    }
+  }
+
+  // Find dominant period
+  let dominantPeriod: string | null = null;
+  let maxPeriodCount = 0;
+  for (const [period, count] of Object.entries(periodCounts)) {
+    if (count > maxPeriodCount) {
+      maxPeriodCount = count;
+      dominantPeriod = period;
+    }
+  }
+
+  const totalScholars = similarTafsirs.length;
+  const hasMultipleMadhhabs = Object.keys(madhabCounts).length > 1;
+
+  // Build contextual framing string
+  let scholarContext = "";
+  if (totalScholars > 5) {
+    if (dominantMadhab && maxMadhabCount >= Math.ceil(totalScholars * 0.5)) {
+      scholarContext = `Bu tefsir ${dominantMadhab} alimlerinin genel görüşlerini yansıtmaktadır.`;
+    } else if (dominantPeriod) {
+      scholarContext = `Bu tefsir ${dominantPeriod} dönemindeki alimlerin yorumlarını içermektedir.`;
+    } else if (hasMultipleMadhhabs) {
+      scholarContext = `Bu tefsir farklı İslami mezheplerden alimlerin yorumlarını birleştirmektedir.`;
+    } else {
+      scholarContext = `Bu tefsir ${totalScholars} farklı alimin yorumundan derlenmiştir.`;
+    }
+  } else if (totalScholars > 1) {
+    scholarContext = `Bu tefsir ${totalScholars} alimin yorumlarına dayanmaktadır.`;
+  }
+
+  return {
+    dominantMadhab,
+    dominantPeriod,
+    madhabCounts,
+    periodCounts,
+    totalScholars,
+    hasMultipleMadhhabs,
+    scholarContext,
+  };
+}
+
 async function loadCitations(
   prismaClient: PrismaClient,
   similarTafsirs: any[],
@@ -740,6 +821,9 @@ router.post(
       );
       const keyArabicTerms = [...new Set(allArabicTerms)].slice(0, 15);
 
+      // Analyze scholars for patterns (madhab, period, tradition)
+      const scholarAnalysis = analyzeScholarGroup(similarTafsirs);
+
       const promptOptions = {
         verseText: verse.arabicText,
         translation: verse.translation || undefined,
@@ -770,6 +854,7 @@ router.post(
           methodTags: filters?.methodTags,
           language: filters?.language || "Turkish",
         },
+        scholarAnalysis,
       };
 
       // Check for existing cached results using a stable cacheKey
