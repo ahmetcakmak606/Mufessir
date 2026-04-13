@@ -6,8 +6,8 @@ Quick reference for agentic coding in this monorepo.
 
 ```
 apps/backend       - Express.js API server with Prisma ORM
-apps/frontend      - Next.js 15 + React 19 + Tailwind CSS
-packages/database  - Prisma schema
+apps/frontend     - Next.js 15 + React 19 + Tailwind CSS
+packages/database - Prisma schema
 packages/shared-types - Shared TypeScript types
 ```
 
@@ -15,40 +15,46 @@ packages/shared-types - Shared TypeScript types
 
 ## Commands
 
-### Run Everything
+### Root (run from monorepo root)
 
-| Command               | Description                  |
-| --------------------- | ---------------------------- |
-| `npm run dev`         | Start all apps in dev mode   |
-| `npm run build`       | Build all packages           |
-| `npm run test`        | Run frontend + backend tests |
-| `npm run lint`        | Lint all packages            |
-| `npm run check-types` | Type-check all packages      |
+| Command               | Description                |
+| --------------------- | -------------------------- |
+| `npm run dev`         | Start all apps in dev mode |
+| `npm run build`       | Build all packages         |
+| `npm run test`        | Run all tests              |
+| `npm run lint`        | Lint all packages          |
+| `npm run check-types` | Type-check all packages    |
+| `npm run format`      | Format with Prettier       |
 
 ### Backend (`cd apps/backend`)
 
 | Command                 | Description                  |
 | ----------------------- | ---------------------------- |
 | `npm run dev`           | Start dev server (tsx watch) |
+| `npm run build`         | Build with TypeScript        |
+| `npm run check-types`   | Type-check only              |
 | `npm run test`          | Run tests                    |
 | `npm run test:watch`    | Watch mode                   |
 | `npm run test:coverage` | With coverage                |
 
 ### Frontend (`cd apps/frontend`)
 
-| Command              | Description               |
-| -------------------- | ------------------------- |
-| `npm run dev`        | Start Next.js (Turbopack) |
-| `npm run test`       | Run tests                 |
-| `npm run test:watch` | Watch mode                |
-| `npm run test:e2e`   | Playwright e2e tests      |
+| Command               | Description               |
+| --------------------- | ------------------------- |
+| `npm run dev`         | Start Next.js (Turbopack) |
+| `npm run build`       | Build production          |
+| `npm run lint`        | Run ESLint                |
+| `npm run check-types` | Type-check only           |
+| `npm run test`        | Run tests                 |
+| `npm run test:watch`  | Watch mode                |
+| `npm run test:e2e`    | Playwright e2e tests      |
 
 ### Database
 
 ```bash
 npm run db:up        # Start Docker
 npm run db:migrate   # Run Prisma migrations
-npm run db:seed      # Seed sample data
+npm run db:seed     # Seed sample data
 npm run setup:dev   # Full: up + migrate + seed
 ```
 
@@ -58,14 +64,17 @@ npm run setup:dev   # Full: up + migrate + seed
 # Backend - specific file
 cd apps/backend && npx vitest run tests/app.test.ts
 
-# Backend - by test name
+# Backend - by test name pattern
 cd apps/backend && npx vitest run --testNamePattern "Health"
 
 # Frontend - specific file
 cd apps/frontend && npx vitest run src/components/Some.test.tsx
 
-# Frontend - by test name
+# Frontend - by test name pattern
 cd apps/frontend && npx vitest run --testNamePattern "disables save"
+
+# E2E - headed for debugging
+cd apps/frontend && npm run test:e2e:headed
 ```
 
 ---
@@ -74,59 +83,66 @@ cd apps/frontend && npx vitest run --testNamePattern "disables save"
 
 ### Imports
 
-**Backend:** Explicit relative with `.js` extension
+**Backend:** Explicit relative imports with `.js` extension
 
 ```ts
 import router from "./routes/auth.js";
 import { type Request, type Response } from "express";
+import { db } from "../lib/db.js";
 ```
 
 **Frontend:** Use `@/` alias from `src/`
 
 ```ts
 import { authApi } from "@/lib/auth";
+import { UserCard } from "@/components/UserCard";
 ```
 
-Add `'use client'` at top of interactive components.
+Add `'use client'` at top of client-side interactive components.
 
 ### Formatting
 
-- Prettier: `npm run format` before commit
+- Run `npm run format` before committing
 - 2-space indent, single quotes, trailing commas
+- Configured in root prettier settings
 
 ### TypeScript
 
-- Explicit types for params/returns
-- `type` for shapes, `interface` for extendable types
+- Explicit types for function params and returns
+- Use `type` for shapes, `interface` for extendable types
 - Avoid `any`; use `unknown` if needed
-- Use `as` assertions sparingly
+- Use `as` assertions sparingly, prefer type guards
 
-### Naming
+### Naming Conventions
 
 | Type               | Convention       | Example                     |
 | ------------------ | ---------------- | --------------------------- |
 | Files (utils)      | kebab-case       | `scholar-enrichment.ts`     |
 | Files (components) | PascalCase       | `UserCard.tsx`              |
+| Files (hooks)      | PascalCase       | `useAuth.ts`                |
 | Functions          | camelCase + verb | `getUser`, `verifyPassword` |
 | Types              | PascalCase       | `AuthContextType`           |
 | Constants          | SCREAMING_SNAKE  | `MAX_REQUESTS`              |
+| React components   | PascalCase       | `UserProfile`               |
 
 ---
 
 ## Error Handling
 
-**Backend:**
+### Backend
 
-- HTTP status codes: 400, 401, 403, 404, 500
-- Response format: `{ error: "Message" }`
-- Never expose internal details to clients
-- Use try/catch, return 500 on exceptions
+- HTTP status codes: 400 (bad request), 401 (unauthorized), 403 (forbidden), 404 (not found), 500 (server error)
+- Response format: `{ error: "User-friendly message" }`
+- Never expose internal error details to clients
+- Use try/catch, return 500 on uncaught exceptions
+- Validate request body early; return 400 for missing required fields
 
-**Frontend:**
+### Frontend
 
-- React Query error states
-- User-friendly messages
-- Handle loading states
+- Use React Query for server state with built-in error states
+- Display user-friendly error messages
+- Always handle loading states during data fetches
+- Show inline validation errors on forms
 
 ---
 
@@ -134,24 +150,39 @@ Add `'use client'` at top of interactive components.
 
 ### Express Routes
 
-- async/await for all handlers
+```ts
+// All handlers use async/await
+router.post("/route", authenticateJWT, async (req, res) => {
+  try {
+    const { field } = req.body;
+    if (!field) {
+      return res.status(400).json({ error: "field is required" });
+    }
+    // ... handler logic
+  } catch (error) {
+    console.error("Route error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+```
+
+- Use auth middleware (`authenticateJWT`) for protected routes
+- Mount routers at `/routes/*`
 - Validate body early → 400 for missing fields
-- Use auth middleware (`authenticateJWT`)
-- Mount at `/routes/*`
 
-### React
+### React Components
 
-- Functional components + TypeScript
-- `useAuth` hook for auth context
-- React Query for server state
-- `useState` for local state
+- Use functional components with TypeScript
+- Use `useAuth` hook for authentication context
+- Use React Query (`@tanstack/react-query`) for server state
+- Use `useState` for local component state
 - Extract reusable logic to custom hooks
 
 ### Testing
 
-- Vitest for both
-- Backend: supertest for HTTP integration
-- Frontend: @testing-library/react + user-event
+- Vitest for both frontend and backend
+- Backend: supertest for HTTP integration tests
+- Frontend: @testing-library/react + user-event for component tests
 
 ---
 
@@ -163,14 +194,16 @@ npm run lint && npm run check-types && npm run test
 
 ---
 
-## Active Work
+## Environment Variables
 
-**Location:** `docs/REARCHITECTURE_PLAN.md`
+Create `.env` files from `.env.example`. Required variables:
 
-**Current:** Snapshot System for academic reproducibility with citation keys.
+```
+# Backend
+DATABASE_URL
+JWT_SECRET
+NODE_ENV=development
 
-**To resume:**
-
-1. Read the plan, find first unchecked `[ ]`
-2. Follow steps, run tests
-3. Mark `[ ]` → `[x]`
+# Frontend
+NEXT_PUBLIC_API_URL=http://localhost:3001
+```

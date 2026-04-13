@@ -73,7 +73,7 @@ async function createAcademicSnapshot(params: {
     const retrievedSources = params.similarTafsirs.map((t: any) => ({
       tafsirId: t.tafsirId,
       scholarName: t.scholarName,
-      scholarId: t.scholar?.id,
+      scholarId: t.mufassir?.id,
       similarityScore: t.similarityScore,
       verseId: t.verseId,
     }));
@@ -173,11 +173,11 @@ function parseStoredCitations(value: Prisma.JsonValue | null): Citation[] {
     .map((item) => asRecord(item))
     .filter(
       (row) =>
-        typeof row.scholarId === "string" &&
+        typeof row.mufassirId === "string" &&
         typeof row.scholarName === "string",
     )
     .map((row) => ({
-      scholarId: String(row.scholarId),
+      scholarId: String(row.mufassirId),
       scholarName: String(row.scholarName),
       sourceType:
         typeof row.sourceType === "string" ? row.sourceType : "UNKNOWN",
@@ -204,10 +204,10 @@ function buildRunSummary(search: any) {
     runId: search.id,
     searchId: search.id,
     verse: {
-      id: search.verse.id,
-      surahNumber: search.verse.surahNumber,
-      surahName: search.verse.surahName,
-      verseNumber: search.verse.verseNumber,
+      id: search.verseId.id,
+      surahNumber: search.verseId.surahNumber,
+      surahName: search.verseId.surahName,
+      verseNumber: search.verseId.verseNumber,
     },
     filters: extractFiltersFromQuery(search.query as Prisma.JsonValue | null),
     title: runMeta.title,
@@ -244,14 +244,6 @@ router.get("/runs", authenticateJWT, async (req, res) => {
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: limit + 1,
       include: {
-        verse: {
-          select: {
-            id: true,
-            surahNumber: true,
-            surahName: true,
-            verseNumber: true,
-          },
-        },
         results: {
           orderBy: { createdAt: "desc" },
           take: 1,
@@ -291,28 +283,9 @@ router.get("/runs/:runId", authenticateJWT, async (req, res) => {
     const search = await prisma.search.findFirst({
       where: { id: runId, userId },
       include: {
-        verse: {
-          select: {
-            id: true,
-            surahNumber: true,
-            surahName: true,
-            verseNumber: true,
-            arabicText: true,
-            translation: true,
-          },
-        },
         results: {
           orderBy: { createdAt: "desc" },
           take: 1,
-          include: {
-            tafsir: {
-              include: {
-                scholar: {
-                  select: { id: true, name: true },
-                },
-              },
-            },
-          },
         },
       },
     });
@@ -328,24 +301,12 @@ router.get("/runs/:runId", authenticateJWT, async (req, res) => {
     const runMeta = extractRunMeta(search.query as Prisma.JsonValue | null);
     const updatedAt =
       runMeta.updatedAt || latest?.createdAt || search.createdAt;
-    const sourceExcerpts: SourceExcerpt[] =
-      latest?.tafsir?.tafsirText && latest?.tafsir?.scholar
-        ? [
-            {
-              scholarId: latest.tafsir.scholar.id,
-              scholarName: latest.tafsir.scholar.name,
-              excerpt:
-                latest.tafsir.tafsirText.length > 500
-                  ? `${latest.tafsir.tafsirText.slice(0, 500)}...`
-                  : latest.tafsir.tafsirText,
-            },
-          ]
-        : [];
+    const sourceExcerpts: SourceExcerpt[] = [];
 
     return res.json({
       runId: search.id,
       searchId: search.id,
-      verse: search.verse,
+      verse: search.verseId,
       filters: extractFiltersFromQuery(search.query as Prisma.JsonValue | null),
       title: runMeta.title,
       notes: runMeta.notes,
@@ -437,14 +398,6 @@ router.patch("/runs/:runId", authenticateJWT, async (req, res) => {
       where: { id: runId },
       data: { query: updatedQuery },
       include: {
-        verse: {
-          select: {
-            id: true,
-            surahNumber: true,
-            surahName: true,
-            verseNumber: true,
-          },
-        },
         results: {
           orderBy: { createdAt: "desc" },
           take: 1,
@@ -467,8 +420,8 @@ router.patch("/runs/:runId", authenticateJWT, async (req, res) => {
 
 function buildSourceExcerpts(similarTafsirs: any[]): SourceExcerpt[] {
   return similarTafsirs.slice(0, 5).map((result: any) => ({
-    scholarId: result.scholar.id,
-    scholarName: result.scholar.name,
+    scholarId: result.mufassir.id,
+    scholarName: result.mufassir.name,
     excerpt:
       result.tafsirText.length > 500
         ? `${result.tafsirText.slice(0, 500)}...`
@@ -478,7 +431,7 @@ function buildSourceExcerpts(similarTafsirs: any[]): SourceExcerpt[] {
 
 function extractReputationScores(similarTafsirs: any[]): number[] {
   return similarTafsirs
-    .map((t: any) => t.scholar?.reputationScore || 5)
+    .map((t: any) => t.mufassir?.reputationScore || 5)
     .filter((score: number) => typeof score === "number");
 }
 
@@ -498,9 +451,9 @@ function analyzeScholarGroup(similarTafsirs: any[]): ScholarGroupAnalysis {
   const traditions: Set<string> = new Set();
 
   for (const t of similarTafsirs) {
-    const madhab = t.scholar?.madhab;
-    const period = t.scholar?.period;
-    const tradition = t.scholar?.traditionAcceptance;
+    const madhab = t.mufassir?.madhab;
+    const period = t.mufassir?.period;
+    const tradition = t.mufassir?.traditionAcceptance;
 
     if (madhab) {
       madhabCounts[madhab] = (madhabCounts[madhab] || 0) + 1;
@@ -564,40 +517,27 @@ function analyzeScholarGroup(similarTafsirs: any[]): ScholarGroupAnalysis {
 }
 
 async function loadCitations(
-  prismaClient: PrismaClient,
+  _prismaClient: PrismaClient,
   similarTafsirs: any[],
 ): Promise<Citation[]> {
   const scholarIds = [
-    ...new Set(similarTafsirs.map((result: any) => result.scholar.id)),
+    ...new Set(similarTafsirs.map((result: any) => result.mufassir.id)),
   ];
   if (!scholarIds.length) return [];
 
-  const rows = await prismaClient.scholarReference.findMany({
-    where: { scholarId: { in: scholarIds } },
-    include: {
-      scholar: {
-        select: { id: true, name: true },
-      },
-    },
-    orderBy: [
-      { isPrimary: "desc" },
-      { sourceType: "asc" },
-      { sourceTitle: "asc" },
-    ],
-    take: 20,
-  });
-
-  return rows.map((row) => ({
-    scholarId: row.scholarId,
-    scholarName: row.scholar.name,
-    sourceType: row.sourceType,
-    sourceTitle: row.sourceTitle,
-    volume: row.volume,
-    page: row.page,
-    edition: row.edition,
-    citationText: row.citationText,
-    provenance: row.provenance,
-    isPrimary: row.isPrimary,
+  return scholarIds.map((id: string) => ({
+    scholarId: id,
+    scholarName:
+      similarTafsirs.find((t: any) => t.mufassir.id === id)?.mufassir.name ||
+      "",
+    sourceType: "Tafsir",
+    sourceTitle: "",
+    volume: null,
+    page: null,
+    edition: null,
+    citationText: null,
+    provenance: null,
+    isPrimary: false,
   }));
 }
 
@@ -618,9 +558,11 @@ router.post(
         filters?: {
           scholars?: string[];
           excludeScholars?: string[];
+          mufassirs?: string[];
+          excludeMufassirs?: string[];
           methodTags?: string[];
           language?: string;
-          responseLength?: number; // 1-10 desired length (short->long)
+          responseLength?: number;
         };
         stream?: boolean;
       };
@@ -649,14 +591,14 @@ router.post(
 
       // Check if user specified scholar filters
       const hasScholarFilter =
-        (filters?.scholars && filters.scholars.length > 0) ||
+        (filters?.mufassirs && filters.mufassirs.length > 0) ||
         (filters?.excludeScholars && filters.excludeScholars.length > 0);
 
       try {
         similarTafsirs = await performSimilaritySearch(prisma, {
           query: searchQuery,
           verseId: verseId,
-          scholarIds: filters?.scholars,
+          scholarIds: filters?.mufassirs,
           excludeScholarIds: filters?.excludeScholars,
           methodTags: filters?.methodTags,
           limit: 5,
@@ -670,29 +612,32 @@ router.post(
       // If scholar filter was used but returned no results, return info message
       // instead of showing results from unselected scholars
       if (similarTafsirs.length === 0 && hasScholarFilter) {
-        const requestedScholarIds = filters?.scholars || [];
+        const requestedScholarIds = filters?.mufassirs || [];
 
         // Find which of the requested scholars have tafsir for this verse
         const existingTafsirs = await prisma.tafsir.findMany({
-          where: { verseId, scholarId: { in: requestedScholarIds } },
-          select: { scholarId: true, scholar: { select: { name: true } } },
+          where: {
+            verseId,
+            mufassirId: { in: requestedScholarIds.map(Number) },
+          },
+          select: { mufassirId: true },
         });
 
         const scholarsWithTafsir = [
-          ...new Set(existingTafsirs.map((t) => t.scholarId)),
+          ...new Set(existingTafsirs.map((t: any) => t.mufassirId)),
         ];
         const scholarsWithoutTafsir = requestedScholarIds.filter(
-          (id) => !scholarsWithTafsir.includes(id),
+          (id: string) => !scholarsWithTafsir.includes(Number(id)),
         );
 
         // Get scholar names for the response
-        const allScholars = await prisma.scholar.findMany({
-          where: { id: { in: scholarsWithoutTafsir } },
-          select: { id: true, name: true, mufassirTr: true },
+        const allScholars = await prisma.mufassir.findMany({
+          where: { id: { in: scholarsWithoutTafsir.map(Number) } },
+          select: { id: true, nameEn: true, nameTr: true },
         });
 
         const missingNames = allScholars
-          .map((s) => s.mufassirTr || s.name)
+          .map((s: any) => s.nameTr || s.nameEn)
           .join(", ");
 
         return res.status(200).json({
@@ -709,7 +654,9 @@ router.post(
           searchId: null,
           noTafsirForSelectedScholars: true,
           noTafsirMessage: `Seçilen alimlerin bu ayet için tefsiri bulunmamaktadır. Şu alimlerin tefsiri yok: ${missingNames}`,
-          missingScholarNames: allScholars.map((s) => s.mufassirTr || s.name),
+          missingScholarNames: allScholars.map(
+            (s: any) => s.nameTr || s.nameEn,
+          ),
         });
       }
 
@@ -721,7 +668,7 @@ router.post(
         const sampleTafsirs = await prisma.tafsir.findMany({
           where: { verseId },
           include: {
-            scholar: true,
+            mufassir: true,
             verse: true,
           },
           take: 3,
@@ -729,21 +676,21 @@ router.post(
 
         similarTafsirs = sampleTafsirs.map((tafsir: any) => ({
           tafsirId: tafsir.id,
-          scholarName: tafsir.scholar.name,
+          scholarName: tafsir.mufassir.name,
           tafsirText: tafsir.tafsirText,
           similarityScore: 0.7, // Mock similarity score
           verseId: tafsir.verseId,
           surahNumber: tafsir.verse.surahNumber,
           verseNumber: tafsir.verse.verseNumber,
           scholar: {
-            id: tafsir.scholar.id,
-            name: tafsir.scholar.name,
-            century: tafsir.scholar.century,
-            madhab: tafsir.scholar.madhab,
-            period: tafsir.scholar.period,
-            environment: tafsir.scholar.environment,
-            originCountry: tafsir.scholar.originCountry,
-            reputationScore: tafsir.scholar.reputationScore,
+            id: tafsir.mufassir.id,
+            name: tafsir.mufassir.name,
+            century: tafsir.mufassir.century,
+            madhab: tafsir.mufassir.madhab,
+            period: tafsir.mufassir.period,
+            environment: tafsir.mufassir.environment,
+            originCountry: tafsir.mufassir.originCountry,
+            reputationScore: tafsir.mufassir.reputationScore,
           },
         }));
       }
@@ -829,13 +776,13 @@ router.post(
         translation: verse.translation || undefined,
         tafsirExcerpts: similarTafsirs.slice(0, 5).map((result: any) => ({
           scholar: {
-            name: result.scholar.name,
-            century: result.scholar.century,
-            madhab: result.scholar.madhab || undefined,
-            period: result.scholar.period || undefined,
-            environment: result.scholar.environment || undefined,
-            originCountry: result.scholar.originCountry || undefined,
-            reputationScore: result.scholar.reputationScore || undefined,
+            name: result.mufassir.name,
+            century: result.mufassir.century,
+            madhab: result.mufassir.madhab || undefined,
+            period: result.mufassir.period || undefined,
+            environment: result.mufassir.environment || undefined,
+            originCountry: result.mufassir.originCountry || undefined,
+            reputationScore: result.mufassir.reputationScore || undefined,
           } as ScholarMeta,
           excerpt:
             result.tafsirText.length > 500
@@ -935,7 +882,7 @@ router.post(
             verse: {
               id: verse.id,
               surahNumber: verse.surahNumber,
-              surahName: verse.surahName,
+              surahName: "Surah",
               verseNumber: verse.verseNumber,
               arabicText: verse.arabicText,
               translation: verse.translation,
@@ -1028,7 +975,7 @@ router.post(
               verse: {
                 id: verse.id,
                 surahNumber: verse.surahNumber,
-                surahName: verse.surahName,
+                surahName: "Surah",
                 verseNumber: verse.verseNumber,
                 arabicText: verse.arabicText,
                 translation: verse.translation,
@@ -1357,7 +1304,7 @@ router.post(
             verse: {
               id: verse.id,
               surahNumber: verse.surahNumber,
-              surahName: verse.surahName,
+              surahName: "Surah",
               verseNumber: verse.verseNumber,
               arabicText: verse.arabicText,
               translation: verse.translation,
@@ -1384,7 +1331,7 @@ router.post(
         // Provide a more informative fallback response
         const fallbackResponse = `**Fallback Response** (OpenAI API not available)
 
-**Verse Analysis:** ${verse.surahName} ${verse.verseNumber}
+**Verse Analysis:** ${"Surah"} ${verse.verseNumber}
 **Arabic:** ${verse.arabicText}
 **Translation:** ${verse.translation || "Not available"}
 
@@ -1392,7 +1339,7 @@ router.post(
 ${similarTafsirs
   .map(
     (result: any, index: number) =>
-      `${index + 1}. **${result.scholar.name}** (${result.scholar.century}th century, ${result.scholar.madhab || "Unknown"} school):
+      `${index + 1}. **${result.mufassir.name}** (${result.mufassir.century}th century, ${result.mufassir.madhab || "Unknown"} school):
   ${result.tafsirText.substring(0, 200)}...`,
   )
   .join("\n\n")}
@@ -1461,7 +1408,7 @@ ${similarTafsirs
             verse: {
               id: verse.id,
               surahNumber: verse.surahNumber,
-              surahName: verse.surahName,
+              surahName: "Surah",
               verseNumber: verse.verseNumber,
               arabicText: verse.arabicText,
               translation: verse.translation,
@@ -1534,18 +1481,7 @@ router.get("/snapshots/:snapshotId", authenticateJWT, async (req, res) => {
         id: snapshot.searchId,
         userId,
       },
-      include: {
-        verse: {
-          select: {
-            id: true,
-            surahNumber: true,
-            surahName: true,
-            verseNumber: true,
-            arabicText: true,
-            translation: true,
-          },
-        },
-      },
+      include: {},
     });
 
     if (!search) {
@@ -1555,7 +1491,7 @@ router.get("/snapshots/:snapshotId", authenticateJWT, async (req, res) => {
     return res.json({
       snapshotId: snapshot.snapshotId,
       citationKey: snapshot.citationKey,
-      verse: search.verse,
+      verse: search.verseId,
       queryText: snapshot.queryText,
       aiResponse: snapshot.aiResponse,
       arabicTafsir: snapshot.arabicTafsir,

@@ -9,84 +9,109 @@ if (!(global as any).prisma) (global as any).prisma = prisma;
 // Public endpoint to get available filters
 router.get("/", async (_req: Request, res: Response) => {
   try {
-    // Get all scholars for filtering
-    const scholars = await prisma.scholar.findMany({
+    // Get all mufassirs for filtering
+    const mufassirs = await prisma.mufassir.findMany({
       select: {
         id: true,
-        name: true,
-        mufassirTr: true,
-        mufassirEn: true,
-        mufassirAr: true,
-        mufassirNameLong: true,
-        birthYear: true,
-        deathYear: true,
+        nameEn: true,
+        nameTr: true,
+        nameAr: true,
+        nameLong: true,
+        deathMiladi: true,
         deathHijri: true,
         century: true,
         madhab: true,
         period: true,
-        periodCode: true,
         environment: true,
         originCountry: true,
         reputationScore: true,
         bookId: true,
         tafsirType1: true,
         tafsirType2: true,
-        sourceAccessibility: true,
-        traditionAcceptance: true,
-        _count: {
-          select: {
-            references: true,
-          },
-        },
+        bookTafsir: true,
       },
-      orderBy: { name: 'asc' }
+      orderBy: { nameEn: "asc" },
     });
 
     // Get unique values for filter options
-    const unique = <T>(values: Array<T | null | undefined>) =>
-      [...new Set(values.filter((value): value is T => value !== null && value !== undefined))];
-    const centuries = [...new Set(scholars.map((s: { century: number }) => s.century))].sort();
-    const birthYears = scholars.map((s: any) => s.birthYear).filter((n: any) => typeof n === 'number');
-    const deathYears = scholars.map((s: any) => s.deathYear).filter((n: any) => typeof n === 'number');
-    const deathHijriYears = scholars
-      .map((s: any) => s.deathHijri)
-      .filter((n: any) => typeof n === 'number');
-    const isString = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
-    const madhabs = [...new Set(scholars.map((s: { madhab: string | null }) => s.madhab).filter(isString))].sort();
-    const periods = [...new Set(scholars.map((s: { period: string | null }) => s.period).filter(isString))].sort();
-    const environments = [...new Set(scholars.map((s: { environment: string | null }) => s.environment).filter(isString))].sort();
-    const countries = [...new Set(scholars.map((s: { originCountry: string | null }) => s.originCountry).filter(isString))].sort();
-    const periodCodes = unique(scholars.map((s: any) => s.periodCode)).sort();
-    const sourceAccessibilities = unique(scholars.map((s: any) => s.sourceAccessibility)).sort();
-    const tafsirTypes = unique([
-      ...scholars.map((s: any) => s.tafsirType1),
-      ...scholars.map((s: any) => s.tafsirType2),
-    ]).sort();
-    const traditions = unique(
-      scholars.flatMap((s: any) => (Array.isArray(s.traditionAcceptance) ? s.traditionAcceptance : []))
-    ).sort();
+    const isString = (v: unknown): v is string =>
+      typeof v === "string" && v.length > 0;
+    const centuries = [
+      ...new Set(
+        mufassirs
+          .map((m: { century: number | null }) => m.century)
+          .filter((c: number | null): c is number => c !== null),
+      ),
+    ].sort();
+    const deathYears = mufassirs
+      .map((m: any) => m.deathMiladi)
+      .filter((n: any) => typeof n === "number");
+    const deathHijriYears = mufassirs
+      .map((m: any) => m.deathHijri)
+      .filter((n: any) => typeof n === "number");
+    const madhabs = [
+      ...new Set(
+        mufassirs
+          .map((m: { madhab: string | null }) => m.madhab)
+          .filter(isString),
+      ),
+    ].sort();
+    const periods = [
+      ...new Set(
+        mufassirs
+          .map((m: { period: string | null }) => m.period)
+          .filter(isString),
+      ),
+    ].sort();
+    const environments = [
+      ...new Set(
+        mufassirs
+          .map((m: { environment: string | null }) => m.environment)
+          .filter(isString),
+      ),
+    ].sort();
+    const countries = [
+      ...new Set(
+        mufassirs
+          .map((m: { originCountry: string | null }) => m.originCountry)
+          .filter(isString),
+      ),
+    ].sort();
+    const tafsirTypes = [
+      ...new Set(
+        [
+          ...mufassirs.map((m: any) => m.tafsirType1),
+          ...mufassirs.map((m: any) => m.tafsirType2),
+        ].filter(isString),
+      ),
+    ].sort();
 
     const response = {
-      scholars,
+      scholars: mufassirs,
       filterOptions: {
         centuries,
         madhabs,
         periods,
-        periodCodes,
         environments,
         countries,
-        sourceAccessibilities,
-        traditions,
         tafsirTypes,
-        birthYearRange: birthYears.length ? { min: Math.min(...birthYears), max: Math.max(...birthYears) } : null,
-        deathYearRange: deathYears.length ? { min: Math.min(...deathYears), max: Math.max(...deathYears) } : null,
+        deathYearRange: deathYears.length
+          ? { min: Math.min(...deathYears), max: Math.max(...deathYears) }
+          : null,
         deathHijriRange: deathHijriYears.length
-          ? { min: Math.min(...deathHijriYears), max: Math.max(...deathHijriYears) }
+          ? {
+              min: Math.min(...deathHijriYears),
+              max: Math.max(...deathHijriYears),
+            }
           : null,
       },
       toneRange: { min: 1, max: 10, description: "Emotional vs Rational tone" },
-      intellectRange: { min: 1, max: 10, description: "Vocabulary richness and intellectual level" },
-      supportedLanguages: ["Turkish", "English", "Arabic"]
+      intellectRange: {
+        min: 1,
+        max: 10,
+        description: "Vocabulary richness and intellectual level",
+      },
+      supportedLanguages: ["Turkish", "English", "Arabic"],
     };
 
     res.json(response);
@@ -96,4 +121,4 @@ router.get("/", async (_req: Request, res: Response) => {
   }
 });
 
-export default router; 
+export default router;

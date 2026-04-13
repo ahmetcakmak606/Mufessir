@@ -35,139 +35,138 @@ enum SourceAccessibility {
   LOST
 }
 
-// Kullanıcı modeli
+model Surah {
+  id               Int       @id
+  surahNumber      Int       @unique @map("surah_number")
+  nameAr           String?   @map("surah_name_ar")
+  nameTr           String?   @map("surah_name_tr")
+  nameEn           String?   @map("surah_name_en")
+  totalAyahs       Int       @map("total_ayahs")
+  revelationType  String?   @map("revelation_type")
+  revelationOrder Int?      @map("revelation_order")
+  verses           Verse[]
+
+  @@map("surahs")
+}
+
+model Verse {
+  id               String    @id @default(cuid())
+  verseNumber       Int       @map("ayah_number")
+  surahNumber      Int       @map("surah_id")
+  arabicText        String    @map("ayah_text_ar")
+  transliteration  String?
+  translation      String?   @map("ayah_text_tr")
+  surah             Surah     @relation(fields: [surahNumber], references: [id])
+  tafsirs          Tafsir[]
+
+  @@unique([surahNumber, verseNumber])
+  @@index([surahNumber])
+  @@map("ayahs")
+}
+
+model Mufassir {
+  id                 Int       @id @map("mufassir_id")
+  nameEn             String?   @map("mufassir_en")
+  nameTr             String?   @map("mufassir_tr")
+  nameAr             String?   @map("mufassir_ar")
+  nameLong           String?   @map("mufassir_name_long")
+  bookTafsir         String?   @map("mufassirs_tafsir")
+  bookTafsirAr       String?   @map("mufassirs_tafsir_ar")
+  bookId             Int?      @map("book_id")
+  deathHijri         Int?      @map("death_hijri")
+  deathMiladi        Int?      @map("death_miladi")
+  century            Int?
+  period             String?
+  madhab             String?
+  environment        String?
+  originCountry      String?   @map("origin_country")
+  reputationScore   Float?    @map("reputation_score")
+  explanation        String?   @db.Text
+  detailInformation  String?   @db.Text
+  tafsirType1        String?   @map("tafsir_type1")
+  tafsirType2        String?   @map("tafsir_type2")
+  tafsirs            Tafsir[]
+
+  @@map("mufassirs")
+}
+
+model Tafsir {
+  id            String    @id @default(cuid())
+  verseId       String
+  mufassirId    Int       @map("mufassir_id")
+  tafsirText    String    @db.Text @map("commentary")
+  tafsirType    String?   @map("tafsir_type")
+  keywords      String[]
+  methodTags   String[]  @default(["MIXED"])
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt
+  verse        Verse     @relation(fields: [verseId], references: [id])
+  mufassir     Mufassir  @relation(fields: [mufassirId], references: [id])
+
+  @@index([verseId])
+  @@index([mufassirId])
+  @@map("all_tafsirs")
+}
+
 model User {
   id             String    @id @default(cuid())
   email          String    @unique
-  passwordHash   String    // Bcrypt-hashed password
-  name           String?
-  openaiApiKey   String?   // Şifrelenmiş olarak saklanmalı
-  dailyQuota     Int       @default(10) // Remaining AI calls for the current window
+  passwordHash   String
+  name          String?
+  openaiApiKey   String?
+  dailyQuota    Int       @default(10)
   quotaResetAt   DateTime  @default(now())
-  emailVerified  Boolean   @default(false)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  searches       Search[]
-  favorites      Favorite[]
+  emailVerified Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  searches      Search[]
+  favorites     Favorite[]
   passwordResets PasswordReset[]
 }
 
-// Ayet modeli
-model Verse {
-  id             String    @id @default(cuid())
-  surahNumber    Int
-  surahName      String
-  verseNumber    Int
-  arabicText     String
-  transliteration String?
-  translation    String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  tafsirs        Tafsir[]
-  searches       Search[]
-  favorites      Favorite[]
-
-  @@unique([surahNumber, verseNumber])
-}
-
-// Müfessir modeli
-model Scholar {
-  id                 String                 @id @default(cuid())
-  name               String
-  mufassirTr         String?
-  mufassirEn         String?
-  mufassirAr         String?
-  mufassirNameLong   String?
-  birthYear          Int?
-  deathYear          Int?
-  deathHijri         Int?
-  century            Int                    @default(0)
-  madhab             String?                // Mezhep
-  period             String?                // Legacy/free-form period
-  periodCode         ScholarPeriod?
-  environment        String?                // Darul islam, darul harp, vb.
-  originCountry      String?
-  bookId             String?
-  tafsirType1        String?
-  tafsirType2        String?
-  explanation        String?                @db.Text
-  detailInformation  String?                @db.Text
-  reputationScore    Float?                 // Compatibility score (derived average)
-  scholarlyInfluence Int?
-  methodologicalRigor Int?
-  corpusBreadth      Int?
-  traditionAcceptance TraditionAcceptance[] @default([])
-  sourceAccessibility SourceAccessibility?
-  tafsirs            Tafsir[]
-  references         ScholarReference[]
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
-
-  @@index([periodCode])
-  @@index([madhab])
-  @@index([sourceAccessibility])
-}
-
-// Tefsir modeli
-model Tafsir {
-  id             String    @id @default(cuid())
-  verseId        String
-  scholarId      String
-  tafsirText     String    @db.Text
-  tafsirType     String?   // Filolojik, İşari, vb.
-  keywords       String[]
-  methodTags     String[]  @default(["MIXED"])
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  verse          Verse     @relation(fields: [verseId], references: [id])
-  scholar        Scholar   @relation(fields: [scholarId], references: [id])
-  searchResults  SearchResult[]
-}
-
-// Arama modeli
 model Search {
-  id             String    @id @default(cuid())
-  userId         String
-  verseId        String
-  query          Json      // Kullanıcının filtre ve ayarları
-  createdAt      DateTime  @default(now())
-  user           User      @relation(fields: [userId], references: [id])
-  verse          Verse     @relation(fields: [verseId], references: [id])
-  results        SearchResult[]
+  id        String        @id @default(cuid())
+  userId    String      @map("user_id")
+  verseId   String      @map("verse_id")
+  query    Json
+  createdAt DateTime      @default(now())
+  user      User        @relation(fields: [userId], references: [id])
+  results  SearchResult[]
+
+  @@map("searches")
 }
 
-// Arama sonucu modeli
 model SearchResult {
   id              String    @id @default(cuid())
-  searchId        String
-  tafsirId        String
-  aiResponse      String    @db.Text
-  citations       Json?
+  searchId        String    @map("search_id")
+  tafsirId        String    @map("tafsir_id")
+  aiResponse     String    @db.Text
+  citations      Json?
   confidenceScore Float?
-  similarityScore Float?   // AI çıktısının belirli tefsire benzerlik skoru
+  similarityScore Float?
   createdAt       DateTime  @default(now())
-  search          Search    @relation(fields: [searchId], references: [id])
-  tafsir          Tafsir    @relation(fields: [tafsirId], references: [id])
+  search         Search    @relation(fields: [searchId], references: [id])
+
+  @@map("search_results")
 }
 
-// Favoriler modeli
 model Favorite {
-  id             String    @id @default(cuid())
-  userId         String
-  verseId        String
-  note           String?
-  createdAt      DateTime  @default(now())
-  user           User      @relation(fields: [userId], references: [id])
-  verse          Verse     @relation(fields: [verseId], references: [id])
+  id          String    @id @default(cuid())
+  userId      String    @map("user_id")
+  verseId     String    @map("verse_id")
+  note        String?
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@map("favorites")
 }
 
-// Password reset tokens
 model PasswordReset {
   id         String   @id @default(cuid())
   userId     String
   codeHash   String
   expiresAt  DateTime
-  used       Boolean  @default(false)
+  used      Boolean  @default(false)
   createdAt  DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
@@ -175,43 +174,23 @@ model PasswordReset {
   @@index([userId])
 }
 
-model ScholarReference {
-  id           String   @id @default(cuid())
-  scholarId    String
-  sourceType   String
-  sourceTitle  String
-  volume       String?
-  page         String?
-  edition      String?
-  citationText String?  @db.Text
-  provenance   String?
-  isPrimary    Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  scholar Scholar @relation(fields: [scholarId], references: [id], onDelete: Cascade)
-
-  @@index([scholarId])
-  @@index([sourceType])
-}
-
 model AcademicSnapshot {
-  id               String    @id @default(cuid())
-  snapshotId       String    @unique
-  verseId          String
-  queryText        String
-  corpusVersion   String
-  embeddingModel  String
-  llmModel        String
-  promptHash      String
-  aiResponse      String    @db.Text
-  arabicTafsir    String?   @db.Text
-  turkishTafsir   String?   @db.Text
+  id              String    @id @default(cuid())
+  snapshotId      String    @unique
+  verseId         String
+  queryText       String
+  corpusVersion  String
+  embeddingModel String
+  llmModel       String
+  promptHash     String
+  aiResponse     String    @db.Text
+  arabicTafsir   String?   @db.Text
+  turkishTafsir  String?   @db.Text
   retrievedSources Json?
-  confidence     Float?
-  provenance     String?
-  citations     Json?
-  generatedAt    DateTime  @default(now())
-  citationKey    String
-  searchId       String?
+  confidence    Float?
+  provenance    String?
+  citations    Json?
+  generatedAt   DateTime  @default(now())
+  citationKey  String
+  searchId     String?
 }

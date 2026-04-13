@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "check-types": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/src/index.js",
-    "postinstall": "prisma generate --schema ../../packages/database/prisma/schema.prisma",
+    "postinstall": "prisma generate --schema ../../packages/database/prisma/schema.prisma --output-dir ../../packages/database/node_modules/.prisma/client",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:traceability": "vitest run tests/traceability.test.ts",
@@ -27,7 +27,6 @@
     "import-users-csv": "tsx scripts/import-users-csv.ts"
   },
   "dependencies": {
-    "@prisma/client": "6.11.1",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^9.6.0",
     "cors": "^2.8.5",
