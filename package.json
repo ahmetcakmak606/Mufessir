@@ -16,7 +16,7 @@
     "check-types": "turbo run check-types",
     "db:up": "docker compose up -d",
     "db:migrate": "cd packages/database && npx prisma generate && npx prisma db push --skip-generate",
-    "db:seed": "npm --workspace apps/backend run seed",
+    "db:seed": "cd packages/database && npx prisma generate && cp -r node_modules/.prisma ../../apps/backend/node_modules/.prisma && cp -r node_modules/@prisma ../../apps/backend/node_modules/@prisma && npm --workspace apps/backend run seed",
     "db:derive": "npm --workspace apps/backend run derive-scholar-metadata",
     "db:export:scholar-starter": "npm --workspace apps/backend run export-scholar-enrichment-starter",
     "db:enrich:scholars": "npm --workspace apps/backend run import-scholar-enrichment",
