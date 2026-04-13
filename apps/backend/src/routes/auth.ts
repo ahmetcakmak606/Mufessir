@@ -45,7 +45,9 @@ function decodeBase64Url(value: string): Buffer {
   return Buffer.from(padded, "base64");
 }
 
-function parseJwtParts<THeader, TPayload>(token: string): {
+function parseJwtParts<THeader, TPayload>(
+  token: string,
+): {
   encodedHeader: string;
   encodedPayload: string;
   encodedSignature: string;
@@ -59,8 +61,12 @@ function parseJwtParts<THeader, TPayload>(token: string): {
   const encodedSignature = parts[2];
   if (!encodedHeader || !encodedPayload || !encodedSignature) return null;
   try {
-    const header = JSON.parse(decodeBase64Url(encodedHeader).toString("utf8")) as THeader;
-    const payload = JSON.parse(decodeBase64Url(encodedPayload).toString("utf8")) as TPayload;
+    const header = JSON.parse(
+      decodeBase64Url(encodedHeader).toString("utf8"),
+    ) as THeader;
+    const payload = JSON.parse(
+      decodeBase64Url(encodedPayload).toString("utf8"),
+    ) as TPayload;
     return { encodedHeader, encodedPayload, encodedSignature, header, payload };
   } catch {
     return null;
@@ -102,11 +108,12 @@ type AppleSigningKey = CryptoJsonWebKey & {
   kty?: string;
 };
 
-let appleKeysCache: { keys: AppleSigningKey[]; expiresAt: number } | null = null;
+let appleKeysCache: { keys: AppleSigningKey[]; expiresAt: number } | null =
+  null;
 
 async function verifyGoogleIdToken(
   idToken: string,
-  allowedClientIds: string[]
+  allowedClientIds: string[],
 ): Promise<GoogleTokenInfo | null> {
   const url = `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`;
   const response = await fetch(url);
@@ -117,7 +124,12 @@ async function verifyGoogleIdToken(
   if (!payload.aud || !allowedClientIds.includes(payload.aud)) {
     return null;
   }
-  if (!payload.iss || !["https://accounts.google.com", "accounts.google.com"].includes(payload.iss)) {
+  if (
+    !payload.iss ||
+    !["https://accounts.google.com", "accounts.google.com"].includes(
+      payload.iss,
+    )
+  ) {
     return null;
   }
   const nowUnix = Math.floor(Date.now() / 1000);
@@ -157,10 +169,13 @@ function verifyRs256JwtSignature(
   encodedHeader: string,
   encodedPayload: string,
   encodedSignature: string,
-  jwk: AppleSigningKey
+  jwk: AppleSigningKey,
 ): boolean {
   if (!jwk.kty || !jwk.n || !jwk.e) return false;
-  const publicKey = crypto.createPublicKey({ key: jwk as CryptoJsonWebKey, format: "jwk" });
+  const publicKey = crypto.createPublicKey({
+    key: jwk as CryptoJsonWebKey,
+    format: "jwk",
+  });
   const data = Buffer.from(`${encodedHeader}.${encodedPayload}`);
   const signature = decodeBase64Url(encodedSignature);
   return crypto.verify("RSA-SHA256", data, publicKey, signature);
@@ -168,12 +183,13 @@ function verifyRs256JwtSignature(
 
 async function verifyAppleIdToken(
   idToken: string,
-  allowedClientIds: string[]
+  allowedClientIds: string[],
 ): Promise<AppleTokenPayload | null> {
   const parsed = parseJwtParts<AppleTokenHeader, AppleTokenPayload>(idToken);
   if (!parsed) return null;
 
-  const { encodedHeader, encodedPayload, encodedSignature, header, payload } = parsed;
+  const { encodedHeader, encodedPayload, encodedSignature, header, payload } =
+    parsed;
   if (!header.kid || header.alg !== "RS256") return null;
 
   const keys = await getAppleSigningKeys();
@@ -184,7 +200,7 @@ async function verifyAppleIdToken(
     encodedHeader,
     encodedPayload,
     encodedSignature,
-    key
+    key,
   );
   if (!signatureOk) return null;
 
@@ -193,7 +209,8 @@ async function verifyAppleIdToken(
   if (!payload.sub || !payload.sub.trim()) return null;
 
   const nowUnix = Math.floor(Date.now() / 1000);
-  const expUnix = typeof payload.exp === "string" ? Number(payload.exp) : payload.exp;
+  const expUnix =
+    typeof payload.exp === "string" ? Number(payload.exp) : payload.exp;
   if (!expUnix || expUnix <= nowUnix) return null;
 
   if (
@@ -208,12 +225,19 @@ async function verifyAppleIdToken(
 }
 
 router.post("/register", async (req: Request, res: Response) => {
-  const { email, password, name } = req.body as { email: string; password: string; name?: string };
-  if (!email || !password) return res.status(400).json({ error: "Email and password required" });
+  const { email, password, name } = req.body as {
+    email: string;
+    password: string;
+    name?: string;
+  };
+  if (!email || !password)
+    return res.status(400).json({ error: "Email and password required" });
 
   try {
     const normalizedEmail = normalizeEmail(email);
-    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    const existing = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
     if (existing) return res.status(409).json({ error: "User already exists" });
 
     const passwordHash = await hashPassword(password);
@@ -236,7 +260,8 @@ router.post("/register", async (req: Request, res: Response) => {
 
 router.post("/login", async (req: Request, res: Response) => {
   const { email, password } = req.body as { email: string; password: string };
-  if (!email || !password) return res.status(400).json({ error: "Email and password required" });
+  if (!email || !password)
+    return res.status(400).json({ error: "Email and password required" });
 
   try {
     const startedAt = Date.now();
@@ -300,7 +325,10 @@ router.post("/sso/google", async (req: Request, res: Response) => {
     } else if (!user.emailVerified) {
       await prisma.user.update({
         where: { id: user.id },
-        data: { emailVerified: true, name: user.name ?? payload.name ?? undefined },
+        data: {
+          emailVerified: true,
+          name: user.name ?? payload.name ?? undefined,
+        },
       });
     }
 
@@ -358,7 +386,10 @@ router.post("/sso/apple", async (req: Request, res: Response) => {
     } else if (!user.emailVerified) {
       await prisma.user.update({
         where: { id: user.id },
-        data: { emailVerified: true, name: user.name ?? name ?? payload.email ?? undefined },
+        data: {
+          emailVerified: true,
+          name: user.name ?? name ?? payload.email ?? undefined,
+        },
       });
     }
 
@@ -380,14 +411,24 @@ router.post("/sso/apple", async (req: Request, res: Response) => {
 
 router.get("/me", async (req: Request, res: Response) => {
   const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : undefined;
   if (!token) return res.status(401).json({ error: "Missing token" });
   try {
     const secret = process.env.JWT_SECRET as string;
     const payload = jwt.verify(token, secret) as jwt.JwtPayload;
-    const user = await prisma.user.findUnique({ where: { id: payload.sub as string } });
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub as string },
+    });
     if (!user) return res.status(401).json({ error: "Invalid token" });
-    res.json({ id: user.id, email: user.email, name: user.name, dailyQuota: user.dailyQuota, quotaResetAt: user.quotaResetAt });
+    res.json({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      dailyQuota: user.dailyQuota,
+      quotaResetAt: user.quotaResetAt,
+    });
   } catch {
     return res.status(401).json({ error: "Invalid token" });
   }
@@ -395,7 +436,10 @@ router.get("/me", async (req: Request, res: Response) => {
 
 function signJwt(user: { id: string; email: string }) {
   const secret = process.env.JWT_SECRET as string;
-  return jwt.sign({ email: user.email }, secret, { subject: user.id, expiresIn: "7d" });
+  return jwt.sign({ email: user.email }, secret, {
+    subject: user.id,
+    expiresIn: "7d",
+  });
 }
 
 // Request password reset: generates a 6-digit code and emails it
@@ -403,14 +447,16 @@ router.post("/password/reset/request", async (req: Request, res: Response) => {
   const { email } = req.body as { email: string };
   if (!email) return res.status(400).json({ error: "Email required" });
 
-  const user = await prisma.user.findUnique({ where: { email: normalizeEmail(email) } });
+  const user = await prisma.user.findUnique({
+    where: { email: normalizeEmail(email) },
+  });
   if (!user) {
     // Do not leak user existence
     return res.json({ ok: true });
   }
 
   // Generate 6-digit numeric code
-  const code = (Math.floor(100000 + Math.random() * 900000)).toString();
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
   const codeHash = await hashPassword(code);
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
@@ -434,17 +480,25 @@ router.post("/password/reset/request", async (req: Request, res: Response) => {
 
 // Confirm reset with code and set new password
 router.post("/password/reset/confirm", async (req: Request, res: Response) => {
-  const { email, code, newPassword } = req.body as { email: string; code: string; newPassword: string };
-  if (!email || !code || !newPassword) return res.status(400).json({ error: "Missing fields" });
+  const { email, code, newPassword } = req.body as {
+    email: string;
+    code: string;
+    newPassword: string;
+  };
+  if (!email || !code || !newPassword)
+    return res.status(400).json({ error: "Missing fields" });
 
-  const user = await prisma.user.findUnique({ where: { email: normalizeEmail(email) } });
+  const user = await prisma.user.findUnique({
+    where: { email: normalizeEmail(email) },
+  });
   if (!user) return res.status(400).json({ error: "Invalid code" });
 
   const rec = await prisma.passwordReset.findFirst({
     where: { userId: user.id, used: false },
     orderBy: { createdAt: "desc" },
   });
-  if (!rec || rec.expiresAt < new Date()) return res.status(400).json({ error: "Invalid or expired code" });
+  if (!rec || rec.expiresAt < new Date())
+    return res.status(400).json({ error: "Invalid or expired code" });
 
   const ok = await verifyPassword(code, rec.codeHash);
   if (!ok) return res.status(400).json({ error: "Invalid or expired code" });
@@ -452,9 +506,12 @@ router.post("/password/reset/confirm", async (req: Request, res: Response) => {
   // Update password
   const passwordHash = await hashPassword(newPassword);
   await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
-  await prisma.passwordReset.update({ where: { id: rec.id }, data: { used: true } });
+  await prisma.passwordReset.update({
+    where: { id: rec.id },
+    data: { used: true },
+  });
 
   return res.json({ ok: true });
 });
 
-export default router; 
+export default router;
