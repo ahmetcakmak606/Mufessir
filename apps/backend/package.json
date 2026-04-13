@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "check-types": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/src/index.js",
-    "postinstall": "cd ../../packages/database && npx prisma generate && cp -r node_modules/.prisma ../../apps/backend/node_modules/.prisma && cp -r node_modules/@prisma ../../apps/backend/node_modules/@prisma"
+    "postinstall": "cd ../../packages/database && npx prisma generate && cp -r node_modules/.prisma ../../apps/backend/node_modules/.prisma && cp -r node_modules/@prisma ../../apps/backend/node_modules/@prisma",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:traceability": "vitest run tests/traceability.test.ts",
