@@ -15,7 +15,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "db:up": "docker compose up -d",
-    "db:migrate": "npx prisma migrate deploy --schema packages/database/prisma/schema.prisma",
+    "db:migrate": "cd packages/database && npx prisma generate && npx prisma db push --skip-generate",
     "db:seed": "npm --workspace apps/backend run seed",
     "db:derive": "npm --workspace apps/backend run derive-scholar-metadata",
     "db:export:scholar-starter": "npm --workspace apps/backend run export-scholar-enrichment-starter",
