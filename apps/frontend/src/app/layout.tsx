@@ -18,8 +18,9 @@ const merriweather = Merriweather({
 });
 
 export const metadata: Metadata = {
-  title: "Mufessir - AI-powered Tafsir Platform",
-  description: "AI-powered Tafsir platform with traditional Islamic scholarship",
+  title: "Mufessir AI - AI-powered Tafsir Platform",
+  description:
+    "AI-powered Tafsir platform with traditional Islamic scholarship",
 };
 
 export default function RootLayout({
@@ -34,9 +35,7 @@ export default function RootLayout({
       >
         <QueryProvider>
           <AuthProvider>
-            <LangProvider>
-              {children}
-            </LangProvider>
+            <LangProvider>{children}</LangProvider>
           </AuthProvider>
         </QueryProvider>
       </body>

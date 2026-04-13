@@ -148,7 +148,10 @@ export const locales = {
       streaming: "Tefsir akışı devam ediyor...",
       metricConfidence: "Güven",
       metricProvenance: "Provenans",
-      metricCitations: "Atıf",
+      metricCitations: "Atıflar",
+      metricSimilarity: "Benzerlik",
+      metricExcerpts: "Alıntılar",
+      metricReputation: "İtibar",
       snippetsTitle: "Kaynak Arapça Tefsir Alıntıları",
       academicCitationsTitle: "Akademik Atıflar",
       tableScholar: "Müfessir",
@@ -317,7 +320,7 @@ export const locales = {
   },
   en: {
     home: {
-      brand: "Mufessir",
+      brand: "Mufessir AI",
       title: "AI-powered Tafsir Platform",
       subtitle:
         "Experience the wisdom of traditional Islamic scholarship enhanced by modern AI technology. Access centuries of Quranic commentary with intelligent analysis and personalized insights.",
@@ -339,7 +342,7 @@ export const locales = {
         "Users return for clarity: visible sources, confidence signaling, and scholar-aware framing.",
     },
     login: {
-      title: "Sign in to Mufessir",
+      title: "Sign in to Mufessir AI",
       subtitle: "Access AI-powered Tafsir with traditional Islamic scholarship",
       email: "Email address",
       password: "Password",
@@ -371,7 +374,7 @@ export const locales = {
     },
     register: {
       title: "Create your account",
-      subtitle: "Join Mufessir to access AI-powered Tafsir",
+      subtitle: "Join Mufessir AI to access AI-powered Tafsir",
       name: "Full Name",
       email: "Email address",
       password: "Password",
@@ -402,7 +405,7 @@ export const locales = {
       appleContinue: "Continue with Apple",
     },
     dashboard: {
-      headerTitle: "Mufessir Dashboard",
+      headerTitle: "Mufessir AI Dashboard",
       logout: "Logout",
       userTitle: "User",
       name: "Name",
@@ -460,9 +463,12 @@ export const locales = {
         "Verse not found in local sample DB. Available samples: 1:1, 1:2, 2:255, 3:64, 112:1.",
       selectionHint: "You can manage mufassir selection in the table below.",
       streaming: "Streaming tafsir...",
-      metricConfidence: "Confidence",
+      metricConfidence: "Trust",
       metricProvenance: "Provenance",
       metricCitations: "Citations",
+      metricSimilarity: "Similarity",
+      metricExcerpts: "Excerpts",
+      metricReputation: "Reputation",
       snippetsTitle: "Source Arabic Tafsir Snippets",
       academicCitationsTitle: "Academic Citations",
       tableScholar: "Mufassir",

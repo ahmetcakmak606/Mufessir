@@ -728,7 +728,7 @@ export default function QueryWorkspacePage() {
             </div>
 
             {mobileResultTab === "result" && (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="ui-kpi">
                   <div className="ui-muted text-xs">
                     {dashboard.metricConfidence}
@@ -744,11 +744,22 @@ export default function QueryWorkspacePage() {
                       ? `${Math.round(confidence * 100)}%`
                       : noValueLabel}
                   </div>
-                  {getConfidenceStatus(confidence)?.level === "low" && (
-                    <div className="text-xs text-red-600 mt-1">
-                      {getConfidenceStatus(confidence)?.message}
-                    </div>
-                  )}
+                </div>
+                <div className="ui-kpi">
+                  <div className="ui-muted text-xs">
+                    {dashboard.metricCitations}
+                  </div>
+                  <div className="text-xl font-semibold text-[var(--text-strong)]">
+                    {citations.length}
+                  </div>
+                </div>
+                <div className="ui-kpi">
+                  <div className="ui-muted text-xs">
+                    {dashboard.metricExcerpts}
+                  </div>
+                  <div className="text-xl font-semibold text-[var(--text-strong)]">
+                    {sourceExcerpts.length}
+                  </div>
                 </div>
                 <div className="ui-kpi">
                   <div className="ui-muted text-xs">
@@ -756,14 +767,6 @@ export default function QueryWorkspacePage() {
                   </div>
                   <div className="text-base font-medium text-[var(--text-strong)]">
                     {provenanceLabel}
-                  </div>
-                </div>
-                <div className="ui-kpi">
-                  <div className="ui-muted text-xs">
-                    {dashboard.metricCitations}
-                  </div>
-                  <div className="text-base font-medium text-[var(--text-strong)]">
-                    {citations.length}
                   </div>
                 </div>
               </div>
