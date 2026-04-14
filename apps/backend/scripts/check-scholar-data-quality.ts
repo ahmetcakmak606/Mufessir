@@ -26,11 +26,11 @@ function inRange1to5(value: number | null | undefined): boolean {
 }
 
 async function main() {
-  const scholars = await prisma.scholar.findMany({
+  const scholars = await prisma.mufassir.findMany({
     select: {
       id: true,
-      name: true,
-      mufassirTr: true,
+      nameEn: true,
+      nameTr: true,
       bookId: true,
       explanation: true,
       detailInformation: true,
@@ -47,10 +47,10 @@ async function main() {
     },
   });
 
-  const references = await prisma.scholarReference.count();
+  const references = await prisma.tafsir.count();
   const total = scholars.length;
   const requiredFields: Array<keyof (typeof scholars)[number]> = [
-    "mufassirTr",
+    "nameTr",
     "bookId",
     "explanation",
     "detailInformation",
@@ -93,7 +93,7 @@ async function main() {
   );
 
   const dependencyReport = {
-    t01_data_enrichment_ready: coverage.find((c) => c.field === "mufassirTr")?.ratio ?? 0,
+    t01_data_enrichment_ready: coverage.find((c) => c.field === "nameTr")?.ratio ?? 0,
     t01a_metadata_ready:
       (coverage.find((c) => c.field === "periodCode")?.ratio ?? 0) *
       (coverage.find((c) => c.field === "madhab")?.ratio ?? 0),
