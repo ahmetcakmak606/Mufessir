@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import fs from "fs";
 import { resolve, dirname } from "path";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "/Users/ac/personalgithub/Mufessir/packages/database/node_modules/@prisma/client";
 import { fileURLToPath } from "url";
 import { config } from "dotenv";
 
@@ -134,7 +134,7 @@ const verseBatch: Array<{
 const tafsirBatch: Array<{
   id: string;
   verseId: string;
-  scholarId: string;
+  mufassirId: number;
   tafsirText: string;
   tafsirType: string | null;
   keywords: string[];
@@ -361,6 +361,8 @@ function isTableOfInterest(table: string): boolean {
   if (table === "mufassirs") return true;
   if (table === "Mufessirs_dead_hijri") return true;
   if (table.startsWith("tafseer_")) return true;
+  // Skip all_tafsirs - it comes before ayahs in the dump causing ordering issues
+  // if (table === "all_tafsirs") return true;
   return false;
 }
 
@@ -555,9 +557,10 @@ async function handleRow(table: string, row: Field[]) {
     return;
   }
 
-  if (table.startsWith("tafseer_")) {
+  if (table.startsWith("tafseer_") || table === "all_tafsirs") {
     if (!versesReady || !scholarsReady) {
-      throw new Error("Verses/scholars are not ready before tafseer import.");
+      console.log(`Skipping ${table} rows - verses/scholars not ready yet`);
+      return;
     }
     const tafseerId = toValue(row[0]);
     const surahId = toValue(row[1]);
@@ -584,7 +587,7 @@ async function handleRow(table: string, row: Field[]) {
     tafsirBatch.push({
       id: `tafsir-${surahId}-${tafseerId}`,
       verseId,
-      scholarId,
+      mufassirId: mufassirId,
       tafsirText: asString(commentary) || "",
       tafsirType,
       keywords: [],
@@ -659,18 +662,26 @@ async function parseDump() {
             currentTable === "mufassirs" ||
             currentTable === "Mufessirs_dead_hijri"
           ) {
-            await buildMufassirs();
+            // await buildMufassirs();
+            scholarsReady = true;
           }
-          if (currentTable.startsWith("tafseer_")) {
+          if (
+            currentTable.startsWith("tafseer_") ||
+            currentTable === "all_tafsirs"
+          ) {
             await flushTafsirs();
           }
           if (
             currentTable === "mufassirs" ||
             currentTable === "Mufessirs_dead_hijri"
           ) {
-            await buildMufassirs();
+            // await buildMufassirs();
+            scholarsReady = true;
           }
-          if (currentTable.startsWith("tafseer_")) {
+          if (
+            currentTable.startsWith("tafseer_") ||
+            currentTable === "all_tafsirs"
+          ) {
             await flushTafsirs();
           }
           state = "search";

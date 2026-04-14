@@ -20,7 +20,7 @@ config({ path: envPath });
 
 console.log("DATABASE_URL loaded:", process.env.DATABASE_URL ? "YES" : "NO");
 
-const app = express();
+const app: Express = express();
 
 // Initialize Prisma after dotenv config so DATABASE_URL is available
 const prisma = new PrismaClient();
