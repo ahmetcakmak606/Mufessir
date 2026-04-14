@@ -5,20 +5,14 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "embed": "tsx scripts/embed-tafsirs.ts",
-    "generate": "prisma generate --schema prisma/schema.prisma",
-    "import:quran": "tsx scripts/import-quran.ts --ar packages/database/data/quran-ar.json --tr packages/database/data/quran-tr-diyanet.json"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
-  "devDependencies": {
-    "prisma": "6.19.3",
-    "tsx": "^4.19.2"
+    "generate": "prisma generate --schema prisma/schema.prisma"
   },
   "dependencies": {
-    "@prisma/client": "6.19.3",
+    "@prisma/client": "^5.22.0",
     "dotenv": "^16.4.6",
     "openai": "^4.28.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0"
   }
 }

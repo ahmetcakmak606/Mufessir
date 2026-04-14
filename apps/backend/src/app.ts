@@ -11,12 +11,18 @@ import tafseerRouter from "./routes/tafseer.js";
 import filtersRouter from "./routes/filters.js";
 import versesRouter from "./routes/verses.js";
 
-// Load .env from the project root when running locally
+// Load .env from the backend directory when running locally
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-config({ path: resolve(__dirname, "../../../.env") });
+const envPath = resolve(__dirname, "../.env");
+console.log("Loading .env from:", envPath);
+config({ path: envPath });
 
-const app: Express = express();
+console.log("DATABASE_URL loaded:", process.env.DATABASE_URL ? "YES" : "NO");
+
+const app = express();
+
+// Initialize Prisma after dotenv config so DATABASE_URL is available
 const prisma = new PrismaClient();
 
 // Store prisma on app locals for access in routers
@@ -32,18 +38,24 @@ app.use("/tafseer", tafseerRouter);
 app.use("/filters", filtersRouter);
 app.use("/verses", versesRouter);
 
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error(
-    JSON.stringify({
-      level: "error",
-      event: "unhandled_error",
-      message: err.message,
-      stack: err.stack,
-      at: new Date().toISOString(),
-    })
-  );
-  res.status(500).json({ error: "Internal server error" });
-});
+app.use(
+  (
+    err: Error,
+    _req: express.Request,
+    res: express.Response,
+    _next: express.NextFunction,
+  ) => {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        event: "unhandled_error",
+        message: err.message,
+        stack: err.stack,
+        at: new Date().toISOString(),
+      }),
+    );
+    res.status(500).json({ error: "Internal server error" });
+  },
+);
 
 export default app;
-

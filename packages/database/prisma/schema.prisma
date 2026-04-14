@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
   shadowDatabaseUrl = env("SHADOW_DB_URL")
 }
 
@@ -36,28 +36,28 @@ enum SourceAccessibility {
 }
 
 model Surah {
-  id               Int       @id
-  surahNumber      Int       @unique @map("surah_number")
-  nameAr           String?   @map("surah_name_ar")
-  nameTr           String?   @map("surah_name_tr")
-  nameEn           String?   @map("surah_name_en")
-  totalAyahs       Int       @map("total_ayahs")
-  revelationType  String?   @map("revelation_type")
-  revelationOrder Int?      @map("revelation_order")
-  verses           Verse[]
+  id              Int     @id
+  surahNumber     Int     @unique @map("surah_number")
+  nameAr          String? @map("surah_name_ar")
+  nameTr          String? @map("surah_name_tr")
+  nameEn          String? @map("surah_name_en")
+  totalAyahs      Int     @map("total_ayahs")
+  revelationType  String? @map("revelation_type")
+  revelationOrder Int?    @map("revelation_order")
+  verses          Verse[]
 
   @@map("surahs")
 }
 
 model Verse {
-  id               String    @id @default(cuid())
-  verseNumber       Int       @map("ayah_number")
-  surahNumber      Int       @map("surah_id")
-  arabicText        String    @map("ayah_text_ar")
-  transliteration  String?
-  translation      String?   @map("ayah_text_tr")
-  surah             Surah     @relation(fields: [surahNumber], references: [id])
-  tafsirs          Tafsir[]
+  id              String   @id
+  verseNumber     Int      @map("ayah_number")
+  surahNumber     Int      @map("surah_id")
+  arabicText      String   @map("ayah_text_ar")
+  transliteration String?
+  translation     String?  @map("ayah_text_tr")
+  surah           Surah    @relation(fields: [surahNumber], references: [id])
+  tafsirs         Tafsir[]
 
   @@unique([surahNumber, verseNumber])
   @@index([surahNumber])
@@ -65,43 +65,51 @@ model Verse {
 }
 
 model Mufassir {
-  id                 Int       @id @map("mufassir_id")
-  nameEn             String?   @map("mufassir_en")
-  nameTr             String?   @map("mufassir_tr")
-  nameAr             String?   @map("mufassir_ar")
-  nameLong           String?   @map("mufassir_name_long")
-  bookTafsir         String?   @map("mufassirs_tafsir")
-  bookTafsirAr       String?   @map("mufassirs_tafsir_ar")
-  bookId             Int?      @map("book_id")
-  deathHijri         Int?      @map("death_hijri")
-  deathMiladi        Int?      @map("death_miladi")
-  century            Int?
-  period             String?
-  madhab             String?
-  environment        String?
-  originCountry      String?   @map("origin_country")
-  reputationScore   Float?    @map("reputation_score")
-  explanation        String?   @db.Text
-  detailInformation  String?   @db.Text
-  tafsirType1        String?   @map("tafsir_type1")
-  tafsirType2        String?   @map("tafsir_type2")
-  tafsirs            Tafsir[]
+  id                  Int      @id @map("mufassir_id")
+  nameEn              String?  @map("mufassir_en")
+  nameTr              String?  @map("mufassir_tr")
+  nameAr              String?  @map("mufassir_ar")
+  nameLong            String?  @map("mufassir_name_long")
+  bookTafsir          String?  @map("mufassirs_tafsir")
+  bookTafsirAr        String?  @map("mufassirs_tafsir_ar")
+  bookId              Int?     @map("book_id")
+  deathHijri          Int?     @map("death_hijri")
+  deathMiladi         Int?     @map("death_miladi")
+  century             Int?
+  period              String?
+  periodCode          String?
+  madhab              String?
+  environment         String?
+  originCountry       String?  @map("origin_country")
+  reputationScore     Float?   @map("reputation_score")
+  explanation         String?  @db.Text
+  detailInformation   String?  @db.Text
+  tafsirType1         String?  @map("tafsir_type1")
+  tafsirType2         String?  @map("tafsir_type2")
+  sourceAccessibility String?  @map("source_accessibility")
+  scholarlyInfluence  Float?
+  methodologicalRigor Float?
+  corpusBreadth       Float?
+  traditionAcceptance String[] @default([])
+  tafsirs             Tafsir[]
 
   @@map("mufassirs")
 }
 
 model Tafsir {
-  id            String    @id @default(cuid())
-  verseId       String
-  mufassirId    Int       @map("mufassir_id")
-  tafsirText    String    @db.Text @map("commentary")
-  tafsirType    String?   @map("tafsir_type")
-  keywords      String[]
-  methodTags   String[]  @default(["MIXED"])
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt
-  verse        Verse     @relation(fields: [verseId], references: [id])
-  mufassir     Mufassir  @relation(fields: [mufassirId], references: [id])
+  id            String   @id @default(cuid())
+  verseId       String   @map("verse_id")
+  mufassirId    Int      @map("mufassir_id")
+  tafsirText    String   @map("commentary") @db.Text
+  tafsirType    String?  @map("tafsir_type")
+  keywords      String[] @default([])
+  methodTags    String[] @default(["MIXED"])
+  languageLevel Float?   @map("language_level")
+  emotionalRatio Float?  @map("emotional_ratio")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt
+  verse         Verse    @relation(fields: [verseId], references: [id])
+  mufassir      Mufassir @relation(fields: [mufassirId], references: [id])
 
   @@index([verseId])
   @@index([mufassirId])
@@ -109,65 +117,65 @@ model Tafsir {
 }
 
 model User {
-  id             String    @id @default(cuid())
-  email          String    @unique
+  id             String          @id @default(cuid())
+  email          String          @unique
   passwordHash   String
-  name          String?
+  name           String?
   openaiApiKey   String?
-  dailyQuota    Int       @default(10)
-  quotaResetAt   DateTime  @default(now())
-  emailVerified Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  searches      Search[]
-  favorites     Favorite[]
+  dailyQuota     Int             @default(10)
+  quotaResetAt   DateTime        @default(now())
+  emailVerified  Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  searches       Search[]
+  favorites      Favorite[]
   passwordResets PasswordReset[]
 }
 
 model Search {
-  id        String        @id @default(cuid())
-  userId    String      @map("user_id")
-  verseId   String      @map("verse_id")
-  query    Json
-  createdAt DateTime      @default(now())
-  user      User        @relation(fields: [userId], references: [id])
-  results  SearchResult[]
+  id        String         @id @default(cuid())
+  userId    String         @map("user_id")
+  verseId   String         @map("verse_id")
+  query     Json
+  createdAt DateTime       @default(now())
+  user      User           @relation(fields: [userId], references: [id])
+  results   SearchResult[]
 
   @@map("searches")
 }
 
 model SearchResult {
-  id              String    @id @default(cuid())
-  searchId        String    @map("search_id")
-  tafsirId        String    @map("tafsir_id")
-  aiResponse     String    @db.Text
-  citations      Json?
+  id              String   @id @default(cuid())
+  searchId        String   @map("search_id")
+  tafsirId        String   @map("tafsir_id")
+  aiResponse      String   @db.Text
+  citations       Json?
   confidenceScore Float?
   similarityScore Float?
-  createdAt       DateTime  @default(now())
-  search         Search    @relation(fields: [searchId], references: [id])
+  createdAt       DateTime @default(now())
+  search          Search   @relation(fields: [searchId], references: [id])
 
   @@map("search_results")
 }
 
 model Favorite {
-  id          String    @id @default(cuid())
-  userId      String    @map("user_id")
-  verseId     String    @map("verse_id")
-  note        String?
-  createdAt   DateTime  @default(now())
-  user        User      @relation(fields: [userId], references: [id])
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  verseId   String   @map("verse_id")
+  note      String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
 
   @@map("favorites")
 }
 
 model PasswordReset {
-  id         String   @id @default(cuid())
-  userId     String
-  codeHash   String
-  expiresAt  DateTime
+  id        String   @id @default(cuid())
+  userId    String
+  codeHash  String
+  expiresAt DateTime
   used      Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
 
@@ -175,22 +183,22 @@ model PasswordReset {
 }
 
 model AcademicSnapshot {
-  id              String    @id @default(cuid())
-  snapshotId      String    @unique
-  verseId         String
-  queryText       String
-  corpusVersion  String
-  embeddingModel String
-  llmModel       String
-  promptHash     String
-  aiResponse     String    @db.Text
-  arabicTafsir   String?   @db.Text
-  turkishTafsir  String?   @db.Text
+  id               String   @id @default(cuid())
+  snapshotId       String   @unique
+  verseId          String
+  queryText        String
+  corpusVersion    String
+  embeddingModel   String
+  llmModel         String
+  promptHash       String
+  aiResponse       String   @db.Text
+  arabicTafsir     String?  @db.Text
+  turkishTafsir    String?  @db.Text
   retrievedSources Json?
-  confidence    Float?
-  provenance    String?
-  citations    Json?
-  generatedAt   DateTime  @default(now())
-  citationKey  String
-  searchId     String?
+  confidence       Float?
+  provenance       String?
+  citations        Json?
+  generatedAt      DateTime @default(now())
+  citationKey      String
+  searchId         String?
 }
