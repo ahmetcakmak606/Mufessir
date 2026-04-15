@@ -202,8 +202,39 @@ Create `.env` files from `.env.example`. Required variables:
 # Backend
 DATABASE_URL
 JWT_SECRET
-NODE_ENV=development
 
 # Frontend
-NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_API_URL=http://localhost:4000
+```
+
+---
+
+## Non-obvious Commands
+
+```bash
+# Scholar data quality check
+npm run quality:scholars
+
+# Import scholar enrichments from CSV
+npm run db:enrich:scholars
+
+# Export scholar enrichment template
+npm run db:export:scholar-starter
+
+# Data import scripts
+npm run db:derive  # Derive metadata from embeddings
+npm run import-sqlite   # Import from SQLite
+npm run import-mysql-dump  # Import from MySQL dump
+```
+
+---
+
+## CI / Commit Convention
+
+Commits must follow Conventional Commits:
+
+```
+<type>(<scope>): <description>
+Types: feat, fix, refactor, docs, chore
+Example: feat(auth): add password reset endpoint
 ```
