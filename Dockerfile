@@ -13,7 +13,7 @@ RUN cd packages/database && npx prisma generate
 
 COPY . .
 
-RUN npm run build --workspace=@mufessir/backend
+RUN cd apps/backend && npm run build
 
 EXPOSE 4000
 
