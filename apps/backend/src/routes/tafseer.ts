@@ -93,7 +93,7 @@ async function createAcademicSnapshot(params: {
         retrievedSources,
         confidence: params.confidence,
         provenance: params.provenance,
-        citations: params.citations as unknown as Prisma.InputJsonValue,
+        citations: params.citations as any,
         citationKey,
         searchId: params.searchId,
       },
@@ -150,13 +150,13 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 function extractFiltersFromQuery(
-  queryValue: Prisma.JsonValue | null,
+  queryValue: any | null,
 ): Record<string, unknown> {
   const queryObj = asRecord(queryValue);
   return asRecord(queryObj.filters);
 }
 
-function extractRunMeta(queryValue: Prisma.JsonValue | null): RunMeta {
+function extractRunMeta(queryValue: any | null): RunMeta {
   const queryObj = asRecord(queryValue);
   const meta = asRecord(queryObj.runMeta);
   return {
@@ -167,7 +167,7 @@ function extractRunMeta(queryValue: Prisma.JsonValue | null): RunMeta {
   };
 }
 
-function parseStoredCitations(value: Prisma.JsonValue | null): Citation[] {
+function parseStoredCitations(value: any | null): Citation[] {
   if (!Array.isArray(value)) return [];
   return value
     .map((item) => asRecord(item))
@@ -198,7 +198,7 @@ function parseStoredCitations(value: Prisma.JsonValue | null): Citation[] {
 function buildRunSummary(search: any) {
   const latest = search.results?.[0];
   const citations = parseStoredCitations(latest?.citations ?? null);
-  const runMeta = extractRunMeta(search.query as Prisma.JsonValue | null);
+  const runMeta = extractRunMeta(search.query as any | null);
   const updatedAt = runMeta.updatedAt || latest?.createdAt || search.createdAt;
   return {
     runId: search.id,
@@ -209,7 +209,7 @@ function buildRunSummary(search: any) {
       surahName: search.verseId.surahName,
       verseNumber: search.verseId.verseNumber,
     },
-    filters: extractFiltersFromQuery(search.query as Prisma.JsonValue | null),
+    filters: extractFiltersFromQuery(search.query as any | null),
     title: runMeta.title,
     notes: runMeta.notes,
     starred: runMeta.starred,
@@ -296,9 +296,9 @@ router.get("/runs/:runId", authenticateJWT, async (req, res) => {
 
     const latest = search.results[0];
     const citations = parseStoredCitations(
-      (latest?.citations ?? null) as Prisma.JsonValue | null,
+      (latest?.citations ?? null) as any | null,
     );
-    const runMeta = extractRunMeta(search.query as Prisma.JsonValue | null);
+    const runMeta = extractRunMeta(search.query as any | null);
     const updatedAt =
       runMeta.updatedAt || latest?.createdAt || search.createdAt;
     const sourceExcerpts: SourceExcerpt[] = [];
@@ -307,7 +307,7 @@ router.get("/runs/:runId", authenticateJWT, async (req, res) => {
       runId: search.id,
       searchId: search.id,
       verse: search.verseId,
-      filters: extractFiltersFromQuery(search.query as Prisma.JsonValue | null),
+      filters: extractFiltersFromQuery(search.query as any | null),
       title: runMeta.title,
       notes: runMeta.notes,
       starred: runMeta.starred,
@@ -365,8 +365,8 @@ router.patch("/runs/:runId", authenticateJWT, async (req, res) => {
       return res.status(404).json({ error: "Run not found" });
     }
 
-    const currentQuery = asRecord(search.query as Prisma.JsonValue | null);
-    const currentMeta = extractRunMeta(search.query as Prisma.JsonValue | null);
+    const currentQuery = asRecord(search.query as any | null);
+    const currentMeta = extractRunMeta(search.query as any | null);
     const nextMeta: RunMeta = {
       ...currentMeta,
       ...(hasTitle
@@ -389,7 +389,7 @@ router.patch("/runs/:runId", authenticateJWT, async (req, res) => {
       updatedAt: new Date().toISOString(),
     };
 
-    const updatedQuery: Prisma.InputJsonValue = {
+    const updatedQuery: any = {
       ...currentQuery,
       runMeta: nextMeta,
     };
@@ -1135,7 +1135,7 @@ router.post(
                   searchId: search.id,
                   tafsirId: saveTafsirId,
                   aiResponse: arabicTafsir,
-                  citations: citations as unknown as Prisma.InputJsonValue,
+                  citations: citations as unknown as any,
                   confidenceScore: confidence,
                   similarityScore: mostSimilar?.similarityScore || null,
                 },
@@ -1276,7 +1276,7 @@ router.post(
                 searchId: search.id,
                 tafsirId: saveTafsirId,
                 aiResponse: arabicTafsir,
-                citations: citations as unknown as Prisma.InputJsonValue,
+                citations: citations as unknown as any,
                 confidenceScore: confidence,
                 similarityScore: mostSimilar?.similarityScore || null,
               },
@@ -1368,7 +1368,7 @@ ${similarTafsirs
               searchId: search.id,
               tafsirId: saveTafsirId,
               aiResponse: fallbackResponse,
-              citations: citations as unknown as Prisma.InputJsonValue,
+              citations: citations as unknown as any,
               confidenceScore: confidence,
               similarityScore: similarTafsirs[0]?.similarityScore || null,
             },
