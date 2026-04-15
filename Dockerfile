@@ -16,6 +16,8 @@ COPY . .
 
 RUN cd apps/backend && npx tsc -p tsconfig.json
 
+RUN ls -la apps/backend/dist/src/ || echo "dist folder missing"
+
 EXPOSE 4000
 
 CMD ["node", "apps/backend/dist/src/index.js"]
