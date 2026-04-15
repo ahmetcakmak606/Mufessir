@@ -2,13 +2,7 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { randomInt, randomUUID } from "crypto";
 
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: "postgresql://postgres:tIfauUhFPHrbxFxcYhGwxVbENJmKkKnZ@switchyard.proxy.rlwy.net:52129/railway",
-    },
-  },
-});
+const prisma = new PrismaClient();
 
 const FILTERS = {
   centuries: [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15],

@@ -27,12 +27,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/health",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "health"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
             }
           },
           "event": [
@@ -109,13 +105,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/register",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "register"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
             }
           }
         },
@@ -158,13 +149,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/login",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "login"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
             }
           }
         },
@@ -197,14 +183,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/sso/google",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "sso",
-                "google"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "sso", "google"]
             }
           }
         },
@@ -237,14 +217,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/sso/apple",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "sso",
-                "apple"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "sso", "apple"]
             }
           }
         },
@@ -280,13 +254,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/auth/me",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "me"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
             }
           }
         },
@@ -323,15 +292,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/password/reset/request",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "password",
-                "reset",
-                "request"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "password", "reset", "request"]
             }
           }
         },
@@ -365,15 +327,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/password/reset/confirm",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "password",
-                "reset",
-                "confirm"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "password", "reset", "confirm"]
             }
           }
         }
@@ -399,10 +354,10 @@
                   "});",
                   "pm.test('filterOptions has normalized dimensions', function () {",
                   "  pm.expect(json.filterOptions).to.be.an('object');",
-                  "  pm.expect(json.filterOptions.periodCodes).to.be.an('array');",
-                  "  pm.expect(json.filterOptions.sourceAccessibilities).to.be.an('array');",
-                  "  pm.expect(json.filterOptions.traditions).to.be.an('array');",
-                  "  pm.expect(json.filterOptions.tafsirTypes).to.be.an('array');",
+                  "  pm.expect(json.filterOptions.centuries).to.be.an('array');",
+                  "  pm.expect(json.filterOptions.periods).to.be.an('array');",
+                  "  pm.expect(json.filterOptions.madhabs).to.be.an('array');",
+                  "  pm.expect(json.filterOptions.environments).to.be.an('array');",
                   "});"
                 ]
               }
@@ -412,12 +367,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/filters",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "filters"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["filters"]
             }
           }
         }
@@ -450,12 +401,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/verses?surahNumber={{surahNumber}}&verseNumber={{verseNumber}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "verses"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["verses"],
               "query": [
                 {
                   "key": "surahNumber",
@@ -492,12 +439,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/verses?take=5",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "verses"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["verses"],
               "query": [
                 {
                   "key": "take",
@@ -530,12 +473,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/verses?q=Allah&take=3",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "verses"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["verses"],
               "query": [
                 {
                   "key": "q",
@@ -583,12 +522,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/tafseer",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "tafseer"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["tafseer"]
             }
           }
         },
@@ -636,12 +571,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/tafseer",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "tafseer"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["tafseer"]
             }
           }
         },
@@ -688,12 +619,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/tafseer",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "tafseer"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["tafseer"]
             }
           },
           "protocolProfileBehavior": {
