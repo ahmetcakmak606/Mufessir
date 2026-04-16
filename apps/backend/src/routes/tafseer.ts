@@ -547,6 +547,32 @@ router.post(
   decrementQuota(prisma),
   async (req, res) => {
     try {
+      const resolveTafsirVerseIds = async (canonicalVerseId: string) => {
+        const verseIds = [canonicalVerseId];
+        const maybeComposite = canonicalVerseId.split("-");
+        if (maybeComposite.length !== 2) {
+          return verseIds;
+        }
+
+        const [legacyRow] = await prisma.$queryRawUnsafe<
+          Array<{ legacy_id: number }>
+        >(
+          `SELECT legacy_id
+           FROM (
+             SELECT id, ROW_NUMBER() OVER (ORDER BY surah_id ASC, ayah_number ASC) AS legacy_id
+             FROM ayahs
+           ) ordered_ayahs
+           WHERE id = $1
+           LIMIT 1`,
+          canonicalVerseId,
+        );
+
+        if (legacyRow?.legacy_id) {
+          verseIds.push(String(legacyRow.legacy_id));
+        }
+        return verseIds;
+      };
+
       const {
         verseId,
         filters,
@@ -581,6 +607,8 @@ router.post(
       // Build search query from verse text
       const searchQuery =
         `${verse.arabicText} ${verse.translation || ""}`.trim();
+      const candidateVerseIds = await resolveTafsirVerseIds(verseId);
+      const candidateVerseIdSet = new Set(candidateVerseIds);
 
       // Perform vector similarity search to find relevant tafsirs
       // ALWAYS filter by verseId - semantic search should only find tafsirs FOR the queried verse
@@ -596,12 +624,19 @@ router.post(
         similarTafsirs = await performSimilaritySearch(prisma, {
           query: searchQuery,
           verseId: verseId,
+          verseIds: candidateVerseIds,
           scholarIds: filters?.mufassirs,
           excludeScholarIds: filters?.excludeScholars,
           methodTags: filters?.methodTags,
           limit: 5,
           minSimilarity: 0.3,
         });
+        similarTafsirs = similarTafsirs.map((result: any) => ({
+          ...result,
+          verseId: candidateVerseIdSet.has(result.verseId)
+            ? verseId
+            : result.verseId,
+        }));
         usedScholarFilter = hasScholarFilter === true;
       } catch (searchError) {
         console.error("Similarity search error:", searchError);
@@ -615,7 +650,7 @@ router.post(
         // Find which of the requested scholars have tafsir for this verse
         const existingTafsirs = await prisma.tafsir.findMany({
           where: {
-            verseId,
+            verseId: { in: candidateVerseIds },
             mufassirId: { in: requestedScholarIds.map(Number) },
           },
           select: { mufassirId: true },
@@ -663,69 +698,22 @@ router.post(
 
       // Final fallback: get any tafsirs for this verse (no similarity search)
       if (similarTafsirs.length === 0) {
-        const sampleTafsirs = await prisma.tafsir.findMany({
-          where: { verseId },
-          select: {
-            id: true,
-            verseId: true,
-            tafsirText: true,
-            mufassir: {
-              select: {
-                id: true,
-                nameEn: true,
-                nameTr: true,
-                nameAr: true,
-                century: true,
-                madhab: true,
-                period: true,
-                environment: true,
-                originCountry: true,
-                reputationScore: true,
-              },
-            },
-            verse: {
-              select: {
-                surahNumber: true,
-                verseNumber: true,
-              },
-            },
-          },
-          take: 3,
+        const sampleTafsirs = await performSimilaritySearch(prisma, {
+          query: searchQuery,
+          verseId,
+          verseIds: candidateVerseIds,
+          limit: 3,
         });
-
-        similarTafsirs = sampleTafsirs.map((tafsir: any) => ({
-          tafsirId: tafsir.id,
-          scholarName:
-            tafsir.mufassir.nameEn ||
-            tafsir.mufassir.nameTr ||
-            tafsir.mufassir.nameAr ||
-            "Unknown",
-          tafsirText: tafsir.tafsirText,
-          similarityScore: 0.7, // Mock similarity score
-          verseId: tafsir.verseId,
-          surahNumber: tafsir.verse.surahNumber,
-          verseNumber: tafsir.verse.verseNumber,
-          scholar: {
-            id: tafsir.mufassir.id,
-            name:
-              tafsir.mufassir.nameEn ||
-              tafsir.mufassir.nameTr ||
-              tafsir.mufassir.nameAr ||
-              "Unknown",
-            century: tafsir.mufassir.century,
-            madhab: tafsir.mufassir.madhab,
-            period: tafsir.mufassir.period,
-            environment: tafsir.mufassir.environment,
-            originCountry: tafsir.mufassir.originCountry,
-            reputationScore: tafsir.mufassir.reputationScore,
-          },
+        similarTafsirs = sampleTafsirs.map((result: any) => ({
+          ...result,
+          verseId,
         }));
       }
 
       // Validate that retrieved sources are from the queried verse
       // This catches edge cases where vector search might return wrong results
       const sourceVerseMatch = similarTafsirs.every(
-        (t: any) => t.verseId === verseId,
+        (t: any) => t.verseId === verseId || candidateVerseIdSet.has(t.verseId),
       );
 
       // Log warning if source-verse mismatch detected
