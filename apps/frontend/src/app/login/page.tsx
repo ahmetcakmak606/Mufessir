@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { useAuth } from '@/context/AuthContext';
-import { useLang } from '@/context/LangContext';
-import { locales } from '@/locales';
-import { requestGoogleIdToken } from '@/lib/google-sso';
-import { requestAppleIdToken } from '@/lib/apple-sso';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
+import { useLang } from "@/context/LangContext";
+import { locales } from "@/locales";
+import { requestGoogleIdToken } from "@/lib/google-sso";
+import { requestAppleIdToken } from "@/lib/apple-sso";
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
@@ -26,12 +26,12 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
       await login(email, password);
-      router.push('/dashboard');
+      router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : t.loginFailed);
     } finally {
@@ -40,7 +40,7 @@ export default function Login() {
   };
 
   const handleGoogleSignIn = async () => {
-    setError('');
+    setError("");
     setGoogleLoading(true);
     try {
       const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -49,7 +49,7 @@ export default function Login() {
       }
       const idToken = await requestGoogleIdToken(clientId);
       await loginWithGoogleIdToken(idToken);
-      router.push('/dashboard');
+      router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : t.googleSignInFailed);
     } finally {
@@ -58,7 +58,7 @@ export default function Login() {
   };
 
   const handleAppleSignIn = async () => {
-    setError('');
+    setError("");
     setAppleLoading(true);
     try {
       const clientId = process.env.NEXT_PUBLIC_APPLE_CLIENT_ID;
@@ -67,7 +67,7 @@ export default function Login() {
       }
       const { idToken, name } = await requestAppleIdToken({ clientId });
       await loginWithAppleIdToken(idToken, name || undefined);
-      router.push('/dashboard');
+      router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : t.appleSignInFailed);
     } finally {
@@ -83,34 +83,59 @@ export default function Login() {
         <aside className="ui-panel hidden flex-col justify-between p-8 lg:flex">
           <div>
             <span className="ui-badge">{brand}</span>
-            <h1 className="font-display ui-title mt-4 text-4xl">{t.sideTitle}</h1>
+            <h1 className="font-display ui-title mt-4 text-4xl">
+              {t.sideTitle}
+            </h1>
             <p className="ui-muted mt-4 text-sm leading-relaxed">
               {t.sideText}
             </p>
           </div>
           <div className="space-y-3 text-sm">
-            <p className="ui-panel-strong rounded-xl px-3 py-2 ui-muted">{t.sidePoint1}</p>
-            <p className="ui-panel-strong rounded-xl px-3 py-2 ui-muted">{t.sidePoint2}</p>
-            <p className="ui-panel-strong rounded-xl px-3 py-2 ui-muted">{t.sidePoint3}</p>
+            <p className="ui-panel-strong rounded-xl px-3 py-2 ui-muted">
+              {t.sidePoint1}
+            </p>
+            <p className="ui-panel-strong rounded-xl px-3 py-2 ui-muted">
+              {t.sidePoint2}
+            </p>
+            <p className="ui-panel-strong rounded-xl px-3 py-2 ui-muted">
+              {t.sidePoint3}
+            </p>
           </div>
         </aside>
 
         <section className="ui-panel-strong p-5 sm:p-8">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="font-display ui-title text-3xl sm:text-4xl">{t.title}</h2>
+              <h2 className="font-display ui-title text-3xl sm:text-4xl">
+                {t.title}
+              </h2>
               <p className="ui-muted mt-2 text-sm sm:text-base">{t.subtitle}</p>
             </div>
             <div className="ui-panel flex items-center gap-1 rounded-full p-1">
-              <button onClick={() => setLang('tr')} className="ui-button-ghost" data-active={lang === 'tr'}>TR</button>
-              <button onClick={() => setLang('en')} className="ui-button-ghost" data-active={lang === 'en'}>EN</button>
+              <button
+                onClick={() => setLang("tr")}
+                className="ui-button-ghost"
+                data-active={lang === "tr"}
+              >
+                TR
+              </button>
+              <button
+                onClick={() => setLang("en")}
+                className="ui-button-ghost"
+                data-active={lang === "en"}
+              >
+                EN
+              </button>
             </div>
           </div>
 
           <form className="mt-7 space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-3">
               <div>
-                <label htmlFor="email" className="ui-muted mb-1 block text-xs font-semibold uppercase tracking-[0.08em]">
+                <label
+                  htmlFor="email"
+                  className="ui-muted mb-1 block text-xs font-semibold uppercase tracking-[0.08em]"
+                >
                   {t.email}
                 </label>
                 <input
@@ -126,7 +151,10 @@ export default function Login() {
                 />
               </div>
               <div>
-                <label htmlFor="password" className="ui-muted mb-1 block text-xs font-semibold uppercase tracking-[0.08em]">
+                <label
+                  htmlFor="password"
+                  className="ui-muted mb-1 block text-xs font-semibold uppercase tracking-[0.08em]"
+                >
                   {t.password}
                 </label>
                 <input
@@ -186,12 +214,18 @@ export default function Login() {
             )}
 
             <div className="flex items-center justify-between gap-3 text-sm">
-              <Link href="/reset-password" className="ui-muted hover:text-[var(--text-strong)]">
+              <Link
+                href="/reset-password"
+                className="ui-muted hover:text-[var(--text-strong)]"
+              >
                 {t.forgotPassword}
               </Link>
               <span className="ui-muted">
-                {t.noAccount}{' '}
-                <Link href="/register" className="font-semibold text-[var(--brand-dark)] hover:text-[var(--brand)]">
+                {t.noAccount}{" "}
+                <Link
+                  href="/register"
+                  className="font-semibold text-[var(--brand-dark)] hover:text-[var(--brand)]"
+                >
                   {t.signup}
                 </Link>
               </span>
@@ -201,4 +235,4 @@ export default function Login() {
       </div>
     </div>
   );
-} 
+}

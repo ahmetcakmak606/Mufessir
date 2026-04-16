@@ -22,7 +22,7 @@ export interface SimilaritySearchResult {
 
 export async function performSimilaritySearch(
   queryEmbedding: number[],
-  options: SimilaritySearchOptions
+  options: SimilaritySearchOptions,
 ): Promise<SimilaritySearchResult[]> {
   const limit = options.limit || 50;
   const minSimilarity = options.minSimilarity || 0.5;
@@ -61,18 +61,23 @@ export async function performSimilaritySearch(
 
   params.push(limit);
 
-  const results = await prisma.$queryRaw<SimilaritySearchResult[]>(query, ...params);
+  const results = await prisma.$queryRaw<SimilaritySearchResult[]>(
+    query,
+    ...params,
+  );
 
   // Filter by minimum similarity and format results
   return results
-    .filter(result => result.similarityScore <= (1 - minSimilarity)) // Lower score = more similar
-    .map(result => ({
+    .filter((result) => result.similarityScore <= 1 - minSimilarity) // Lower score = more similar
+    .map((result) => ({
       ...result,
       similarityScore: 1 - result.similarityScore, // Convert to 0-1 scale where 1 = most similar
     }));
 }
 
-export async function getTafsirEmbedding(tafsirId: string): Promise<number[] | null> {
+export async function getTafsirEmbedding(
+  tafsirId: string,
+): Promise<number[] | null> {
   const tafsir = await prisma.tafsir.findUnique({
     where: { id: tafsirId },
     select: { embedding: true },
@@ -85,5 +90,7 @@ export async function createQueryEmbedding(text: string): Promise<number[]> {
   // This would typically call OpenAI API
   // For now, return a placeholder
   // In the actual implementation, this would call OpenAI's embedding API
-  throw new Error("Query embedding not implemented yet - needs OpenAI integration");
-} 
+  throw new Error(
+    "Query embedding not implemented yet - needs OpenAI integration",
+  );
+}

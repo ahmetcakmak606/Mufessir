@@ -7,9 +7,15 @@ interface AuthenticatedRequest extends Request {
   user?: { id: string; email: string; dailyQuota?: number };
 }
 
-export function authenticateJWT(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+export function authenticateJWT(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+) {
   const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : undefined;
   if (!token) return res.status(401).json({ error: "Missing token" });
 
   try {
@@ -23,7 +29,11 @@ export function authenticateJWT(req: AuthenticatedRequest, res: Response, next: 
 }
 
 export function enforceQuota(prisma: PrismaClient) {
-  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  return async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ) => {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ error: "Unauthenticated" });
 
@@ -36,16 +46,17 @@ export function enforceQuota(prisma: PrismaClient) {
     // Reset quota if window elapsed
     if (user.quotaResetAt < now) {
       dailyQuota = Number(process.env.FREE_DAILY_QUOTA) || 10;
-      await prisma.user.update({ 
-        where: { id: userId }, 
-        data: { 
-          dailyQuota, 
-          quotaResetAt: new Date(now.getTime() + 24 * 60 * 60 * 1000) 
-        } 
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          dailyQuota,
+          quotaResetAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+        },
       });
     }
 
-    if (dailyQuota <= 0) return res.status(429).json({ error: "Quota exhausted" });
+    if (dailyQuota <= 0)
+      return res.status(429).json({ error: "Quota exhausted" });
 
     // Store user info for quota decrement middleware
     req.user = { ...req.user, dailyQuota } as any;
@@ -54,7 +65,11 @@ export function enforceQuota(prisma: PrismaClient) {
 }
 
 export function decrementQuota(prisma: PrismaClient) {
-  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  return async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ) => {
     let decremented = false;
 
     const decrement = () => {
@@ -62,10 +77,12 @@ export function decrementQuota(prisma: PrismaClient) {
       if (res.statusCode >= 200 && res.statusCode < 300) {
         const userId = req.user?.id;
         if (userId) {
-          prisma.user.update({
-            where: { id: userId },
-            data: { dailyQuota: { decrement: 1 } }
-          }).catch(console.error);
+          prisma.user
+            .update({
+              where: { id: userId },
+              data: { dailyQuota: { decrement: 1 } },
+            })
+            .catch(console.error);
         }
       }
       decremented = true;
@@ -85,4 +102,4 @@ export function decrementQuota(prisma: PrismaClient) {
 
     next();
   };
-} 
+}

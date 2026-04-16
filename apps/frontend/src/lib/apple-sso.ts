@@ -34,7 +34,8 @@ declare global {
 let appleScriptPromise: Promise<void> | null = null;
 
 function randomNonce(size = 24): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let out = "";
   for (let i = 0; i < size; i += 1) {
     out += chars[Math.floor(Math.random() * chars.length)];
@@ -54,22 +55,28 @@ export async function loadAppleSignInScript(): Promise<void> {
   if (!appleScriptPromise) {
     appleScriptPromise = new Promise<void>((resolve, reject) => {
       const existing = document.querySelector<HTMLScriptElement>(
-        'script[src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js"]'
+        'script[src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js"]',
       );
       if (existing) {
         existing.addEventListener("load", () => resolve(), { once: true });
-        existing.addEventListener("error", () => reject(new Error("Failed to load Apple SSO script")), {
-          once: true,
-        });
+        existing.addEventListener(
+          "error",
+          () => reject(new Error("Failed to load Apple SSO script")),
+          {
+            once: true,
+          },
+        );
         return;
       }
 
       const script = document.createElement("script");
-      script.src = "https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js";
+      script.src =
+        "https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js";
       script.async = true;
       script.defer = true;
       script.onload = () => resolve();
-      script.onerror = () => reject(new Error("Failed to load Apple SSO script"));
+      script.onerror = () =>
+        reject(new Error("Failed to load Apple SSO script"));
       document.head.appendChild(script);
     });
   }
@@ -88,7 +95,9 @@ export async function requestAppleIdToken(config: {
   }
 
   const redirectURI =
-    config.redirectURI || process.env.NEXT_PUBLIC_APPLE_REDIRECT_URI || window.location.origin;
+    config.redirectURI ||
+    process.env.NEXT_PUBLIC_APPLE_REDIRECT_URI ||
+    window.location.origin;
 
   auth.init({
     clientId: config.clientId,

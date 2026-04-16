@@ -1,7 +1,7 @@
 // Authentication utilities for JWT storage and API calls
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-const TOKEN_KEY = 'mufessir_auth_token';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const TOKEN_KEY = "mufessir_auth_token";
 
 export interface User {
   id: string;
@@ -38,36 +38,38 @@ export interface AppleSsoData {
 // Token management
 export const tokenStorage = {
   get: (): string | null => {
-    if (typeof window === 'undefined') return null;
+    if (typeof window === "undefined") return null;
     return localStorage.getItem(TOKEN_KEY);
   },
-  
+
   set: (token: string): void => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     localStorage.setItem(TOKEN_KEY, token);
   },
-  
+
   remove: (): void => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     localStorage.removeItem(TOKEN_KEY);
-  }
+  },
 };
 
 // API utilities
 const apiCall = async (endpoint: string, options: RequestInit = {}) => {
   const token = tokenStorage.get();
-  
+
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
     },
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
     throw new Error(errorData.error || `HTTP ${response.status}`);
   }
 
@@ -77,39 +79,39 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
 // Authentication API calls
 export const authApi = {
   register: async (data: RegisterData): Promise<AuthResponse> => {
-    const response = await apiCall('/auth/register', {
-      method: 'POST',
+    const response = await apiCall("/auth/register", {
+      method: "POST",
       body: JSON.stringify(data),
     });
     return response;
   },
 
   login: async (data: LoginData): Promise<AuthResponse> => {
-    const response = await apiCall('/auth/login', {
-      method: 'POST',
+    const response = await apiCall("/auth/login", {
+      method: "POST",
       body: JSON.stringify(data),
     });
     return response;
   },
 
   googleSso: async (data: GoogleSsoData): Promise<AuthResponse> => {
-    const response = await apiCall('/auth/sso/google', {
-      method: 'POST',
+    const response = await apiCall("/auth/sso/google", {
+      method: "POST",
       body: JSON.stringify(data),
     });
     return response;
   },
 
   appleSso: async (data: AppleSsoData): Promise<AuthResponse> => {
-    const response = await apiCall('/auth/sso/apple', {
-      method: 'POST',
+    const response = await apiCall("/auth/sso/apple", {
+      method: "POST",
       body: JSON.stringify(data),
     });
     return response;
   },
 
   getProfile: async (): Promise<User> => {
-    const response = await apiCall('/auth/me');
+    const response = await apiCall("/auth/me");
     return response;
   },
 
@@ -119,15 +121,19 @@ export const authApi = {
 
   // Password reset helpers
   requestPasswordReset: async (email: string): Promise<{ ok: boolean }> => {
-    return apiCall('/auth/password/reset/request', {
-      method: 'POST',
+    return apiCall("/auth/password/reset/request", {
+      method: "POST",
       body: JSON.stringify({ email }),
     });
   },
 
-  confirmPasswordReset: async (email: string, code: string, newPassword: string): Promise<{ ok: boolean }> => {
-    return apiCall('/auth/password/reset/confirm', {
-      method: 'POST',
+  confirmPasswordReset: async (
+    email: string,
+    code: string,
+    newPassword: string,
+  ): Promise<{ ok: boolean }> => {
+    return apiCall("/auth/password/reset/confirm", {
+      method: "POST",
       body: JSON.stringify({ email, code, newPassword }),
     });
   },
@@ -136,13 +142,13 @@ export const authApi = {
 // JWT token verification
 export const isTokenValid = (token: string | null): boolean => {
   if (!token) return false;
-  
+
   try {
-    const parts = token.split('.');
+    const parts = token.split(".");
     if (parts.length < 2) return false;
     const decodeBase64Url = (value: string) => {
-      const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
-      const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+      const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+      const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
       return atob(padded);
     };
     const payload = JSON.parse(decodeBase64Url(parts[1] || ""));
@@ -157,4 +163,4 @@ export const isTokenValid = (token: string | null): boolean => {
 export const isAuthenticated = (): boolean => {
   const token = tokenStorage.get();
   return isTokenValid(token);
-}; 
+};

@@ -111,8 +111,8 @@ async function main(): Promise<void> {
         scholars: scholars.length,
       },
       null,
-      2
-    )
+      2,
+    ),
   );
 }
 

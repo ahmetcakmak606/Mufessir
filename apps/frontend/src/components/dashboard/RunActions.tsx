@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 interface RunActionsProps {
   canSave: boolean;
@@ -36,13 +36,28 @@ export function RunActions({
       >
         {saving ? labels.savingRun : labels.saveRun}
       </button>
-      <button type="button" onClick={onReplay} data-testid="replay-run-button" className="ui-button-secondary px-3 py-2 text-xs">
+      <button
+        type="button"
+        onClick={onReplay}
+        data-testid="replay-run-button"
+        className="ui-button-secondary px-3 py-2 text-xs"
+      >
         {labels.replay}
       </button>
-      <button type="button" onClick={onCopyCitations} data-testid="copy-citations-button" className="ui-button-secondary px-3 py-2 text-xs">
+      <button
+        type="button"
+        onClick={onCopyCitations}
+        data-testid="copy-citations-button"
+        className="ui-button-secondary px-3 py-2 text-xs"
+      >
         {labels.copyCitations}
       </button>
-      <button type="button" onClick={onShare} data-testid="share-run-button" className="ui-button-secondary px-3 py-2 text-xs">
+      <button
+        type="button"
+        onClick={onShare}
+        data-testid="share-run-button"
+        className="ui-button-secondary px-3 py-2 text-xs"
+      >
         {labels.share}
       </button>
     </div>

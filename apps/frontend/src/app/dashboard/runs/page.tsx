@@ -1,12 +1,15 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import Link from 'next/link';
-import { useLang } from '@/context/LangContext';
-import { locales } from '@/locales';
-import { RunHistoryList } from '@/components/dashboard/RunHistoryList';
-import { useInfiniteRunHistoryQuery, useUpdateRunMutation } from '@/hooks/use-run-history';
-import { formatProvenance } from '@/lib/metadata-labels';
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useLang } from "@/context/LangContext";
+import { locales } from "@/locales";
+import { RunHistoryList } from "@/components/dashboard/RunHistoryList";
+import {
+  useInfiniteRunHistoryQuery,
+  useUpdateRunMutation,
+} from "@/hooks/use-run-history";
+import { formatProvenance } from "@/lib/metadata-labels";
 import {
   countStarredRuns,
   filterAndSortRuns,
@@ -14,7 +17,7 @@ import {
   type ProvenanceFilter,
   type RunsSort,
   type RunsTab,
-} from '@/lib/runs';
+} from "@/lib/runs";
 
 export default function RunsPage() {
   const { lang } = useLang();
@@ -22,17 +25,18 @@ export default function RunsPage() {
 
   const runsQuery = useInfiniteRunHistoryQuery(20);
   const updateRunMutation = useUpdateRunMutation();
-  const [status, setStatus] = useState('');
-  const [error, setError] = useState('');
-  const [tab, setTab] = useState<RunsTab>('all');
-  const [query, setQuery] = useState('');
-  const [sortBy, setSortBy] = useState<RunsSort>('newest');
-  const [provenanceFilter, setProvenanceFilter] = useState<ProvenanceFilter>('ALL');
-  const [citationFilter, setCitationFilter] = useState<CitationFilter>('ALL');
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
+  const [tab, setTab] = useState<RunsTab>("all");
+  const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState<RunsSort>("newest");
+  const [provenanceFilter, setProvenanceFilter] =
+    useState<ProvenanceFilter>("ALL");
+  const [citationFilter, setCitationFilter] = useState<CitationFilter>("ALL");
 
   const runs = useMemo(
     () => runsQuery.data?.pages.flatMap((page) => page.items) || [],
-    [runsQuery.data]
+    [runsQuery.data],
   );
   const totalCount = runs.length;
   const starredCount = useMemo(() => countStarredRuns(runs), [runs]);
@@ -49,17 +53,20 @@ export default function RunsPage() {
 
   const latestRun = filteredRuns[0];
   const hasActiveFilters =
-    tab !== 'all' ||
+    tab !== "all" ||
     query.trim().length > 0 ||
-    sortBy !== 'newest' ||
-    provenanceFilter !== 'ALL' ||
-    citationFilter !== 'ALL';
+    sortBy !== "newest" ||
+    provenanceFilter !== "ALL" ||
+    citationFilter !== "ALL";
 
   const onToggleStar = async (runId: string, nextStarred: boolean) => {
-    setStatus('');
-    setError('');
+    setStatus("");
+    setError("");
     try {
-      await updateRunMutation.mutateAsync({ runId, payload: { starred: nextStarred } });
+      await updateRunMutation.mutateAsync({
+        runId,
+        payload: { starred: nextStarred },
+      });
       setStatus(t.updateSuccess);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.updateFailed);
@@ -71,11 +78,11 @@ export default function RunsPage() {
   };
 
   const clearFilters = () => {
-    setTab('all');
-    setQuery('');
-    setSortBy('newest');
-    setProvenanceFilter('ALL');
-    setCitationFilter('ALL');
+    setTab("all");
+    setQuery("");
+    setSortBy("newest");
+    setProvenanceFilter("ALL");
+    setCitationFilter("ALL");
   };
 
   return (
@@ -92,7 +99,10 @@ export default function RunsPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {latestRun && (
-                <Link href={`/dashboard/query?runId=${latestRun.runId}&replay=1`} className="ui-button px-3 py-2 text-xs">
+                <Link
+                  href={`/dashboard/query?runId=${latestRun.runId}&replay=1`}
+                  className="ui-button px-3 py-2 text-xs"
+                >
                   {t.replayLatest}
                 </Link>
               )}
@@ -111,17 +121,17 @@ export default function RunsPage() {
             <div className="flex gap-2 rounded-lg border border-[var(--border-soft)] p-1">
               <button
                 type="button"
-                onClick={() => setTab('all')}
+                onClick={() => setTab("all")}
                 className="ui-button-ghost flex-1"
-                data-active={tab === 'all'}
+                data-active={tab === "all"}
               >
                 {t.tabAll}
               </button>
               <button
                 type="button"
-                onClick={() => setTab('starred')}
+                onClick={() => setTab("starred")}
                 className="ui-button-ghost flex-1"
-                data-active={tab === 'starred'}
+                data-active={tab === "starred"}
               >
                 {t.tabStarred}
               </button>
@@ -147,26 +157,40 @@ export default function RunsPage() {
 
             <select
               value={provenanceFilter}
-              onChange={(event) => setProvenanceFilter(event.target.value as ProvenanceFilter)}
+              onChange={(event) =>
+                setProvenanceFilter(event.target.value as ProvenanceFilter)
+              }
               className="ui-select"
             >
               <option value="ALL">{t.provenanceAll}</option>
-              <option value="PRIMARY">{formatProvenance('PRIMARY', lang, t.notAvailable)}</option>
-              <option value="MIXED">{formatProvenance('MIXED', lang, t.notAvailable)}</option>
-              <option value="NONE">{formatProvenance('NONE', lang, t.notAvailable)}</option>
+              <option value="PRIMARY">
+                {formatProvenance("PRIMARY", lang, t.notAvailable)}
+              </option>
+              <option value="MIXED">
+                {formatProvenance("MIXED", lang, t.notAvailable)}
+              </option>
+              <option value="NONE">
+                {formatProvenance("NONE", lang, t.notAvailable)}
+              </option>
             </select>
 
             <div className="flex gap-2">
               <select
                 value={citationFilter}
-                onChange={(event) => setCitationFilter(event.target.value as CitationFilter)}
+                onChange={(event) =>
+                  setCitationFilter(event.target.value as CitationFilter)
+                }
                 className="ui-select"
               >
                 <option value="ALL">{t.citationsAll}</option>
                 <option value="WITH">{t.citationsWith}</option>
                 <option value="WITHOUT">{t.citationsWithout}</option>
               </select>
-              <button type="button" onClick={clearFilters} className="ui-button-secondary px-3 text-xs">
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="ui-button-secondary px-3 text-xs"
+              >
                 {t.clearFilters}
               </button>
             </div>
@@ -176,18 +200,29 @@ export default function RunsPage() {
             {t.resultsLabel}: {filteredRuns.length}
           </p>
 
-          {status && <p className="ui-panel rounded-lg px-3 py-2 text-sm ui-muted">{status}</p>}
-          {error && <p className="ui-danger rounded-lg px-3 py-2 text-sm">{error}</p>}
+          {status && (
+            <p className="ui-panel rounded-lg px-3 py-2 text-sm ui-muted">
+              {status}
+            </p>
+          )}
+          {error && (
+            <p className="ui-danger rounded-lg px-3 py-2 text-sm">{error}</p>
+          )}
         </div>
       </section>
 
       <RunHistoryList
         runs={filteredRuns}
         loading={runsQuery.isLoading}
-        formatProvenance={(value) => formatProvenance(value, lang, t.notAvailable)}
-        onToggleStar={(runId, nextStarred) => void onToggleStar(runId, nextStarred)}
+        formatProvenance={(value) =>
+          formatProvenance(value, lang, t.notAvailable)
+        }
+        onToggleStar={(runId, nextStarred) =>
+          void onToggleStar(runId, nextStarred)
+        }
         labels={{
-          empty: hasActiveFilters && runs.length ? t.noResultsForFilters : t.empty,
+          empty:
+            hasActiveFilters && runs.length ? t.noResultsForFilters : t.empty,
           loading: t.loading,
           open: t.open,
           replay: t.replay,

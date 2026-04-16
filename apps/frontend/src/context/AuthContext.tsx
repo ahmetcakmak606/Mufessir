@@ -1,15 +1,24 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useEffect, ReactNode, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { User, authApi, tokenStorage, isAuthenticated } from '@/lib/auth';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  ReactNode,
+  useState,
+} from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { User, authApi, tokenStorage, isAuthenticated } from "@/lib/auth";
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogleIdToken: (idToken: string) => Promise<void>;
-  loginWithAppleIdToken: (idToken: string, name?: string | null) => Promise<void>;
+  loginWithAppleIdToken: (
+    idToken: string,
+    name?: string | null,
+  ) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -17,12 +26,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const PROFILE_QUERY_KEY = ['auth', 'me'] as const;
+const PROFILE_QUERY_KEY = ["auth", "me"] as const;
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
@@ -70,8 +79,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     await refetchProfile();
   };
 
-  const loginWithAppleIdToken = async (idToken: string, name?: string | null) => {
-    const { token } = await authApi.appleSso({ idToken, name: name ?? undefined });
+  const loginWithAppleIdToken = async (
+    idToken: string,
+    name?: string | null,
+  ) => {
+    const { token } = await authApi.appleSso({
+      idToken,
+      name: name ?? undefined,
+    });
     tokenStorage.set(token);
     await refetchProfile();
   };

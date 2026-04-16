@@ -11,6 +11,7 @@ Guiding principle: The AI must rely solely on controlled data from our DB. No in
   - `packages/eslint-config`, `packages/typescript-config`, `packages/shared-types`
 
 ### Backend Capabilities
+
 - Routes: `/auth` (register/login/me/password reset), `/tafseer` (stream/non-stream with caching), `/filters`, `/verses`, `/health`
 - Auth & quota: JWT-based, daily quota with auto-reset window
 - Similarity: pgvector search (with sample mode fallback), post-generation similarity scoring
@@ -18,25 +19,26 @@ Guiding principle: The AI must rely solely on controlled data from our DB. No in
 - OpenAI: streaming and non-streaming completions (toggle via env), robust fallback when disabled
 
 ### Frontend Capabilities
+
 - Auth flow (register/login/logout), language toggle (TR/EN)
 - Dashboard with verse picker, scholar filters, tone/intellect controls, SSE streaming result
 - Uses `NEXT_PUBLIC_API_URL` to reach backend (defaults to `http://localhost:4000` in dev)
 
 ## Quick Start (Local)
 
-1) Copy environment variables
+1. Copy environment variables
 
 ```
 cp .env.example .env
 ```
 
-2) Start database (pgvector)
+2. Start database (pgvector)
 
 ```
 npm run db:up
 ```
 
-3) Run migrations and seed sample data
+3. Run migrations and seed sample data
 
 ```
 npm run db:migrate
@@ -44,7 +46,7 @@ npm run db:seed
 npm run db:derive
 ```
 
-4) Start apps (in split terminals)
+4. Start apps (in split terminals)
 
 ```
 # Backend
@@ -57,12 +59,14 @@ cd apps/frontend && npm i && npm run dev
 Open http://localhost:3000 and register/login, then use the dashboard to stream tafsir.
 
 Notes
+
 - Frontend falls back to `http://localhost:4000` if `NEXT_PUBLIC_API_URL` is not set.
 - OpenAI is optional in development; when disabled the backend serves an informative fallback.
 
 ## Environment Variables
 
 Backend (.env at repo root is loaded by the backend):
+
 - `DATABASE_URL` – Postgres connection string
 - `SHADOW_DB_URL` – Prisma shadow DB URL
 - `JWT_SECRET` – Secret for JWT signing
@@ -79,6 +83,7 @@ Backend (.env at repo root is loaded by the backend):
 - `APP_URL` – Frontend URL for reset links (default http://localhost:3000)
 
 Frontend (build-time):
+
 - `NEXT_PUBLIC_API_URL` – Backend base URL (set via Vercel or `.env.local` in `apps/frontend`)
 - `NEXT_PUBLIC_GOOGLE_CLIENT_ID` – Google OAuth client ID used by Google Identity Services on login/register
 - `NEXT_PUBLIC_APPLE_CLIENT_ID` – Apple Services ID used by Apple JS sign-in on login/register
@@ -132,10 +137,12 @@ CI runs this Newman smoke suite on every push/PR.
 ### Postman Backend Smoke Suite
 
 Import one of these collections into Postman:
+
 - `apps/backend/postman_collection.json` (canonical backend location)
 - `apps/frontend/postman_collection.json` (same content, kept for convenience)
 
 Then run the full collection in order (Collection Runner). It covers:
+
 - `/health`
 - `/auth` (`register`, `login`, `me`, password reset request/confirm)
 - `/filters`
@@ -172,6 +179,7 @@ TARGET_DB_URL=postgresql://... ./scripts/db-restore.sh /tmp/mufessir.dump
 See [Managed DB Migration Runbook](docs/MANAGED_DB_MIGRATION_RUNBOOK.md) for full cutover steps.
 
 ## Roadmap (Excerpt)
+
 - CI: lint → type-check → test → migrate → deploy
 - Observability: structured logging and basic tracing
 - Cost controls: rate limiting and caching refinements

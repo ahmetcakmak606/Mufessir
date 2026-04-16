@@ -7,22 +7,27 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 async function embedBatch(batchSize: number) {
   // Unsupported("vector") fields cannot be used in Prisma where filters; fetch with raw SQL
-  const rows: Array<{ id: string; arabicText: string; tafsirText: string; scholarName: string }> =
-    await prisma.$queryRawUnsafe(
-      `SELECT t.id, v."arabicText", t."tafsirText", s."name" as "scholarName"
+  const rows: Array<{
+    id: string;
+    arabicText: string;
+    tafsirText: string;
+    scholarName: string;
+  }> = await prisma.$queryRawUnsafe(
+    `SELECT t.id, v."arabicText", t."tafsirText", s."name" as "scholarName"
        FROM "Tafsir" t
        JOIN "Verse" v ON t."verseId" = v.id
        JOIN "Scholar" s ON t."scholarId" = s.id
        WHERE t."embedding" IS NULL
        ORDER BY t."createdAt" ASC
-       LIMIT ${batchSize}`
-    );
+       LIMIT ${batchSize}`,
+  );
 
   if (rows.length === 0) return 0;
 
   for (const r of rows) {
     try {
-      const textToEmbed = `${r.arabicText || ""}\n\n${r.tafsirText || ""}`.trim();
+      const textToEmbed =
+        `${r.arabicText || ""}\n\n${r.tafsirText || ""}`.trim();
       if (!textToEmbed) continue;
 
       const response = await openai.embeddings.create({
@@ -30,7 +35,9 @@ async function embedBatch(batchSize: number) {
         input: textToEmbed,
       });
 
-      const embedding = (response as any).data?.[0]?.embedding as number[] | undefined;
+      const embedding = (response as any).data?.[0]?.embedding as
+        | number[]
+        | undefined;
       if (!embedding) throw new Error("No embedding returned");
 
       await prisma.tafsir.update({ where: { id: r.id }, data: { embedding } });

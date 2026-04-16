@@ -1,17 +1,17 @@
 #!/usr/bin/env tsx
-import { readFileSync } from 'fs';
-import { resolve, dirname } from 'path';
-import { PrismaClient } from '@prisma/client';
-import { fileURLToPath } from 'url';
-import { config } from 'dotenv';
+import { readFileSync } from "fs";
+import { resolve, dirname } from "path";
+import { PrismaClient } from "@prisma/client";
+import { fileURLToPath } from "url";
+import { config } from "dotenv";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-config({ path: resolve(__dirname, '../.env') });
+config({ path: resolve(__dirname, "../.env") });
 
 const CSV_PATH =
-  process.env.USERS_CSV_PATH || resolve(__dirname, '../../../User.csv');
+  process.env.USERS_CSV_PATH || resolve(__dirname, "../../../User.csv");
 
 const prisma = new PrismaClient();
 
@@ -19,7 +19,7 @@ type CsvRow = Record<string, string>;
 
 function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
-  let field = '';
+  let field = "";
   let row: string[] = [];
   let inQuotes = false;
 
@@ -46,26 +46,26 @@ function parseCsv(text: string): string[][] {
       continue;
     }
 
-    if (c === ',') {
+    if (c === ",") {
       row.push(field);
-      field = '';
+      field = "";
       continue;
     }
 
-    if (c === '\n') {
+    if (c === "\n") {
       row.push(field);
       rows.push(row);
       row = [];
-      field = '';
+      field = "";
       continue;
     }
 
-    if (c === '\r') {
-      if (next === '\n') {
+    if (c === "\r") {
+      if (next === "\n") {
         row.push(field);
         rows.push(row);
         row = [];
-        field = '';
+        field = "";
         i++;
       }
       continue;
@@ -89,12 +89,12 @@ function parseDate(value: string | null): Date | null {
   if (/Z$|[+-]\\d{2}:?\\d{2}$/.test(trimmed)) {
     return new Date(trimmed);
   }
-  return new Date(trimmed.replace(' ', 'T') + 'Z');
+  return new Date(trimmed.replace(" ", "T") + "Z");
 }
 
 function normalizeBoolean(value: string | null): boolean {
   if (!value) return false;
-  return value.trim().toLowerCase() === 'true' || value.trim() === '1';
+  return value.trim().toLowerCase() === "true" || value.trim() === "1";
 }
 
 function normalizeString(value: string | null): string | null {
@@ -104,26 +104,28 @@ function normalizeString(value: string | null): string | null {
 }
 
 async function main() {
-  const raw = readFileSync(CSV_PATH, 'utf8');
+  const raw = readFileSync(CSV_PATH, "utf8");
   const rows = parseCsv(raw);
   if (!rows.length) {
-    console.log('No CSV rows found.');
+    console.log("No CSV rows found.");
     return;
   }
 
   const header = rows[0].map((h) => h.trim());
-  const dataRows = rows.slice(1).filter((r) => r.length && r.some((c) => c.trim().length));
+  const dataRows = rows
+    .slice(1)
+    .filter((r) => r.length && r.some((c) => c.trim().length));
 
   const users: CsvRow[] = dataRows.map((r) => {
     const row: CsvRow = {};
     for (let i = 0; i < header.length; i++) {
-      row[header[i]] = r[i] ?? '';
+      row[header[i]] = r[i] ?? "";
     }
     return row;
   });
 
   if (!users.length) {
-    console.log('No user data rows found.');
+    console.log("No user data rows found.");
     return;
   }
 
@@ -148,7 +150,7 @@ async function main() {
 
 main()
   .catch((err) => {
-    console.error('Import failed:', err);
+    console.error("Import failed:", err);
     process.exit(1);
   })
   .finally(async () => {

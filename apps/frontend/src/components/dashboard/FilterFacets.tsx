@@ -1,10 +1,20 @@
-'use client';
+"use client";
 
-import type { FiltersResponse, RunDraftFilters } from '@/lib/tafseer';
+import type { FiltersResponse, RunDraftFilters } from "@/lib/tafseer";
 
-type FacetKey = 'periodCodes' | 'madhabs' | 'traditions' | 'sourceAccessibilities' | 'tafsirTypes';
+type FacetKey =
+  | "periodCodes"
+  | "madhabs"
+  | "traditions"
+  | "sourceAccessibilities"
+  | "tafsirTypes";
 
-type FacetFilterKey = 'periodCodes' | 'madhabs' | 'traditions' | 'sourceAccessibilities' | 'tafsirTypes';
+type FacetFilterKey =
+  | "periodCodes"
+  | "madhabs"
+  | "traditions"
+  | "sourceAccessibilities"
+  | "tafsirTypes";
 
 interface FilterFacetsProps {
   availableFilters: FiltersResponse | null;
@@ -23,11 +33,11 @@ interface FilterFacetsProps {
 }
 
 const facetConfig: Array<{ key: FacetKey; filterKey: FacetFilterKey }> = [
-  { key: 'periodCodes', filterKey: 'periodCodes' },
-  { key: 'madhabs', filterKey: 'madhabs' },
-  { key: 'traditions', filterKey: 'traditions' },
-  { key: 'sourceAccessibilities', filterKey: 'sourceAccessibilities' },
-  { key: 'tafsirTypes', filterKey: 'tafsirTypes' },
+  { key: "periodCodes", filterKey: "periodCodes" },
+  { key: "madhabs", filterKey: "madhabs" },
+  { key: "traditions", filterKey: "traditions" },
+  { key: "sourceAccessibilities", filterKey: "sourceAccessibilities" },
+  { key: "tafsirTypes", filterKey: "tafsirTypes" },
 ];
 
 export function FilterFacets({
@@ -40,7 +50,9 @@ export function FilterFacets({
   const filterOptions = availableFilters?.filterOptions;
 
   const toggleOption = (filterKey: FacetFilterKey, value: string) => {
-    const current = Array.isArray(filters[filterKey]) ? (filters[filterKey] as string[]) : [];
+    const current = Array.isArray(filters[filterKey])
+      ? (filters[filterKey] as string[])
+      : [];
     const next = current.includes(value)
       ? current.filter((item) => item !== value)
       : [...current, value];
@@ -60,11 +72,15 @@ export function FilterFacets({
           if (!options.length) return null;
           return (
             <div key={key} className="space-y-2">
-              <p className="ui-muted text-xs font-semibold uppercase tracking-[0.08em]">{labels[key]}</p>
+              <p className="ui-muted text-xs font-semibold uppercase tracking-[0.08em]">
+                {labels[key]}
+              </p>
               <div className="flex flex-wrap gap-2">
                 {options.map((option) => {
                   const selected = (filters[filterKey] || []).includes(option);
-                  const label = getOptionLabel ? getOptionLabel(filterKey, option) : option;
+                  const label = getOptionLabel
+                    ? getOptionLabel(filterKey, option)
+                    : option;
                   return (
                     <button
                       key={`${key}-${option}`}
@@ -72,8 +88,8 @@ export function FilterFacets({
                       onClick={() => toggleOption(filterKey, option)}
                       className={`rounded-lg border px-2.5 py-1 text-xs ${
                         selected
-                          ? 'border-[var(--brand)] bg-[var(--brand)] text-white'
-                          : 'border-[var(--border-strong)] bg-white text-[var(--text-muted)]'
+                          ? "border-[var(--brand)] bg-[var(--brand)] text-white"
+                          : "border-[var(--border-strong)] bg-white text-[var(--text-muted)]"
                       }`}
                     >
                       {label}

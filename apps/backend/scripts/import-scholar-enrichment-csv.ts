@@ -204,7 +204,10 @@ function getColumn(row: CsvRow, ...aliases: string[]): string {
   return "";
 }
 
-function parseOptionalScore(value: string | null | undefined, label: string): number | null {
+function parseOptionalScore(
+  value: string | null | undefined,
+  label: string,
+): number | null {
   const parsed = parseOptionalInt(value);
   if (parsed === null) return null;
   if (parsed < 1 || parsed > 5) {
@@ -221,7 +224,9 @@ function normalizeEnumCode(value: string): string {
     .replace(/[^A-Z0-9_]/g, "");
 }
 
-function parseSourceAccessibility(value: string | null | undefined): SourceAccessibility | null {
+function parseSourceAccessibility(
+  value: string | null | undefined,
+): SourceAccessibility | null {
   const normalized = normalizeNullableCsv(value);
   if (!normalized) return null;
   const code = normalizeEnumCode(normalized);
@@ -232,7 +237,7 @@ function parseSourceAccessibility(value: string | null | undefined): SourceAcces
 }
 
 function parseTraditionAcceptance(
-  value: string | null | undefined
+  value: string | null | undefined,
 ): TraditionAcceptance[] | null {
   const normalized = normalizeNullableCsv(value);
   if (!normalized) return null;
@@ -277,7 +282,7 @@ function hasReferenceData(reference: ScholarReferenceInput): boolean {
       normalizeNullableText(reference.page) ||
       normalizeNullableText(reference.edition) ||
       normalizeNullableText(reference.citationText) ||
-      normalizeNullableText(reference.provenance)
+      normalizeNullableText(reference.provenance),
   );
 }
 
@@ -303,22 +308,28 @@ function buildNameIndex(scholars: ScholarSnapshot[]): Map<string, string[]> {
     }
   }
 
-  return new Map(Array.from(map.entries()).map(([key, ids]) => [key, Array.from(ids)]));
+  return new Map(
+    Array.from(map.entries()).map(([key, ids]) => [key, Array.from(ids)]),
+  );
 }
 
 function applyDerivations(
   patch: Prisma.ScholarUpdateInput,
   existing: ScholarSnapshot,
-  overwrite: boolean
+  overwrite: boolean,
 ): void {
-  const deathHijri = (patch.deathHijri as number | null | undefined) ?? existing.deathHijri;
+  const deathHijri =
+    (patch.deathHijri as number | null | undefined) ?? existing.deathHijri;
   const bookId = (patch.bookId as string | null | undefined) ?? existing.bookId;
   const scholarlyInfluence =
-    (patch.scholarlyInfluence as number | null | undefined) ?? existing.scholarlyInfluence;
+    (patch.scholarlyInfluence as number | null | undefined) ??
+    existing.scholarlyInfluence;
   const methodologicalRigor =
-    (patch.methodologicalRigor as number | null | undefined) ?? existing.methodologicalRigor;
+    (patch.methodologicalRigor as number | null | undefined) ??
+    existing.methodologicalRigor;
   const corpusBreadth =
-    (patch.corpusBreadth as number | null | undefined) ?? existing.corpusBreadth;
+    (patch.corpusBreadth as number | null | undefined) ??
+    existing.corpusBreadth;
 
   const nextCentury = deriveCenturyFromHijri(deathHijri);
   if (
@@ -330,7 +341,10 @@ function applyDerivations(
   }
 
   const nextPeriodCode = derivePeriodCode(deathHijri);
-  if (nextPeriodCode && (overwrite || !existing.periodCode || "deathHijri" in patch)) {
+  if (
+    nextPeriodCode &&
+    (overwrite || !existing.periodCode || "deathHijri" in patch)
+  ) {
     if (existing.periodCode !== nextPeriodCode) {
       patch.periodCode = nextPeriodCode;
     }
@@ -339,9 +353,13 @@ function applyDerivations(
     }
   }
 
-  const explicitAccessibility = patch.sourceAccessibility as SourceAccessibility | undefined;
+  const explicitAccessibility = patch.sourceAccessibility as
+    | SourceAccessibility
+    | undefined;
   if (!explicitAccessibility) {
-    const derivedAccessibility = deriveSourceAccessibility(bookId) as SourceAccessibility | null;
+    const derivedAccessibility = deriveSourceAccessibility(
+      bookId,
+    ) as SourceAccessibility | null;
     if (
       derivedAccessibility &&
       (overwrite || !existing.sourceAccessibility || "bookId" in patch) &&
@@ -371,48 +389,70 @@ function applyDerivations(
 
 function patchToSnapshot(
   scholar: ScholarSnapshot,
-  patch: Prisma.ScholarUpdateInput
+  patch: Prisma.ScholarUpdateInput,
 ): ScholarSnapshot {
   return {
     ...scholar,
-    mufassirTr: (patch.mufassirTr as string | null | undefined) ?? scholar.mufassirTr,
-    mufassirEn: (patch.mufassirEn as string | null | undefined) ?? scholar.mufassirEn,
-    mufassirAr: (patch.mufassirAr as string | null | undefined) ?? scholar.mufassirAr,
+    mufassirTr:
+      (patch.mufassirTr as string | null | undefined) ?? scholar.mufassirTr,
+    mufassirEn:
+      (patch.mufassirEn as string | null | undefined) ?? scholar.mufassirEn,
+    mufassirAr:
+      (patch.mufassirAr as string | null | undefined) ?? scholar.mufassirAr,
     mufassirNameLong:
-      (patch.mufassirNameLong as string | null | undefined) ?? scholar.mufassirNameLong,
-    birthYear: (patch.birthYear as number | null | undefined) ?? scholar.birthYear,
-    deathYear: (patch.deathYear as number | null | undefined) ?? scholar.deathYear,
-    deathHijri: (patch.deathHijri as number | null | undefined) ?? scholar.deathHijri,
+      (patch.mufassirNameLong as string | null | undefined) ??
+      scholar.mufassirNameLong,
+    birthYear:
+      (patch.birthYear as number | null | undefined) ?? scholar.birthYear,
+    deathYear:
+      (patch.deathYear as number | null | undefined) ?? scholar.deathYear,
+    deathHijri:
+      (patch.deathHijri as number | null | undefined) ?? scholar.deathHijri,
     century: (patch.century as number | null | undefined) ?? scholar.century,
     madhab: (patch.madhab as string | null | undefined) ?? scholar.madhab,
     period: (patch.period as string | null | undefined) ?? scholar.period,
-    periodCode: (patch.periodCode as ScholarPeriod | null | undefined) ?? scholar.periodCode,
-    environment: (patch.environment as string | null | undefined) ?? scholar.environment,
-    originCountry: (patch.originCountry as string | null | undefined) ?? scholar.originCountry,
+    periodCode:
+      (patch.periodCode as ScholarPeriod | null | undefined) ??
+      scholar.periodCode,
+    environment:
+      (patch.environment as string | null | undefined) ?? scholar.environment,
+    originCountry:
+      (patch.originCountry as string | null | undefined) ??
+      scholar.originCountry,
     bookId: (patch.bookId as string | null | undefined) ?? scholar.bookId,
-    tafsirType1: (patch.tafsirType1 as string | null | undefined) ?? scholar.tafsirType1,
-    tafsirType2: (patch.tafsirType2 as string | null | undefined) ?? scholar.tafsirType2,
-    explanation: (patch.explanation as string | null | undefined) ?? scholar.explanation,
+    tafsirType1:
+      (patch.tafsirType1 as string | null | undefined) ?? scholar.tafsirType1,
+    tafsirType2:
+      (patch.tafsirType2 as string | null | undefined) ?? scholar.tafsirType2,
+    explanation:
+      (patch.explanation as string | null | undefined) ?? scholar.explanation,
     detailInformation:
-      (patch.detailInformation as string | null | undefined) ?? scholar.detailInformation,
+      (patch.detailInformation as string | null | undefined) ??
+      scholar.detailInformation,
     scholarlyInfluence:
-      (patch.scholarlyInfluence as number | null | undefined) ?? scholar.scholarlyInfluence,
+      (patch.scholarlyInfluence as number | null | undefined) ??
+      scholar.scholarlyInfluence,
     methodologicalRigor:
-      (patch.methodologicalRigor as number | null | undefined) ?? scholar.methodologicalRigor,
-    corpusBreadth: (patch.corpusBreadth as number | null | undefined) ?? scholar.corpusBreadth,
+      (patch.methodologicalRigor as number | null | undefined) ??
+      scholar.methodologicalRigor,
+    corpusBreadth:
+      (patch.corpusBreadth as number | null | undefined) ??
+      scholar.corpusBreadth,
     sourceAccessibility:
       (patch.sourceAccessibility as SourceAccessibility | null | undefined) ??
       scholar.sourceAccessibility,
     traditionAcceptance:
       (patch.traditionAcceptance as TraditionAcceptance[] | null | undefined) ??
       scholar.traditionAcceptance,
-    reputationScore: (patch.reputationScore as number | null | undefined) ?? scholar.reputationScore,
+    reputationScore:
+      (patch.reputationScore as number | null | undefined) ??
+      scholar.reputationScore,
   };
 }
 
 function toReferenceCreateInput(
   scholarId: string,
-  reference: ScholarReferenceInput
+  reference: ScholarReferenceInput,
 ): Prisma.ScholarReferenceCreateInput {
   return {
     scholar: { connect: { id: scholarId } },
@@ -447,16 +487,20 @@ async function main(): Promise<void> {
           errors: 0,
         },
         null,
-        2
-      )
+        2,
+      ),
     );
     return;
   }
 
   const headers = lines[0].map((header) => normalizeHeader(header));
-  const missingHeaders = expectedColumns.filter((column) => !headers.includes(column));
+  const missingHeaders = expectedColumns.filter(
+    (column) => !headers.includes(column),
+  );
   if (missingHeaders.length > 0) {
-    throw new Error(`CSV missing required columns: ${missingHeaders.join(", ")}`);
+    throw new Error(
+      `CSV missing required columns: ${missingHeaders.join(", ")}`,
+    );
   }
 
   const rows: CsvRow[] = lines
@@ -502,7 +546,7 @@ async function main(): Promise<void> {
   });
 
   const scholarState = new Map<string, ScholarSnapshot>(
-    scholars.map((scholar) => [scholar.id, { ...scholar }])
+    scholars.map((scholar) => [scholar.id, { ...scholar }]),
   );
   const scholarNameIndex = buildNameIndex(scholars);
 
@@ -527,8 +571,8 @@ async function main(): Promise<void> {
         page: reference.page,
         edition: reference.edition,
         citationText: reference.citationText,
-      })
-    )
+      }),
+    ),
   );
 
   let updatedRows = 0;
@@ -543,28 +587,35 @@ async function main(): Promise<void> {
     const row = rows[index];
 
     try {
-      const rawScholarId = normalizeNullableCsv(getColumn(row, "scholar_id", "id"));
+      const rawScholarId = normalizeNullableCsv(
+        getColumn(row, "scholar_id", "id"),
+      );
       const rawScholarName = normalizeNullableCsv(
-        getColumn(row, "scholar_name", "name", "mufassir_name")
+        getColumn(row, "scholar_name", "name", "mufassir_name"),
       );
 
       let scholar: ScholarSnapshot | undefined;
 
       if (rawScholarId) {
-        scholar = scholarState.get(rawScholarId) || scholarState.get(`scholar-${rawScholarId}`);
+        scholar =
+          scholarState.get(rawScholarId) ||
+          scholarState.get(`scholar-${rawScholarId}`);
         if (!scholar) {
           throw new Error(`scholar not found by scholar_id "${rawScholarId}"`);
         }
       }
 
       if (!scholar && rawScholarName) {
-        const matches = scholarNameIndex.get(normalizeLookup(rawScholarName)) || [];
+        const matches =
+          scholarNameIndex.get(normalizeLookup(rawScholarName)) || [];
         if (matches.length === 0) {
-          throw new Error(`scholar not found by scholar_name "${rawScholarName}"`);
+          throw new Error(
+            `scholar not found by scholar_name "${rawScholarName}"`,
+          );
         }
         if (matches.length > 1) {
           throw new Error(
-            `scholar_name "${rawScholarName}" is ambiguous (${matches.join(", ")}); use scholar_id`
+            `scholar_name "${rawScholarName}" is ambiguous (${matches.join(", ")}); use scholar_id`,
           );
         }
         scholar = scholarState.get(matches[0]);
@@ -574,7 +625,10 @@ async function main(): Promise<void> {
         throw new Error("either scholar_id or scholar_name is required");
       }
 
-      if (rawScholarName && normalizeLookup(rawScholarName) !== normalizeLookup(scholar.name)) {
+      if (
+        rawScholarName &&
+        normalizeLookup(rawScholarName) !== normalizeLookup(scholar.name)
+      ) {
         const knownNames = [
           scholar.name,
           scholar.mufassirTr,
@@ -586,7 +640,7 @@ async function main(): Promise<void> {
           .map((value) => normalizeLookup(value));
         if (!knownNames.includes(normalizeLookup(rawScholarName))) {
           throw new Error(
-            `scholar_name "${rawScholarName}" does not match scholar_id "${scholar.id}"`
+            `scholar_name "${rawScholarName}" does not match scholar_id "${scholar.id}"`,
           );
         }
       }
@@ -595,10 +649,18 @@ async function main(): Promise<void> {
         mufassirTr: normalizeNullableCsv(getColumn(row, "mufassir_tr")),
         mufassirEn: normalizeNullableCsv(getColumn(row, "mufassir_en")),
         mufassirAr: normalizeNullableCsv(getColumn(row, "mufassir_ar")),
-        mufassirNameLong: normalizeNullableCsv(getColumn(row, "mufassir_name_long")),
-        birthYear: parseOptionalInt(normalizeNullableCsv(getColumn(row, "birth_year"))),
-        deathYear: parseOptionalInt(normalizeNullableCsv(getColumn(row, "death_year"))),
-        deathHijri: parseOptionalInt(normalizeNullableCsv(getColumn(row, "death_hijri"))),
+        mufassirNameLong: normalizeNullableCsv(
+          getColumn(row, "mufassir_name_long"),
+        ),
+        birthYear: parseOptionalInt(
+          normalizeNullableCsv(getColumn(row, "birth_year")),
+        ),
+        deathYear: parseOptionalInt(
+          normalizeNullableCsv(getColumn(row, "death_year")),
+        ),
+        deathHijri: parseOptionalInt(
+          normalizeNullableCsv(getColumn(row, "death_hijri")),
+        ),
         madhab: normalizeNullableCsv(getColumn(row, "madhab")),
         environment: normalizeNullableCsv(getColumn(row, "environment")),
         originCountry: normalizeNullableCsv(getColumn(row, "origin_country")),
@@ -606,7 +668,9 @@ async function main(): Promise<void> {
         tafsirType1: normalizeNullableCsv(getColumn(row, "tafsir_type1")),
         tafsirType2: normalizeNullableCsv(getColumn(row, "tafsir_type2")),
         explanation: normalizeNullableCsv(getColumn(row, "explanation")),
-        detailInformation: normalizeNullableCsv(getColumn(row, "detail_information")),
+        detailInformation: normalizeNullableCsv(
+          getColumn(row, "detail_information"),
+        ),
       };
 
       const basePatch = buildScholarPatch(patchInput, scholar, allowOverwrite);
@@ -614,24 +678,27 @@ async function main(): Promise<void> {
 
       const scholarlyInfluence = parseOptionalScore(
         normalizeNullableCsv(getColumn(row, "scholarly_influence")),
-        "scholarly_influence"
+        "scholarly_influence",
       );
       const methodologicalRigor = parseOptionalScore(
         normalizeNullableCsv(getColumn(row, "methodological_rigor")),
-        "methodological_rigor"
+        "methodological_rigor",
       );
       const corpusBreadth = parseOptionalScore(
         normalizeNullableCsv(getColumn(row, "corpus_breadth")),
-        "corpus_breadth"
+        "corpus_breadth",
       );
       const sourceAccessibility = parseSourceAccessibility(
-        normalizeNullableCsv(getColumn(row, "source_accessibility"))
+        normalizeNullableCsv(getColumn(row, "source_accessibility")),
       );
       const traditionAcceptance = parseTraditionAcceptance(
-        normalizeNullableCsv(getColumn(row, "tradition_acceptance"))
+        normalizeNullableCsv(getColumn(row, "tradition_acceptance")),
       );
 
-      if (scholarlyInfluence !== null && (allowOverwrite || !hasValue(scholar.scholarlyInfluence))) {
+      if (
+        scholarlyInfluence !== null &&
+        (allowOverwrite || !hasValue(scholar.scholarlyInfluence))
+      ) {
         patch.scholarlyInfluence = scholarlyInfluence;
       }
       if (
@@ -640,7 +707,10 @@ async function main(): Promise<void> {
       ) {
         patch.methodologicalRigor = methodologicalRigor;
       }
-      if (corpusBreadth !== null && (allowOverwrite || !hasValue(scholar.corpusBreadth))) {
+      if (
+        corpusBreadth !== null &&
+        (allowOverwrite || !hasValue(scholar.corpusBreadth))
+      ) {
         patch.corpusBreadth = corpusBreadth;
       }
       if (
@@ -667,7 +737,10 @@ async function main(): Promise<void> {
         edition: normalizeNullableCsv(getColumn(row, "edition")),
         citationText: normalizeNullableCsv(getColumn(row, "citation_text")),
         provenance: normalizeNullableCsv(getColumn(row, "provenance")),
-        isPrimary: parseOptionalBoolean(normalizeNullableCsv(getColumn(row, "is_primary"))) ?? true,
+        isPrimary:
+          parseOptionalBoolean(
+            normalizeNullableCsv(getColumn(row, "is_primary")),
+          ) ?? true,
       };
 
       const patchFieldCount = Object.keys(patch).length;
@@ -681,7 +754,10 @@ async function main(): Promise<void> {
       }
 
       if (shouldInsertReference) {
-        const referenceErrors = validateReferenceRequirement({ referenceOnly: true }, reference);
+        const referenceErrors = validateReferenceRequirement(
+          { referenceOnly: true },
+          reference,
+        );
         if (referenceErrors.length > 0) {
           throw new Error(referenceErrors.join("; "));
         }
@@ -689,13 +765,17 @@ async function main(): Promise<void> {
 
       let insertedReference = false;
       let pendingReferenceFingerprint: string | null = null;
-      let pendingReferenceCreate: Prisma.ScholarReferenceCreateInput | null = null;
+      let pendingReferenceCreate: Prisma.ScholarReferenceCreateInput | null =
+        null;
 
       if (shouldInsertReference) {
         const fingerprint = referenceFingerprint(scholar.id, reference);
         if (!referenceFingerprints.has(fingerprint)) {
           pendingReferenceFingerprint = fingerprint;
-          pendingReferenceCreate = toReferenceCreateInput(scholar.id, reference);
+          pendingReferenceCreate = toReferenceCreateInput(
+            scholar.id,
+            reference,
+          );
         } else {
           duplicateReferenceRows++;
         }

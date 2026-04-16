@@ -1,34 +1,47 @@
 #!/usr/bin/env tsx
 import fs from "fs";
 import { resolve, dirname } from "path";
-import { PrismaClient } from "/Users/ac/personalgithub/Mufessir/packages/database/node_modules/@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { fileURLToPath } from "url";
 import { config } from "dotenv";
 
-type Field = { value: string; quoted: boolean };
+const prisma = new PrismaClient();
 
-type AyahRow = {
-  surahId: number;
-  ayahNumber: number;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+config({ path: resolve(__dirname, "../.env") });
+
+const SQL_PATH = resolve(
+  __dirname,
+  "../../../docs/MufassirAI_TafsirDB_Backup.sql",
+);
+
+interface SurahInfo {
+  id: number;
+  surahNumber: number;
+  nameAr: string | null;
+  nameTr: string | null;
+  nameEn: string | null;
+  totalAyahs: number;
+  revelationType: string | null;
+}
+
+interface VerseInfo {
+  id: string;
+  surahNumber: number;
+  verseNumber: number;
   arabicText: string;
   transliteration: string | null;
-};
+  translation: string | null;
+}
 
-type SurahInfo = {
-  surahNumber: number;
-  nameTr: string | null;
-  nameAr: string | null;
-  nameEn: string | null;
-};
-
-type MufassirInfo = {
+interface MufassirInfo {
+  id: number;
   nameTr: string | null;
   nameEn: string | null;
   nameAr: string | null;
   nameLong: string | null;
-  detailInformation: string | null;
-  explanation: string | null;
-  bookId: string | null;
   deathHijri: number | null;
   deathMiladi: number | null;
   century: number | null;
@@ -39,158 +52,237 @@ type MufassirInfo = {
   reputationScore: number | null;
   tafsirType1: string | null;
   tafsirType2: string | null;
-};
-
-type MufassirFallback = {
-  nameAr: string | null;
-  nameLabel: string | null;
-};
-
-const prisma = new PrismaClient();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-config({ path: resolve(__dirname, "../.env") });
-
-const SQL_PATH =
-  process.env.SQL_DUMP_PATH ||
-  resolve(__dirname, "../../../MufessirAI_backup_20251130_121211.sql");
-
-const BATCH_VERSES = Number(process.env.BATCH_VERSES || 500);
-const BATCH_TAFSIRS = Number(process.env.BATCH_TAFSIRS || 50);
-
-const ayahRows: AyahRow[] = [];
-const surahById = new Map<number, SurahInfo>();
-const mufassirById = new Map<number, MufassirInfo>();
-const mufassirFallbackById = new Map<number, MufassirFallback>();
-
-const mufassirTypeById = new Map<number, string>();
-
-const surahBatch: Array<{
-  id: number;
-  surahNumber: number;
-  nameAr: string | null;
-  nameTr: string | null;
-  nameEn: string | null;
-  totalAyahs: number;
-  revelationType: string | null;
-}> = [];
-
-async function flushSurahs() {
-  if (!surahBatch.length) return;
-  for (const s of surahBatch) {
-    await prisma.surah.upsert({
-      where: { id: s.id },
-      update: {},
-      create: s,
-    });
-  }
-  surahBatch.length = 0;
 }
 
-type ScholarPeriodCode =
-  | "FOUNDATION"
-  | "CLASSICAL_EARLY"
-  | "CLASSICAL_MATURE"
-  | "POST_CLASSICAL"
-  | "MODERN"
-  | "CONTEMPORARY";
-
-function deriveCenturyFromHijri(deathHijri: number | null): number | null {
-  if (!deathHijri || deathHijri <= 0) return null;
-  return Math.ceil(deathHijri / 100);
-}
-
-function derivePeriodCode(deathHijri: number | null): ScholarPeriodCode | null {
-  if (!deathHijri || deathHijri <= 0) return null;
-  if (deathHijri <= 150) return "FOUNDATION";
-  if (deathHijri <= 400) return "CLASSICAL_EARLY";
-  if (deathHijri <= 700) return "CLASSICAL_MATURE";
-  if (deathHijri <= 1200) return "POST_CLASSICAL";
-  if (deathHijri <= 1400) return "MODERN";
-  return "CONTEMPORARY";
-}
-
-function deriveSourceAccessibility(
-  bookId: string | null,
-): "PARTIAL_DIGITAL" | null {
-  if (!bookId || !bookId.trim()) return null;
-  return "PARTIAL_DIGITAL";
-}
-
-let versesReady = false;
-let scholarsReady = false;
-
-const verseBatch: Array<{
-  id: string;
-  surahNumber: number;
-  verseNumber: number;
-  arabicText: string;
-  transliteration: string | null;
-  translation: string | null;
-}> = [];
-
-const tafsirBatch: Array<{
+interface TafsirInfo {
   id: string;
   verseId: string;
   mufassirId: number;
   tafsirText: string;
-  tafsirType: string | null;
-  keywords: string[];
-  languageLevel: number | null;
-  emotionalRatio: number | null;
-}> = [];
-
-function asString(v: unknown): string | null {
-  if (v === null || v === undefined) return null;
-  const s = String(v);
-  return s.length ? s : null;
 }
 
-function asNumber(v: unknown): number | null {
-  if (v === null || v === undefined) return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
+const surahs = new Map<number, SurahInfo>();
+const verses = new Map<string, VerseInfo>();
+const mufassirs = new Map<number, MufassirInfo>();
+const tafsirs: TafsirInfo[] = [];
+
+function decodeEscape(ch: string): string {
+  if (ch === "0") return "\0";
+  if (ch === "b") return "\b";
+  if (ch === "n") return "\n";
+  if (ch === "r") return "\r";
+  if (ch === "t") return "\t";
+  if (ch === "Z") return "\x1a";
+  if (ch === "'") return "'";
+  if (ch === '"') return '"';
+  if (ch === "\\") return "\\";
+  return ch;
 }
 
-function toValue(field: Field): string | number | null {
-  if (field.quoted) return field.value;
-  const trimmed = field.value.trim();
-  if (!trimmed || trimmed.toUpperCase() === "NULL") return null;
-  if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed);
-  return trimmed;
+function parseValue(val: string, quoted: boolean): string | number | null {
+  if (quoted) return val;
+  const t = val.trim();
+  if (!t || t === "NULL") return null;
+  if (/^-?\d+(\.\d+)?$/.test(t)) return Number(t);
+  return t;
 }
 
-function decodeEscapeChar(ch: string): string {
-  switch (ch) {
-    case "0":
-      return "\0";
-    case "b":
-      return "\b";
-    case "n":
-      return "\n";
-    case "r":
-      return "\r";
-    case "t":
-      return "\t";
-    case "Z":
-      return "\x1a";
-    case "'":
-      return "'";
-    case '"':
-      return '"';
-    case "\\":
-      return "\\";
-    default:
-      return ch;
+function processRow(table: string, row: (string | number | null)[]) {
+  if (table === "surahs" && row.length >= 7) {
+    const id = row[0] as number;
+    const sn = row[1] as number;
+    surahs.set(id, {
+      id,
+      surahNumber: sn,
+      nameAr: row[2] as string | null,
+      nameTr: row[3] as string | null,
+      nameEn: row[4] as string | null,
+      totalAyahs: (row[5] as number) || 0,
+      revelationType: row[6] as string | null,
+    });
+  }
+
+  if (table === "ayahs" && row.length >= 7) {
+    const sid = row[1] as number;
+    const an = row[2] as number;
+    const s = surahs.get(sid);
+    const sn = s?.surahNumber ?? sid;
+    const vid = "verse-" + sn + "-" + an;
+    verses.set(vid, {
+      id: vid,
+      surahNumber: sn,
+      verseNumber: an,
+      arabicText: (row[3] as string) || "",
+      transliteration: row[6] as string | null,
+      translation: row[4] as string | null,
+    });
+  }
+
+  if (table === "mufassirs" && row.length >= 23) {
+    const id = row[1] as number;
+    mufassirs.set(id, {
+      id,
+      nameTr: row[3] as string | null,
+      nameEn: row[2] as string | null,
+      nameAr: row[4] as string | null,
+      nameLong: row[5] as string | null,
+      deathHijri: row[9] as number | null,
+      deathMiladi: row[10] as number | null,
+      century: row[11] as number | null,
+      period: row[12] as string | null,
+      madhab: row[13] as string | null,
+      environment: row[14] as string | null,
+      originCountry: row[15] as string | null,
+      reputationScore: row[16] as number | null,
+      tafsirType1: row[21] as string | null,
+      tafsirType2: row[22] as string | null,
+    });
+  }
+
+  if (table === "all_tafsirs" && row.length >= 5) {
+    const tid = row[0] as number;
+    const sid = row[1] as number;
+    const aid = row[2] as number;
+    const mid = row[3] as number;
+    const comm = row[4] as string;
+    const s = surahs.get(sid);
+    const sn = s?.surahNumber ?? sid;
+    const vn = aid >= 10000 ? 0 : aid;
+    const vid = "verse-" + sn + "-" + vn;
+    if (vid && mid) {
+      tafsirs.push({
+        id: "tafsir-" + sid + "-" + aid + "-" + mid,
+        verseId: vid,
+        mufassirId: mid,
+        tafsirText: comm || "",
+      });
+    }
   }
 }
 
-async function clearDb() {
-  if (process.env.RESET_DB !== "true") {
-    throw new Error("RESET_DB=true is required to clear existing data.");
+async function run() {
+  console.log("Processing SQL file in chunks...");
+
+  let buffer = "";
+  let state: "search" | "values" = "search";
+  let table = "";
+  let inStr = false;
+  let esc = false;
+  let depth = 0;
+  let field = "";
+  let fieldQ = false;
+  let row: (string | number | null)[] = [];
+
+  const stream = fs.createReadStream(SQL_PATH, {
+    encoding: "utf8",
+    highWaterMark: 1024 * 1024,
+  });
+
+  for await (const chunk of stream) {
+    buffer += chunk;
+    let i = 0;
+
+    while (i < buffer.length) {
+      const c = buffer[i];
+
+      if (state === "search") {
+        const insertPos = buffer.indexOf("INSERT INTO `", i);
+        if (insertPos !== -1) {
+          const start = insertPos + 12;
+          const end = buffer.indexOf("`", start);
+          if (end > start && end - start < 50) {
+            table = buffer.slice(start, end);
+            const valuesPos = buffer.indexOf("VALUES", end);
+            if (valuesPos !== -1) {
+              i = valuesPos + 6;
+              state = "values";
+              inStr = false;
+              esc = false;
+              depth = 0;
+              console.log("Parsing: " + table);
+              continue;
+            }
+          }
+        }
+        i = buffer.length - 10;
+        continue;
+      }
+
+      // parsing VALUES
+      if (inStr) {
+        if (esc) {
+          buffer = buffer.slice(0, i) + decodeEscape(c) + buffer.slice(i + 1);
+          esc = false;
+        } else if (c === "\\") {
+          esc = true;
+        } else if (c === "'") {
+          inStr = false;
+        }
+        i++;
+        continue;
+      }
+
+      if (c === "'") {
+        inStr = true;
+        fieldQ = true;
+        i++;
+        continue;
+      }
+
+      if (c === "(") {
+        if (depth === 0) {
+          depth = 1;
+          row = [];
+          field = "";
+          fieldQ = false;
+          i++;
+          continue;
+        }
+        depth++;
+      } else if (c === ")") {
+        if (depth === 1) {
+          row.push(parseValue(field, fieldQ));
+          processRow(table, row);
+          depth = 0;
+          field = "";
+          fieldQ = false;
+          row = [];
+          i++;
+          continue;
+        }
+        depth = Math.max(0, depth - 1);
+      } else if (c === "," && depth === 1) {
+        row.push(parseValue(field, fieldQ));
+        field = "";
+        fieldQ = false;
+      } else if (c === ";" && depth === 0) {
+        state = "search";
+        table = "";
+      }
+
+      if (depth >= 1) field += c;
+      i++;
+    }
+
+    // Keep last 1000 chars for partial state
+    if (buffer.length > 1000) {
+      buffer = buffer.slice(-1000);
+    }
   }
+
+  console.log(
+    "Found: " +
+      surahs.size +
+      " surahs, " +
+      verses.size +
+      " verses, " +
+      mufassirs.size +
+      " mufassirs, " +
+      tafsirs.length +
+      " tafsirs",
+  );
+
+  console.log("Clearing DB...");
   await prisma.searchResult.deleteMany();
   await prisma.search.deleteMany();
   await prisma.favorite.deleteMany();
@@ -198,521 +290,57 @@ async function clearDb() {
   await prisma.mufassir.deleteMany();
   await prisma.verse.deleteMany();
   await prisma.surah.deleteMany();
-}
 
-async function flushVerses() {
-  if (!verseBatch.length) return;
-  await prisma.verse.createMany({ data: verseBatch, skipDuplicates: true });
-  verseBatch.length = 0;
-}
-
-async function flushTafsirs() {
-  if (!tafsirBatch.length) return;
-  await prisma.tafsir.createMany({ data: tafsirBatch, skipDuplicates: true });
-  tafsirBatch.length = 0;
-}
-
-async function buildVerses() {
-  for (const a of ayahRows) {
-    const surahInfo = surahById.get(a.surahId);
-    const surahNumber = surahInfo?.surahNumber ?? a.surahId;
-    verseBatch.push({
-      id: `verse-${surahNumber}-${a.ayahNumber}`,
-      surahNumber,
-      verseNumber: a.ayahNumber,
-      arabicText: a.arabicText || "",
-      transliteration: a.transliteration,
-      translation: null,
-    });
-    if (verseBatch.length >= BATCH_VERSES) {
-      await flushVerses();
-    }
+  console.log("Inserting surahs...");
+  for (const s of surahs.values()) {
+    await prisma.surah.upsert({ where: { id: s.id }, update: {}, create: s });
   }
 
-  for (const [surahId, surahInfo] of surahById) {
-    const surahNumber = surahInfo.surahNumber ?? surahId;
-    verseBatch.push({
-      id: `verse-${surahNumber}-0`,
-      surahNumber,
-      verseNumber: 0,
-      arabicText: surahInfo.nameAr || "",
-      transliteration: null,
-      translation: null,
-    });
-    if (verseBatch.length >= BATCH_VERSES) {
-      await flushVerses();
-    }
+  console.log("Inserting verses...");
+  for (const v of verses.values()) {
+    await prisma.verse.upsert({ where: { id: v.id }, update: {}, create: v });
   }
 
-  await flushVerses();
-  versesReady = true;
-}
-
-async function buildMufassirs() {
-  console.log(
-    `Building mufassirs: ${mufassirById.size} mufassirs, ${mufassirFallbackById.size} fallbacks`,
-  );
-
-  const ids = new Set<number>();
-  for (const id of mufassirById.keys()) ids.add(id);
-  for (const id of mufassirFallbackById.keys()) ids.add(id);
-
-  const batch: Array<{
-    id: string;
-    name: string;
-    mufassirTr: string | null;
-    mufassirEn: string | null;
-    mufassirAr: string | null;
-    mufassirNameLong: string | null;
-    birthYear: number | null;
-    deathYear: number | null;
-    deathHijri: number | null;
-    century: number;
-    madhab: string | null;
-    period: string | null;
-    periodCode:
-      | "FOUNDATION"
-      | "CLASSICAL_EARLY"
-      | "CLASSICAL_MATURE"
-      | "POST_CLASSICAL"
-      | "MODERN"
-      | "CONTEMPORARY"
-      | null;
-    environment: string | null;
-    originCountry: string | null;
-    bookId: string | null;
-    tafsirType1: string | null;
-    tafsirType2: string | null;
-    explanation: string | null;
-    detailInformation: string | null;
-    sourceAccessibility: "PARTIAL_DIGITAL" | null;
-    reputationScore: number | null;
-    scholarlyInfluence: number | null;
-    methodologicalRigor: number | null;
-    corpusBreadth: number | null;
-    traditionAcceptance: Array<
-      | "SUNNI_MAINSTREAM"
-      | "MUTAZILI"
-      | "SHII_IMAMI"
-      | "SHII_ZAYDI"
-      | "SUFI_ISHARI"
-      | "IBADI"
-      | "SALAFI"
-      | "CROSS_TRADITION"
-    >;
-  }> = [];
-
-  for (const id of ids) {
-    const m = mufassirById.get(id);
-    const fallback = mufassirFallbackById.get(id);
-    const name =
-      m?.nameTr ||
-      m?.nameEn ||
-      m?.nameAr ||
-      m?.nameLong ||
-      fallback?.nameAr ||
-      fallback?.nameLabel ||
-      `Mufassir ${id}`;
-
-    if (m?.tafsirType1) {
-      mufassirTypeById.set(id, m.tafsirType1);
-    }
-
-    batch.push({
-      id: `scholar-${id}`,
-      name,
-      mufassirTr: m?.nameTr ?? null,
-      mufassirEn: m?.nameEn ?? null,
-      mufassirAr: m?.nameAr ?? null,
-      mufassirNameLong: m?.nameLong ?? null,
-      birthYear: null,
-      deathYear: m?.deathMiladi ?? null,
-      deathHijri: m?.deathHijri ?? null,
-      century: m?.century ?? deriveCenturyFromHijri(m?.deathHijri ?? null) ?? 0,
-      madhab: m?.madhab ?? null,
-      period: m?.period ?? null,
-      periodCode: derivePeriodCode(m?.deathHijri ?? null),
-      environment: m?.environment ?? null,
-      originCountry: m?.originCountry ?? null,
-      bookId: m?.bookId ?? null,
-      tafsirType1: m?.tafsirType1 ?? null,
-      tafsirType2: m?.tafsirType2 ?? null,
-      explanation: m?.explanation ?? null,
-      detailInformation: m?.detailInformation ?? null,
-      sourceAccessibility: deriveSourceAccessibility(m?.bookId ?? null),
-      reputationScore: m?.reputationScore ?? null,
-      scholarlyInfluence: null,
-      methodologicalRigor: null,
-      corpusBreadth: null,
-      traditionAcceptance: [],
+  console.log("Inserting mufassirs...");
+  for (const m of mufassirs.values()) {
+    await prisma.mufassir.upsert({
+      where: { id: m.id },
+      update: {},
+      create: {
+        id: m.id,
+        nameEn: m.nameEn,
+        nameTr: m.nameTr,
+        nameAr: m.nameAr,
+        nameLong: m.nameLong,
+        deathHijri: m.deathHijri,
+        deathMiladi: m.deathMiladi,
+        century: m.century || 0,
+        period: m.period,
+        madhab: m.madhab,
+        environment: m.environment,
+        originCountry: m.originCountry,
+        reputationScore: m.reputationScore,
+        tafsirType1: m.tafsirType1,
+        tafsirType2: m.tafsirType2,
+      },
     });
   }
 
-  if (batch.length) {
-    await prisma.mufassir.createMany({ data: batch, skipDuplicates: true });
+  console.log("Inserting tafsirs...");
+  const bs = 100;
+  for (let i = 0; i < tafsirs.length; i += bs) {
+    const b = tafsirs.slice(i, i + bs);
+    await prisma.tafsir.createMany({ data: b, skipDuplicates: true });
+    if (Math.floor(i / bs) % 10 === 0)
+      console.log("  " + (i + b.length) + "/" + tafsirs.length);
   }
 
-  scholarsReady = true;
+  console.log("Done!");
 }
 
-function isTableOfInterest(table: string): boolean {
-  if (table === "surahs") return true;
-  if (table === "ayahs") return true;
-  if (table === "mufassirs") return true;
-  if (table === "Mufessirs_dead_hijri") return true;
-  if (table.startsWith("tafseer_")) return true;
-  // Skip all_tafsirs - it comes before ayahs in the dump causing ordering issues
-  // if (table === "all_tafsirs") return true;
-  return false;
-}
-
-class ValuesParser {
-  private inString = false;
-  private escapeNext = false;
-  private depth = 0;
-  private field = "";
-  private fieldQuoted = false;
-  private row: Field[] = [];
-  private currentTable = "";
-  private active = false;
-  private parseRows = false;
-
-  reset(table: string, parseRows: boolean) {
-    this.inString = false;
-    this.escapeNext = false;
-    this.depth = 0;
-    this.field = "";
-    this.fieldQuoted = false;
-    this.row = [];
-    this.currentTable = table;
-    this.active = true;
-    this.parseRows = parseRows;
-  }
-
-  async parseChunk(
-    chunk: string,
-    startIndex = 0,
-  ): Promise<{ index: number; done: boolean }> {
-    let i = startIndex;
-    for (; i < chunk.length; i++) {
-      const c = chunk[i];
-
-      if (this.inString) {
-        if (this.escapeNext) {
-          this.field += decodeEscapeChar(c);
-          this.escapeNext = false;
-          continue;
-        }
-        if (c === "\\") {
-          this.escapeNext = true;
-          continue;
-        }
-        if (c === "'") {
-          this.inString = false;
-          continue;
-        }
-        this.field += c;
-        continue;
-      }
-
-      if (c === "'") {
-        this.inString = true;
-        this.fieldQuoted = true;
-        continue;
-      }
-
-      if (c === "(") {
-        if (this.depth === 0) {
-          this.depth = 1;
-          this.row = [];
-          this.field = "";
-          this.fieldQuoted = false;
-          continue;
-        }
-        this.depth++;
-        if (this.parseRows) this.field += c;
-        continue;
-      }
-
-      if (c === ")") {
-        if (this.depth === 1) {
-          if (this.parseRows) {
-            this.row.push({ value: this.field, quoted: this.fieldQuoted });
-            await handleRow(this.currentTable, this.row);
-          }
-          this.depth = 0;
-          this.field = "";
-          this.fieldQuoted = false;
-          this.row = [];
-          continue;
-        }
-        this.depth = Math.max(0, this.depth - 1);
-        if (this.parseRows) this.field += c;
-        continue;
-      }
-
-      if (c === "," && this.depth === 1 && this.parseRows) {
-        this.row.push({ value: this.field, quoted: this.fieldQuoted });
-        this.field = "";
-        this.fieldQuoted = false;
-        continue;
-      }
-
-      if (c === ";" && this.depth === 0) {
-        this.active = false;
-        return { index: i + 1, done: true };
-      }
-
-      if (this.parseRows && this.depth >= 1) {
-        this.field += c;
-      }
-    }
-
-    return { index: i, done: false };
-  }
-}
-
-const valuesParser = new ValuesParser();
-
-async function handleRow(table: string, row: Field[]) {
-  if (table === "surahs") {
-    const id = toValue(row[0]);
-    const surahNumber = toValue(row[1]);
-    const nameAr = toValue(row[2]);
-    const nameTr = toValue(row[3]);
-    const nameEn = toValue(row[4]);
-    if (typeof id === "number") {
-      const totalAyahs = toValue(row[5]);
-      const revelationType = toValue(row[6]);
-      surahById.set(id, {
-        surahNumber: typeof surahNumber === "number" ? surahNumber : id,
-        nameAr: asString(nameAr),
-        nameTr: asString(nameTr),
-        nameEn: asString(nameEn),
-      });
-      surahBatch.push({
-        id,
-        surahNumber: typeof surahNumber === "number" ? surahNumber : id,
-        nameAr: asString(nameAr),
-        nameTr: asString(nameTr),
-        nameEn: asString(nameEn),
-        totalAyahs: typeof totalAyahs === "number" ? totalAyahs : 0,
-        revelationType: asString(revelationType),
-      });
-    }
-    return;
-  }
-
-  if (table === "ayahs") {
-    const surahId = toValue(row[1]);
-    const ayahNumber = toValue(row[2]);
-    const arabicText = toValue(row[3]);
-    const transliteration = toValue(row[6]);
-    if (typeof surahId === "number" && typeof ayahNumber === "number") {
-      ayahRows.push({
-        surahId,
-        ayahNumber,
-        arabicText: asString(arabicText) || "",
-        transliteration: asString(transliteration),
-      });
-    }
-    return;
-  }
-
-  if (table === "mufassirs") {
-    console.log(`Found mufassirs row with ${row.length} fields`);
-    const mufassirId = toValue(row[1]);
-    if (typeof mufassirId !== "number") return;
-
-    mufassirById.set(mufassirId, {
-      nameTr: asString(toValue(row[3])),
-      nameEn: asString(toValue(row[2])),
-      nameAr: asString(toValue(row[4])),
-      nameLong: asString(toValue(row[5])),
-      detailInformation: asString(toValue(row[6])),
-      explanation: asString(toValue(row[7])),
-      bookId: asString(toValue(row[8])),
-      deathHijri: asNumber(toValue(row[9])),
-      deathMiladi: asNumber(toValue(row[10])),
-      century: asNumber(toValue(row[11])),
-      madhab: asString(toValue(row[13])),
-      period: asString(toValue(row[12])),
-      environment: asString(toValue(row[14])),
-      originCountry: asString(toValue(row[15])),
-      reputationScore: asNumber(toValue(row[16])),
-      tafsirType1: asString(toValue(row[21])),
-      tafsirType2: asString(toValue(row[22])),
-    });
-    return;
-  }
-
-  if (table === "Mufessirs_dead_hijri") {
-    const mufassirId = toValue(row[1]);
-    if (typeof mufassirId !== "number") return;
-
-    mufassirFallbackById.set(mufassirId, {
-      nameLabel: asString(toValue(row[0])),
-      nameAr: asString(toValue(row[2])),
-    });
-    return;
-  }
-
-  if (table.startsWith("tafseer_") || table === "all_tafsirs") {
-    if (!versesReady || !scholarsReady) {
-      console.log(`Skipping ${table} rows - verses/scholars not ready yet`);
-      return;
-    }
-    const tafseerId = toValue(row[0]);
-    const surahId = toValue(row[1]);
-    const ayahId = toValue(row[2]);
-    const mufassirId = toValue(row[3]);
-    const commentary = toValue(row[4]);
-
-    if (
-      typeof tafseerId !== "number" ||
-      typeof surahId !== "number" ||
-      typeof ayahId !== "number" ||
-      typeof mufassirId !== "number"
-    ) {
-      return;
-    }
-
-    const surahInfo = surahById.get(surahId);
-    const surahNumber = surahInfo?.surahNumber ?? surahId;
-    const verseNumber = ayahId >= 10000 ? 0 : ayahId;
-    const verseId = `verse-${surahNumber}-${verseNumber}`;
-    const scholarId = `scholar-${mufassirId}`;
-    const tafsirType = mufassirTypeById.get(mufassirId) || null;
-
-    tafsirBatch.push({
-      id: `tafsir-${surahId}-${tafseerId}`,
-      verseId,
-      mufassirId: mufassirId,
-      tafsirText: asString(commentary) || "",
-      tafsirType,
-      keywords: [],
-      languageLevel: null,
-      emotionalRatio: null,
-    });
-
-    if (tafsirBatch.length >= BATCH_TAFSIRS) {
-      await flushTafsirs();
-    }
-    return;
-  }
-}
-
-async function parseDump() {
-  await clearDb();
-
-  const stream = fs.createReadStream(SQL_PATH, { encoding: "utf8" });
-  let buffer = "";
-  let state: "search" | "findValues" | "parseValues" = "search";
-  let currentTable = "";
-
-  for await (const chunk of stream) {
-    buffer += chunk;
-    let idx = 0;
-    let bufferAdjusted = false;
-
-    while (idx < buffer.length) {
-      if (state === "search") {
-        const startIdx = buffer.indexOf("INSERT INTO `", idx);
-        if (startIdx === -1) {
-          buffer = buffer.slice(Math.max(0, buffer.length - 20));
-          bufferAdjusted = true;
-          break;
-        }
-        idx = startIdx + "INSERT INTO `".length;
-        const endIdx = buffer.indexOf("`", idx);
-        if (endIdx === -1) {
-          buffer = buffer.slice(startIdx);
-          break;
-        }
-        currentTable = buffer.slice(idx, endIdx);
-        idx = endIdx + 1;
-        state = "findValues";
-      }
-
-      if (state === "findValues") {
-        const valuesIdx = buffer.indexOf("VALUES", idx);
-        if (valuesIdx === -1) {
-          buffer = buffer.slice(Math.max(0, buffer.length - 20));
-          bufferAdjusted = true;
-          break;
-        }
-        idx = valuesIdx + "VALUES".length;
-        const parseRows = isTableOfInterest(currentTable);
-        valuesParser.reset(currentTable, parseRows);
-        state = "parseValues";
-      }
-
-      if (state === "parseValues") {
-        const { index: nextIdx, done } = await valuesParser.parseChunk(
-          buffer,
-          idx,
-        );
-        idx = nextIdx;
-        if (done) {
-          if (currentTable === "surahs") {
-            await flushSurahs();
-            await buildVerses();
-          }
-          if (
-            currentTable === "mufassirs" ||
-            currentTable === "Mufessirs_dead_hijri"
-          ) {
-            // await buildMufassirs();
-            scholarsReady = true;
-          }
-          if (
-            currentTable.startsWith("tafseer_") ||
-            currentTable === "all_tafsirs"
-          ) {
-            await flushTafsirs();
-          }
-          if (
-            currentTable === "mufassirs" ||
-            currentTable === "Mufessirs_dead_hijri"
-          ) {
-            // await buildMufassirs();
-            scholarsReady = true;
-          }
-          if (
-            currentTable.startsWith("tafseer_") ||
-            currentTable === "all_tafsirs"
-          ) {
-            await flushTafsirs();
-          }
-          state = "search";
-          currentTable = "";
-        }
-      }
-    }
-
-    if (!bufferAdjusted) {
-      if (idx >= buffer.length) {
-        buffer = "";
-      } else if (idx > 0) {
-        buffer = buffer.slice(idx);
-      }
-    }
-  }
-
-  await flushTafsirs();
-}
-
-async function main() {
-  console.log("Using SQL dump:", SQL_PATH);
-  await parseDump();
-  console.log("Import complete.");
-}
-
-main()
-  .catch((err) => {
-    console.error("Import failed:", err);
+run()
+  .catch((e) => {
+    console.error(e);
     process.exit(1);
   })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .finally(() => prisma.$disconnect());

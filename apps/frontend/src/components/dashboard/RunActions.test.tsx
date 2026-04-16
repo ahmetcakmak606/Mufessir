@@ -1,19 +1,19 @@
-import React from 'react';
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
-import { RunActions } from '@/components/dashboard/RunActions';
+import React from "react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+import { RunActions } from "@/components/dashboard/RunActions";
 
 const labels = {
-  saveRun: 'Save',
-  savingRun: 'Saving',
-  replay: 'Replay',
-  copyCitations: 'Copy',
-  share: 'Share',
+  saveRun: "Save",
+  savingRun: "Saving",
+  replay: "Replay",
+  copyCitations: "Copy",
+  share: "Share",
 };
 
-describe('RunActions', () => {
-  it('disables save when run cannot be saved', () => {
+describe("RunActions", () => {
+  it("disables save when run cannot be saved", () => {
     render(
       <RunActions
         canSave={false}
@@ -23,13 +23,13 @@ describe('RunActions', () => {
         onShare={() => {}}
         saving={false}
         labels={labels}
-      />
+      />,
     );
 
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
-  it('triggers action callbacks', async () => {
+  it("triggers action callbacks", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
     const onReplay = vi.fn();
@@ -45,13 +45,13 @@ describe('RunActions', () => {
         onShare={onShare}
         saving={false}
         labels={labels}
-      />
+      />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    await user.click(screen.getByRole('button', { name: 'Replay' }));
-    await user.click(screen.getByRole('button', { name: 'Copy' }));
-    await user.click(screen.getByRole('button', { name: 'Share' }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: "Replay" }));
+    await user.click(screen.getByRole("button", { name: "Copy" }));
+    await user.click(screen.getByRole("button", { name: "Share" }));
 
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onReplay).toHaveBeenCalledTimes(1);

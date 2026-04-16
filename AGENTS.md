@@ -15,226 +15,83 @@ packages/shared-types - Shared TypeScript types
 
 ## Commands
 
-### Root (run from monorepo root)
+### Root
 
-| Command               | Description                |
-| --------------------- | -------------------------- |
-| `npm run dev`         | Start all apps in dev mode |
-| `npm run build`       | Build all packages         |
-| `npm run test`        | Run all tests              |
-| `npm run lint`        | Lint all packages          |
-| `npm run check-types` | Type-check all packages    |
-| `npm run format`      | Format with Prettier       |
-
-### Backend (`cd apps/backend`)
-
-| Command                 | Description                  |
-| ----------------------- | ---------------------------- |
-| `npm run dev`           | Start dev server (tsx watch) |
-| `npm run build`         | Build with TypeScript        |
-| `npm run check-types`   | Type-check only              |
-| `npm run test`          | Run tests                    |
-| `npm run test:watch`    | Watch mode                   |
-| `npm run test:coverage` | With coverage                |
-
-### Frontend (`cd apps/frontend`)
-
-| Command               | Description               |
-| --------------------- | ------------------------- |
-| `npm run dev`         | Start Next.js (Turbopack) |
-| `npm run build`       | Build production          |
-| `npm run lint`        | Run ESLint                |
-| `npm run check-types` | Type-check only           |
-| `npm run test`        | Run tests                 |
-| `npm run test:watch`  | Watch mode                |
-| `npm run test:e2e`    | Playwright e2e tests      |
+| Command               | Description          |
+| --------------------- | -------------------- |
+| `npm run dev`         | Start all apps       |
+| `npm run build`       | Build all packages   |
+| `npm run test`        | Run all tests        |
+| `npm run lint`        | Lint all packages    |
+| `npm run check-types` | Type-check all       |
+| `npm run format`      | Format with Prettier |
 
 ### Database
 
 ```bash
-npm run db:up        # Start Docker
-npm run db:migrate   # Run Prisma migrations
+npm run db:up        # Start Docker (pgvector)
+npm run db:migrate   # Prisma migrations
 npm run db:seed     # Seed sample data
 npm run setup:dev   # Full: up + migrate + seed
 ```
 
-### Running Single Tests
+### Single Tests
 
 ```bash
-# Backend - specific file
+# Backend by file or pattern
 cd apps/backend && npx vitest run tests/app.test.ts
-
-# Backend - by test name pattern
 cd apps/backend && npx vitest run --testNamePattern "Health"
 
-# Frontend - specific file
+# Frontend by file or pattern
 cd apps/frontend && npx vitest run src/components/Some.test.tsx
 
-# Frontend - by test name pattern
-cd apps/frontend && npx vitest run --testNamePattern "disables save"
-
-# E2E - headed for debugging
+# E2E headed
 cd apps/frontend && npm run test:e2e:headed
 ```
 
 ---
 
+## Critical Setup
+
+- **`.env` goes at repo root** (not in apps/). Copy from `.env.example`.
+- Required: `DATABASE_URL`, `JWT_SECRET`, `NEXT_PUBLIC_API_URL=http://localhost:4000`
+- Backend is ES module (`"type": "module"` in package.json)
+
+---
+
 ## Code Style
 
-### Imports
-
-**Backend:** Explicit relative imports with `.js` extension
-
-```ts
-import router from "./routes/auth.js";
-import { type Request, type Response } from "express";
-import { db } from "../lib/db.js";
-```
-
-**Frontend:** Use `@/` alias from `src/`
-
-```ts
-import { authApi } from "@/lib/auth";
-import { UserCard } from "@/components/UserCard";
-```
-
-Add `'use client'` at top of client-side interactive components.
-
-### Formatting
-
-- Run `npm run format` before committing
-- 2-space indent, single quotes, trailing commas
-- Configured in root prettier settings
-
-### TypeScript
-
-- Explicit types for function params and returns
-- Use `type` for shapes, `interface` for extendable types
-- Avoid `any`; use `unknown` if needed
-- Use `as` assertions sparingly, prefer type guards
-
-### Naming Conventions
-
-| Type               | Convention       | Example                     |
-| ------------------ | ---------------- | --------------------------- |
-| Files (utils)      | kebab-case       | `scholar-enrichment.ts`     |
-| Files (components) | PascalCase       | `UserCard.tsx`              |
-| Files (hooks)      | PascalCase       | `useAuth.ts`                |
-| Functions          | camelCase + verb | `getUser`, `verifyPassword` |
-| Types              | PascalCase       | `AuthContextType`           |
-| Constants          | SCREAMING_SNAKE  | `MAX_REQUESTS`              |
-| React components   | PascalCase       | `UserProfile`               |
+- Backend imports: explicit relative with `.js` extension
+- Frontend: `@/` alias from `src/`
+- Add `'use client'` to interactive components
 
 ---
 
-## Error Handling
-
-### Backend
-
-- HTTP status codes: 400 (bad request), 401 (unauthorized), 403 (forbidden), 404 (not found), 500 (server error)
-- Response format: `{ error: "User-friendly message" }`
-- Never expose internal error details to clients
-- Use try/catch, return 500 on uncaught exceptions
-- Validate request body early; return 400 for missing required fields
-
-### Frontend
-
-- Use React Query for server state with built-in error states
-- Display user-friendly error messages
-- Always handle loading states during data fetches
-- Show inline validation errors on forms
-
----
-
-## Patterns
-
-### Express Routes
-
-```ts
-// All handlers use async/await
-router.post("/route", authenticateJWT, async (req, res) => {
-  try {
-    const { field } = req.body;
-    if (!field) {
-      return res.status(400).json({ error: "field is required" });
-    }
-    // ... handler logic
-  } catch (error) {
-    console.error("Route error:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-```
-
-- Use auth middleware (`authenticateJWT`) for protected routes
-- Mount routers at `/routes/*`
-- Validate body early → 400 for missing fields
-
-### React Components
-
-- Use functional components with TypeScript
-- Use `useAuth` hook for authentication context
-- Use React Query (`@tanstack/react-query`) for server state
-- Use `useState` for local component state
-- Extract reusable logic to custom hooks
-
-### Testing
-
-- Vitest for both frontend and backend
-- Backend: supertest for HTTP integration tests
-- Frontend: @testing-library/react + user-event for component tests
-
----
-
-## Pre-commit Checklist
-
-```bash
-npm run lint && npm run check-types && npm run test
-```
-
----
-
-## Environment Variables
-
-Create `.env` files from `.env.example`. Required variables:
+## CI Order (important)
 
 ```
-# Backend
-DATABASE_URL
-JWT_SECRET
-
-# Frontend
-NEXT_PUBLIC_API_URL=http://localhost:4000
+lint → typecheck → test → coverage → e2e → Postman smoke
 ```
+
+Pre-commit: `npm run lint && npm run check-types && npm run test`
 
 ---
 
 ## Non-obvious Commands
 
 ```bash
-# Scholar data quality check
-npm run quality:scholars
-
-# Import scholar enrichments from CSV
-npm run db:enrich:scholars
-
-# Export scholar enrichment template
-npm run db:export:scholar-starter
-
-# Data import scripts
-npm run db:derive  # Derive metadata from embeddings
-npm run import-sqlite   # Import from SQLite
-npm run import-mysql-dump  # Import from MySQL dump
+npm run quality:scholars      # Scholar data quality check
+npm run db:enrich:scholars   # Import CSV enrichments
+npm run db:export:scholar-starter  # Export template
+npm run db:derive           # Derive metadata from embeddings
+npm run import-sqlite       # Import from SQLite
+npm run import-mysql-dump   # Import from MySQL dump
 ```
 
 ---
 
-## CI / Commit Convention
+## Commit Convention
 
-Commits must follow Conventional Commits:
+Conventional Commits: `<type>(<scope>): <description>`
 
-```
-<type>(<scope>): <description>
-Types: feat, fix, refactor, docs, chore
-Example: feat(auth): add password reset endpoint
-```
+- Types: feat, fix, refactor, docs, chore

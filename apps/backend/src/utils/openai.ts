@@ -1,11 +1,13 @@
 import OpenAI from "openai";
 import { buildTafsirPrompt, type PromptOptions } from "./prompt.js";
 
-const aiDisabled = process.env.AI_MODE === "off" || process.env.OPENAI_DISABLED === "1";
+const aiDisabled =
+  process.env.AI_MODE === "off" || process.env.OPENAI_DISABLED === "1";
 
-const openai = process.env.OPENAI_API_KEY && !aiDisabled
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
+const openai =
+  process.env.OPENAI_API_KEY && !aiDisabled
+    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    : null;
 
 export interface TafsirGenerationOptions {
   promptOptions: PromptOptions;
@@ -25,10 +27,14 @@ export interface TafsirGenerationResult {
 
 export async function generateTafsirStream(
   options: TafsirGenerationOptions,
-  onChunk: (chunk: string) => void
+  onChunk: (chunk: string) => void,
 ): Promise<TafsirGenerationResult> {
   if (!openai) {
-    throw new Error(aiDisabled ? "OpenAI disabled by environment" : "OpenAI API key not configured");
+    throw new Error(
+      aiDisabled
+        ? "OpenAI disabled by environment"
+        : "OpenAI API key not configured",
+    );
   }
 
   const {
@@ -47,12 +53,12 @@ export async function generateTafsirStream(
         {
           role: "system",
           content:
-            "You are an expert Islamic scholar and linguist. Provide accurate, scholarly tafsir based only on provided context and keep evidence traceable to cited scholars."
+            "You are an expert Islamic scholar and linguist. Provide accurate, scholarly tafsir based only on provided context and keep evidence traceable to cited scholars.",
         },
         {
           role: "user",
-          content: prompt
-        }
+          content: prompt,
+        },
       ],
       temperature,
       max_tokens: maxTokens,
@@ -89,15 +95,21 @@ export async function generateTafsirStream(
     };
   } catch (error) {
     console.error("OpenAI API error:", error);
-    throw new Error(`Failed to generate tafsir: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `Failed to generate tafsir: ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
   }
 }
 
 export async function generateTafsirNonStreaming(
-  options: TafsirGenerationOptions
+  options: TafsirGenerationOptions,
 ): Promise<TafsirGenerationResult> {
   if (!openai) {
-    throw new Error(aiDisabled ? "OpenAI disabled by environment" : "OpenAI API key not configured");
+    throw new Error(
+      aiDisabled
+        ? "OpenAI disabled by environment"
+        : "OpenAI API key not configured",
+    );
   }
 
   const {
@@ -116,12 +128,12 @@ export async function generateTafsirNonStreaming(
         {
           role: "system",
           content:
-            "You are an expert Islamic scholar and linguist. Provide accurate, scholarly tafsir based only on provided context and keep evidence traceable to cited scholars."
+            "You are an expert Islamic scholar and linguist. Provide accurate, scholarly tafsir based only on provided context and keep evidence traceable to cited scholars.",
         },
         {
           role: "user",
-          content: prompt
-        }
+          content: prompt,
+        },
       ],
       temperature,
       max_tokens: maxTokens,
@@ -129,11 +141,13 @@ export async function generateTafsirNonStreaming(
     });
 
     const content = response.choices[0]?.message?.content || "";
-    const usage = response.usage ? {
-      promptTokens: response.usage.prompt_tokens,
-      completionTokens: response.usage.completion_tokens,
-      totalTokens: response.usage.total_tokens,
-    } : undefined;
+    const usage = response.usage
+      ? {
+          promptTokens: response.usage.prompt_tokens,
+          completionTokens: response.usage.completion_tokens,
+          totalTokens: response.usage.total_tokens,
+        }
+      : undefined;
 
     return {
       content,
@@ -141,6 +155,8 @@ export async function generateTafsirNonStreaming(
     };
   } catch (error) {
     console.error("OpenAI API error:", error);
-    throw new Error(`Failed to generate tafsir: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `Failed to generate tafsir: ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
   }
-} 
+}

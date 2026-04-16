@@ -35,15 +35,14 @@ describe("scholar metadata derivation", () => {
         scholarlyInfluence: 5,
         methodologicalRigor: 4,
         corpusBreadth: 5,
-      })
+      }),
     ).toBe(4.7);
     expect(
       computeCompatibilityReputationScore({
         scholarlyInfluence: 5,
         methodologicalRigor: 4,
         corpusBreadth: null,
-      })
+      }),
     ).toBeNull();
   });
 });
-

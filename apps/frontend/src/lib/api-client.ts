@@ -1,8 +1,8 @@
-import { tokenStorage } from '@/lib/auth';
+import { tokenStorage } from "@/lib/auth";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
-type ApiMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+type ApiMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
 export type ApiRequestOptions = {
   method?: ApiMethod;
@@ -13,7 +13,7 @@ export type ApiRequestOptions = {
 
 export async function apiRequest<T>(
   path: string,
-  { method = 'GET', body, token, signal }: ApiRequestOptions = {}
+  { method = "GET", body, token, signal }: ApiRequestOptions = {},
 ): Promise<T> {
   const resolvedToken = token ?? tokenStorage.get();
 
@@ -21,16 +21,18 @@ export async function apiRequest<T>(
     method,
     signal,
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...(resolvedToken ? { Authorization: `Bearer ${resolvedToken}` } : {}),
     },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
 
   if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({ error: 'Request failed' }));
+    const errorBody = await response
+      .json()
+      .catch(() => ({ error: "Request failed" }));
     const message =
-      typeof errorBody?.error === 'string' && errorBody.error.length > 0
+      typeof errorBody?.error === "string" && errorBody.error.length > 0
         ? errorBody.error
         : `HTTP ${response.status}`;
     throw new Error(message);

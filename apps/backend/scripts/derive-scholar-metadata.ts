@@ -57,7 +57,10 @@ async function main() {
     if (!s.period && nextPeriodCode) {
       patch.period = nextPeriodCode;
     }
-    if (nextSourceAccessibility && s.sourceAccessibility !== nextSourceAccessibility) {
+    if (
+      nextSourceAccessibility &&
+      s.sourceAccessibility !== nextSourceAccessibility
+    ) {
       patch.sourceAccessibility = nextSourceAccessibility;
     }
     if (
@@ -81,7 +84,7 @@ async function main() {
   console.log(
     dryRun
       ? `[dry-run] ${updated} scholar rows require derivation updates`
-      : `Updated ${updated} scholar rows with derived metadata`
+      : `Updated ${updated} scholar rows with derived metadata`,
   );
 }
 
@@ -93,4 +96,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-

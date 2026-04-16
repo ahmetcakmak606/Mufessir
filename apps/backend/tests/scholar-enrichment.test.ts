@@ -22,7 +22,9 @@ describe("scholar enrichment utils", () => {
     expect(parseOptionalBoolean("yes")).toBe(true);
     expect(parseOptionalBoolean("0")).toBe(false);
     expect(parseOptionalBoolean(" ")).toBeNull();
-    expect(() => parseOptionalBoolean("maybe")).toThrow(/Expected boolean value/);
+    expect(() => parseOptionalBoolean("maybe")).toThrow(
+      /Expected boolean value/,
+    );
   });
 
   it("builds patch without overwriting populated fields by default", () => {
@@ -39,7 +41,7 @@ describe("scholar enrichment utils", () => {
         birthYear: 90,
         deathYear: null,
       },
-      false
+      false,
     );
 
     expect(patch).toEqual({
@@ -60,7 +62,7 @@ describe("scholar enrichment utils", () => {
         citationText: null,
         provenance: null,
         isPrimary: true,
-      }
+      },
     );
 
     expect(errors).toHaveLength(3);
@@ -78,7 +80,7 @@ describe("scholar enrichment utils", () => {
         citationText: null,
         provenance: "manual",
         isPrimary: true,
-      }
+      },
     );
 
     expect(errors).toEqual([]);

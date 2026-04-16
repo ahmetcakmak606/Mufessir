@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function DashboardIndexPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/dashboard/query');
+    router.replace("/dashboard/query");
   }, [router]);
 
   return null;

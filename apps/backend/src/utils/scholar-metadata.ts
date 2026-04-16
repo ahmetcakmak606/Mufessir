@@ -28,13 +28,15 @@ export const SOURCE_ACCESSIBILITY_CODES: SourceAccessibilityCode[] = [
   "LOST",
 ];
 
-export function deriveCenturyFromHijri(deathHijri: number | null | undefined): number | null {
+export function deriveCenturyFromHijri(
+  deathHijri: number | null | undefined,
+): number | null {
   if (!deathHijri || deathHijri <= 0) return null;
   return Math.ceil(deathHijri / 100);
 }
 
 export function derivePeriodCode(
-  deathHijri: number | null | undefined
+  deathHijri: number | null | undefined,
 ): ScholarPeriodCode | null {
   if (!deathHijri || deathHijri <= 0) return null;
   if (deathHijri <= 150) return "FOUNDATION";
@@ -46,7 +48,7 @@ export function derivePeriodCode(
 }
 
 export function deriveSourceAccessibility(
-  bookId: string | null | undefined
+  bookId: string | null | undefined,
 ): SourceAccessibilityCode | null {
   if (!bookId || !bookId.trim()) return null;
   return "PARTIAL_DIGITAL";
@@ -61,11 +63,12 @@ export function computeCompatibilityReputationScore({
   methodologicalRigor?: number | null;
   corpusBreadth?: number | null;
 }): number | null {
-  const values = [scholarlyInfluence, methodologicalRigor, corpusBreadth].filter(
-    (v): v is number => typeof v === "number" && Number.isFinite(v)
-  );
+  const values = [
+    scholarlyInfluence,
+    methodologicalRigor,
+    corpusBreadth,
+  ].filter((v): v is number => typeof v === "number" && Number.isFinite(v));
   if (values.length !== 3) return null;
   const avg = values.reduce((acc, v) => acc + v, 0) / values.length;
   return Number(avg.toFixed(1));
 }
-

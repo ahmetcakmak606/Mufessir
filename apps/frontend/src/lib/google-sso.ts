@@ -20,7 +20,9 @@ declare global {
             auto_select?: boolean;
             cancel_on_tap_outside?: boolean;
           }) => void;
-          prompt: (listener?: (notification: PromptMomentNotification) => void) => void;
+          prompt: (
+            listener?: (notification: PromptMomentNotification) => void,
+          ) => void;
         };
       };
     };
@@ -41,13 +43,17 @@ export async function loadGoogleIdentityScript(): Promise<void> {
   if (!scriptLoadPromise) {
     scriptLoadPromise = new Promise<void>((resolve, reject) => {
       const existing = document.querySelector<HTMLScriptElement>(
-        'script[src="https://accounts.google.com/gsi/client"]'
+        'script[src="https://accounts.google.com/gsi/client"]',
       );
       if (existing) {
         existing.addEventListener("load", () => resolve(), { once: true });
-        existing.addEventListener("error", () => reject(new Error("Failed to load Google SSO script")), {
-          once: true,
-        });
+        existing.addEventListener(
+          "error",
+          () => reject(new Error("Failed to load Google SSO script")),
+          {
+            once: true,
+          },
+        );
         return;
       }
 
@@ -56,7 +62,8 @@ export async function loadGoogleIdentityScript(): Promise<void> {
       script.async = true;
       script.defer = true;
       script.onload = () => resolve();
-      script.onerror = () => reject(new Error("Failed to load Google SSO script"));
+      script.onerror = () =>
+        reject(new Error("Failed to load Google SSO script"));
       document.head.appendChild(script);
     });
   }
@@ -103,13 +110,17 @@ export async function requestGoogleIdToken(clientId: string): Promise<string> {
 
     googleId.prompt((notification) => {
       if (settled) return;
-      if (notification.isNotDisplayed() || notification.isSkippedMoment() || notification.isDismissedMoment()) {
+      if (
+        notification.isNotDisplayed() ||
+        notification.isSkippedMoment() ||
+        notification.isDismissedMoment()
+      ) {
         finish(() =>
           reject(
             new Error(
-              "Google sign-in was cancelled or unavailable. Check popup/cookie settings and try again."
-            )
-          )
+              "Google sign-in was cancelled or unavailable. Check popup/cookie settings and try again.",
+            ),
+          ),
         );
       }
     });

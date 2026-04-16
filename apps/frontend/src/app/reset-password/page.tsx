@@ -15,7 +15,9 @@ export default function ResetPasswordPage() {
   const [newPassword, setNewPassword] = useState("");
   const [newPassword2, setNewPassword2] = useState("");
   const [message, setMessage] = useState<string | null>(null);
-  const [messageType, setMessageType] = useState<"success" | "error" | null>(null);
+  const [messageType, setMessageType] = useState<"success" | "error" | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
 
   const onRequest = async (e: React.FormEvent) => {
@@ -59,15 +61,29 @@ export default function ResetPasswordPage() {
       <div className="ui-panel-strong w-full max-w-md p-6 sm:p-7">
         <div className="mb-3 flex justify-end">
           <div className="ui-panel flex items-center gap-1 rounded-full p-1">
-            <button onClick={() => setLang("tr")} className="ui-button-ghost" data-active={lang === "tr"}>TR</button>
-            <button onClick={() => setLang("en")} className="ui-button-ghost" data-active={lang === "en"}>EN</button>
+            <button
+              onClick={() => setLang("tr")}
+              className="ui-button-ghost"
+              data-active={lang === "tr"}
+            >
+              TR
+            </button>
+            <button
+              onClick={() => setLang("en")}
+              className="ui-button-ghost"
+              data-active={lang === "en"}
+            >
+              EN
+            </button>
           </div>
         </div>
 
         <h1 className="font-display ui-title text-3xl">{t.title}</h1>
         <p className="ui-muted mt-2 text-sm">{t.subtitle}</p>
         {message && (
-          <p className={`mt-4 rounded-lg px-3 py-2 text-sm ${messageType === "error" ? "ui-danger" : "ui-panel"}`}>
+          <p
+            className={`mt-4 rounded-lg px-3 py-2 text-sm ${messageType === "error" ? "ui-danger" : "ui-panel"}`}
+          >
             {message}
           </p>
         )}
@@ -82,7 +98,10 @@ export default function ResetPasswordPage() {
               className="ui-input"
               required
             />
-            <button disabled={loading} className="ui-button w-full py-2.5 text-sm">
+            <button
+              disabled={loading}
+              className="ui-button w-full py-2.5 text-sm"
+            >
               {loading ? t.sending : t.sendCode}
             </button>
           </form>
@@ -122,7 +141,10 @@ export default function ResetPasswordPage() {
               className="ui-input"
               required
             />
-            <button disabled={loading} className="ui-button w-full py-2.5 text-sm">
+            <button
+              disabled={loading}
+              className="ui-button w-full py-2.5 text-sm"
+            >
               {loading ? t.updating : t.updatePassword}
             </button>
           </form>

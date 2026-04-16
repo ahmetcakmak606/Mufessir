@@ -6,8 +6,12 @@ const router: Router = Router();
 // GET /verses?surahNumber=1&verseNumber=1 → returns a single verse by composite key
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const surahNumber = req.query.surahNumber ? Number(req.query.surahNumber) : undefined;
-    const verseNumber = req.query.verseNumber ? Number(req.query.verseNumber) : undefined;
+    const surahNumber = req.query.surahNumber
+      ? Number(req.query.surahNumber)
+      : undefined;
+    const verseNumber = req.query.verseNumber
+      ? Number(req.query.verseNumber)
+      : undefined;
 
     if (surahNumber && verseNumber) {
       const verse = await prisma.verse.findFirst({
@@ -51,5 +55,3 @@ router.get("/", async (req: Request, res: Response) => {
 });
 
 export default router;
-
-

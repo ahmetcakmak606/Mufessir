@@ -77,7 +77,7 @@ async function main() {
     (s) =>
       !inRange1to5(s.scholarlyInfluence) ||
       !inRange1to5(s.methodologicalRigor) ||
-      !inRange1to5(s.corpusBreadth)
+      !inRange1to5(s.corpusBreadth),
   );
 
   const duplicateBookIds = new Map<string, string[]>();
@@ -89,11 +89,12 @@ async function main() {
     duplicateBookIds.set(bookId, arr);
   }
   const duplicateBookIdRows = Array.from(duplicateBookIds.entries()).filter(
-    ([, ids]) => ids.length > 1
+    ([, ids]) => ids.length > 1,
   );
 
   const dependencyReport = {
-    t01_data_enrichment_ready: coverage.find((c) => c.field === "nameTr")?.ratio ?? 0,
+    t01_data_enrichment_ready:
+      coverage.find((c) => c.field === "nameTr")?.ratio ?? 0,
     t01a_metadata_ready:
       (coverage.find((c) => c.field === "periodCode")?.ratio ?? 0) *
       (coverage.find((c) => c.field === "madhab")?.ratio ?? 0),
@@ -115,14 +116,18 @@ async function main() {
 
   console.log(JSON.stringify(report, null, 2));
 
-  const belowCoverage = coverage.filter((item) => item.ratio < requiredCoverage);
+  const belowCoverage = coverage.filter(
+    (item) => item.ratio < requiredCoverage,
+  );
   const hardFailures: string[] = [];
   if (expectScholarCount > 0 && total < expectScholarCount) {
-    hardFailures.push(`scholar_count ${total} < expected ${expectScholarCount}`);
+    hardFailures.push(
+      `scholar_count ${total} < expected ${expectScholarCount}`,
+    );
   }
   if (invalidProfileRows.length > 0) {
     hardFailures.push(
-      `invalid_reputation_profile_rows=${invalidProfileRows.length} (must be 1..5)`
+      `invalid_reputation_profile_rows=${invalidProfileRows.length} (must be 1..5)`,
     );
   }
   if (duplicateBookIdRows.length > 0) {
@@ -130,7 +135,7 @@ async function main() {
   }
   if (strict && belowCoverage.length > 0) {
     hardFailures.push(
-      `coverage_below_threshold=${belowCoverage.map((x) => x.field).join(",")}`
+      `coverage_below_threshold=${belowCoverage.map((x) => x.field).join(",")}`,
     );
   }
 

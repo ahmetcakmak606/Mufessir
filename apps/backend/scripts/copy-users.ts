@@ -1,23 +1,23 @@
 #!/usr/bin/env tsx
-import { PrismaClient } from '@prisma/client';
-import { config } from 'dotenv';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { PrismaClient } from "@prisma/client";
+import { config } from "dotenv";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-config({ path: resolve(__dirname, '../.env') });
+config({ path: resolve(__dirname, "../.env") });
 
 const OLD_DATABASE_URL = process.env.OLD_DATABASE_URL;
 const NEW_DATABASE_URL = process.env.DATABASE_URL;
 
 if (!OLD_DATABASE_URL) {
-  throw new Error('OLD_DATABASE_URL is required.');
+  throw new Error("OLD_DATABASE_URL is required.");
 }
 
 if (!NEW_DATABASE_URL) {
-  throw new Error('DATABASE_URL is required.');
+  throw new Error("DATABASE_URL is required.");
 }
 
 const source = new PrismaClient({
@@ -37,7 +37,7 @@ async function main() {
   while (true) {
     const users = await source.user.findMany({
       take: BATCH_SIZE,
-      orderBy: { id: 'asc' },
+      orderBy: { id: "asc" },
       ...(lastId ? { cursor: { id: lastId }, skip: 1 } : {}),
     });
 
@@ -64,12 +64,12 @@ async function main() {
     console.log(`Copied users: ${total}`);
   }
 
-  console.log('User copy complete.');
+  console.log("User copy complete.");
 }
 
 main()
   .catch((err) => {
-    console.error('Copy failed:', err);
+    console.error("Copy failed:", err);
     process.exit(1);
   })
   .finally(async () => {

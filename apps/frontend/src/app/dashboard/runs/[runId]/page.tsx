@@ -1,14 +1,17 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { useLang } from '@/context/LangContext';
-import { locales } from '@/locales';
-import { CitationPanel } from '@/components/dashboard/CitationPanel';
-import { SourceSnippetPanel } from '@/components/dashboard/SourceSnippetPanel';
-import { useRunDetailQuery, useUpdateRunMutation } from '@/hooks/use-run-history';
-import { formatProvenance } from '@/lib/metadata-labels';
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useLang } from "@/context/LangContext";
+import { locales } from "@/locales";
+import { CitationPanel } from "@/components/dashboard/CitationPanel";
+import { SourceSnippetPanel } from "@/components/dashboard/SourceSnippetPanel";
+import {
+  useRunDetailQuery,
+  useUpdateRunMutation,
+} from "@/hooks/use-run-history";
+import { formatProvenance } from "@/lib/metadata-labels";
 
 function toRunId(param: string | string[] | undefined): string | undefined {
   if (!param) return undefined;
@@ -24,23 +27,23 @@ export default function RunDetailPage() {
   const runQuery = useRunDetailQuery(runId);
   const updateMutation = useUpdateRunMutation();
 
-  const [title, setTitle] = useState('');
-  const [notes, setNotes] = useState('');
-  const [status, setStatus] = useState('');
-  const [error, setError] = useState('');
+  const [title, setTitle] = useState("");
+  const [notes, setNotes] = useState("");
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!runQuery.data) return;
-    setTitle(runQuery.data.title || '');
-    setNotes(runQuery.data.notes || '');
+    setTitle(runQuery.data.title || "");
+    setNotes(runQuery.data.notes || "");
   }, [runQuery.data]);
 
   const run = runQuery.data;
 
   const saveMeta = async () => {
     if (!runId) return;
-    setStatus('');
-    setError('');
+    setStatus("");
+    setError("");
     try {
       await updateMutation.mutateAsync({
         runId,
@@ -57,8 +60,8 @@ export default function RunDetailPage() {
 
   const toggleStar = async () => {
     if (!runId || !run) return;
-    setStatus('');
-    setError('');
+    setStatus("");
+    setError("");
     try {
       await updateMutation.mutateAsync({
         runId,
@@ -82,8 +85,15 @@ export default function RunDetailPage() {
         <div className="space-y-3 px-4 py-5 sm:px-5 sm:py-6">
           <h2 className="ui-title text-lg font-semibold">{t.notFoundTitle}</h2>
           <p className="ui-muted text-sm">{t.notFoundText}</p>
-          {runQuery.error && <p className="ui-danger rounded-lg px-3 py-2 text-sm">{t.loadFailed}</p>}
-          <Link href="/dashboard/runs" className="ui-button-secondary w-fit px-3 py-2 text-sm">
+          {runQuery.error && (
+            <p className="ui-danger rounded-lg px-3 py-2 text-sm">
+              {t.loadFailed}
+            </p>
+          )}
+          <Link
+            href="/dashboard/runs"
+            className="ui-button-secondary w-fit px-3 py-2 text-sm"
+          >
             {t.backToRuns}
           </Link>
         </div>
@@ -98,21 +108,33 @@ export default function RunDetailPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="ui-title text-xl font-semibold">
-                {run.title || `${run.verse.surahName} ${run.verse.surahNumber}:${run.verse.verseNumber}`}
+                {run.title ||
+                  `${run.verse.surahName} ${run.verse.surahNumber}:${run.verse.verseNumber}`}
               </h2>
               <p className="ui-muted text-sm">
-                {run.verse.surahName} {run.verse.surahNumber}:{run.verse.verseNumber}
+                {run.verse.surahName} {run.verse.surahNumber}:
+                {run.verse.verseNumber}
               </p>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Link href={`/dashboard/query?runId=${run.runId}&replay=1`} className="ui-button px-3 py-2 text-xs">
+              <Link
+                href={`/dashboard/query?runId=${run.runId}&replay=1`}
+                className="ui-button px-3 py-2 text-xs"
+              >
                 {t.replay}
               </Link>
-              <button type="button" onClick={() => void toggleStar()} className="ui-button-secondary px-3 py-2 text-xs">
+              <button
+                type="button"
+                onClick={() => void toggleStar()}
+                className="ui-button-secondary px-3 py-2 text-xs"
+              >
                 {run.starred ? t.unstar : t.star}
               </button>
-              <Link href="/dashboard/runs" className="ui-button-secondary px-3 py-2 text-xs">
+              <Link
+                href="/dashboard/runs"
+                className="ui-button-secondary px-3 py-2 text-xs"
+              >
                 {t.backToRuns}
               </Link>
             </div>
@@ -120,11 +142,14 @@ export default function RunDetailPage() {
 
           <div className="flex flex-wrap gap-2 text-xs">
             <span className="ui-badge">
-              {t.confidence}:{' '}
-              {typeof run.confidence === 'number' ? `${Math.round(run.confidence * 100)}%` : t.notAvailable}
+              {t.confidence}:{" "}
+              {typeof run.confidence === "number"
+                ? `${Math.round(run.confidence * 100)}%`
+                : t.notAvailable}
             </span>
             <span className="ui-badge">
-              {t.provenance}: {formatProvenance(run.provenance, lang, t.notAvailable)}
+              {t.provenance}:{" "}
+              {formatProvenance(run.provenance, lang, t.notAvailable)}
             </span>
             <span className="ui-badge">
               {t.citations}: {run.citations.length}
@@ -137,8 +162,14 @@ export default function RunDetailPage() {
             </span>
           </div>
 
-          {status && <p className="ui-panel rounded-lg px-3 py-2 text-sm ui-muted">{status}</p>}
-          {error && <p className="ui-danger rounded-lg px-3 py-2 text-sm">{error}</p>}
+          {status && (
+            <p className="ui-panel rounded-lg px-3 py-2 text-sm ui-muted">
+              {status}
+            </p>
+          )}
+          {error && (
+            <p className="ui-danger rounded-lg px-3 py-2 text-sm">{error}</p>
+          )}
         </div>
       </section>
 
@@ -149,7 +180,9 @@ export default function RunDetailPage() {
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="space-y-1.5">
-              <span className="ui-muted block text-xs font-semibold uppercase tracking-[0.08em]">{t.titleLabel}</span>
+              <span className="ui-muted block text-xs font-semibold uppercase tracking-[0.08em]">
+                {t.titleLabel}
+              </span>
               <input
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
@@ -160,7 +193,9 @@ export default function RunDetailPage() {
           </div>
 
           <label className="space-y-1.5">
-            <span className="ui-muted block text-xs font-semibold uppercase tracking-[0.08em]">{t.notesLabel}</span>
+            <span className="ui-muted block text-xs font-semibold uppercase tracking-[0.08em]">
+              {t.notesLabel}
+            </span>
             <textarea
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
@@ -190,7 +225,11 @@ export default function RunDetailPage() {
         </div>
       </section>
 
-      <SourceSnippetPanel title={t.snippetsTitle} empty={t.emptySnippets} excerpts={run.sourceExcerpts} />
+      <SourceSnippetPanel
+        title={t.snippetsTitle}
+        empty={t.emptySnippets}
+        excerpts={run.sourceExcerpts}
+      />
       <CitationPanel
         title={t.citationsTitle}
         empty={t.emptyCitations}

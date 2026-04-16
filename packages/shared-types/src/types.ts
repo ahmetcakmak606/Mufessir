@@ -1,1 +1,4 @@
-export interface Tefsir { id: string; text: string; }
+export interface Tefsir {
+  id: string;
+  text: string;
+}
