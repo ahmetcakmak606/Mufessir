@@ -76,8 +76,8 @@ function getPeriodStatus(
   includeIds: Set<string>,
   excludeIds: Set<string>,
 ): PeriodStatus {
-  const included = scholars.filter((s) => includeIds.has(s.id)).length;
-  const excluded = scholars.filter((s) => excludeIds.has(s.id)).length;
+  const included = scholars.filter((s) => includeIds.has(String(s.id))).length;
+  const excluded = scholars.filter((s) => excludeIds.has(String(s.id))).length;
   const total = scholars.length;
 
   if (total === 0) return "none";
@@ -215,8 +215,9 @@ export function ScholarGroupPanel({
             </summary>
             <div className="mt-1 space-y-0.5 pl-1">
               {scholarsInPeriod.map((scholar) => {
-                const included = includeIds.has(scholar.id);
-                const excluded = excludeIds.has(scholar.id);
+                const scholarId = String(scholar.id);
+                const included = includeIds.has(scholarId);
+                const excluded = excludeIds.has(scholarId);
                 const score = scholar.reputationScore;
                 return (
                   <div
@@ -281,7 +282,7 @@ export function ScholarGroupPanel({
                     <div className="flex shrink-0 items-center space-x-1">
                       <button
                         type="button"
-                        onClick={() => onInclude(scholar.id)}
+                        onClick={() => onInclude(scholarId)}
                         className={`rounded p-1 ${
                           included
                             ? "text-[var(--brand)]"
@@ -305,7 +306,7 @@ export function ScholarGroupPanel({
                       </button>
                       <button
                         type="button"
-                        onClick={() => onExclude(scholar.id)}
+                        onClick={() => onExclude(scholarId)}
                         className={`rounded p-1 ${
                           excluded
                             ? "text-red-600"
@@ -330,7 +331,7 @@ export function ScholarGroupPanel({
                       {(included || excluded) && (
                         <button
                           type="button"
-                          onClick={() => onResetScholar(scholar.id)}
+                          onClick={() => onResetScholar(scholarId)}
                           className="ml-1 rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
                           title={labels.reset}
                         >

@@ -24,6 +24,7 @@ import {
   type SourceExcerpt,
 } from "../utils/citations.js";
 import { translateToTurkish } from "../utils/translation.js";
+import { prisma } from "../prisma.js";
 
 const router: Router = Router();
 
@@ -103,9 +104,6 @@ async function createAcademicSnapshot(params: {
     return null;
   }
 }
-
-const prisma: PrismaClient = (global as any).prisma || new PrismaClient();
-if (!(global as any).prisma) (global as any).prisma = prisma;
 
 // Optional DEMO mode: serve precomputed tafsir for selected verses
 const __filename = fileURLToPath(import.meta.url);
@@ -667,16 +665,41 @@ router.post(
       if (similarTafsirs.length === 0) {
         const sampleTafsirs = await prisma.tafsir.findMany({
           where: { verseId },
-          include: {
-            mufassir: true,
-            verse: true,
+          select: {
+            id: true,
+            verseId: true,
+            tafsirText: true,
+            mufassir: {
+              select: {
+                id: true,
+                nameEn: true,
+                nameTr: true,
+                nameAr: true,
+                century: true,
+                madhab: true,
+                period: true,
+                environment: true,
+                originCountry: true,
+                reputationScore: true,
+              },
+            },
+            verse: {
+              select: {
+                surahNumber: true,
+                verseNumber: true,
+              },
+            },
           },
           take: 3,
         });
 
         similarTafsirs = sampleTafsirs.map((tafsir: any) => ({
           tafsirId: tafsir.id,
-          scholarName: tafsir.mufassir.name,
+          scholarName:
+            tafsir.mufassir.nameEn ||
+            tafsir.mufassir.nameTr ||
+            tafsir.mufassir.nameAr ||
+            "Unknown",
           tafsirText: tafsir.tafsirText,
           similarityScore: 0.7, // Mock similarity score
           verseId: tafsir.verseId,
@@ -684,7 +707,11 @@ router.post(
           verseNumber: tafsir.verse.verseNumber,
           scholar: {
             id: tafsir.mufassir.id,
-            name: tafsir.mufassir.name,
+            name:
+              tafsir.mufassir.nameEn ||
+              tafsir.mufassir.nameTr ||
+              tafsir.mufassir.nameAr ||
+              "Unknown",
             century: tafsir.mufassir.century,
             madhab: tafsir.mufassir.madhab,
             period: tafsir.mufassir.period,

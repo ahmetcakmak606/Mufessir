@@ -133,7 +133,7 @@ export default function QueryWorkspacePage() {
       if (Array.isArray(prev.scholars)) return prev;
       return {
         ...prev,
-        scholars: availableFilters.scholars.map((scholar) => scholar.id),
+        scholars: availableFilters.scholars.map((s) => String(s.id)),
         excludeScholars: [],
       };
     });
@@ -488,12 +488,12 @@ export default function QueryWorkspacePage() {
   };
 
   const includeAll = () => {
-    const ids = filteredScholars.map((scholar) => scholar.id);
+    const ids = filteredScholars.map((scholar) => String(scholar.id));
     setFilters((prev) => ({ ...prev, scholars: ids, excludeScholars: [] }));
   };
 
   const excludeAll = () => {
-    const ids = filteredScholars.map((scholar) => scholar.id);
+    const ids = filteredScholars.map((scholar) => String(scholar.id));
     setFilters((prev) => ({ ...prev, scholars: [], excludeScholars: ids }));
   };
 

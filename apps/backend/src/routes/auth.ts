@@ -1,15 +1,12 @@
 import { Router, type Request, type Response } from "express";
 import jwt from "jsonwebtoken";
 import { hashPassword, verifyPassword } from "../utils/hash.js";
-import { PrismaClient } from "@prisma/client";
 import crypto, { type JsonWebKey as CryptoJsonWebKey } from "crypto";
 import { sendMail } from "../utils/email.js";
 import fetch from "node-fetch";
+import { prisma } from "../prisma.js";
 
 const router: Router = Router();
-
-const prisma: PrismaClient = (global as any).prisma || new PrismaClient();
-if (!(global as any).prisma) (global as any).prisma = prisma;
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();

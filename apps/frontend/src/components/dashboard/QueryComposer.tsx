@@ -335,7 +335,7 @@ export function QueryComposer({
               onIncludePeriod={(periodCode) => {
                 const ids = filteredScholars
                   .filter((s) => s.periodCode === periodCode)
-                  .map((s) => s.id);
+                  .map((s) => String(s.id));
                 const nextInclude = new Set([
                   ...(filters.scholars || []),
                   ...ids,
@@ -349,7 +349,7 @@ export function QueryComposer({
               onExcludePeriod={(periodCode) => {
                 const ids = filteredScholars
                   .filter((s) => s.periodCode === periodCode)
-                  .map((s) => s.id);
+                  .map((s) => String(s.id));
                 const nextExclude = new Set([
                   ...(filters.excludeScholars || []),
                   ...ids,

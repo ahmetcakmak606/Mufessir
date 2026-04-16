@@ -1,10 +1,7 @@
 import { Router, type Request, type Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../prisma.js";
 
 const router: Router = Router();
-
-const prisma: PrismaClient = (global as any).prisma || new PrismaClient();
-if (!(global as any).prisma) (global as any).prisma = prisma;
 
 // GET /verses?surahNumber=1&verseNumber=1 → returns a single verse by composite key
 router.get("/", async (req: Request, res: Response) => {

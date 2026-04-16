@@ -1,9 +1,7 @@
-import { config } from "dotenv";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
 import express, { type Express } from "express";
 import cors from "cors";
-import { PrismaClient } from "@prisma/client";
+import "./env.js";
+import { prisma } from "./prisma.js";
 import { requestLogger } from "./middleware/request-logger.js";
 import healthRouter from "./routes/health.js";
 import authRouter from "./routes/auth.js";
@@ -11,19 +9,7 @@ import tafseerRouter from "./routes/tafseer.js";
 import filtersRouter from "./routes/filters.js";
 import versesRouter from "./routes/verses.js";
 
-// Load .env from the backend directory when running locally
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const envPath = resolve(__dirname, "../.env");
-console.log("Loading .env from:", envPath);
-config({ path: envPath });
-
-console.log("DATABASE_URL loaded:", process.env.DATABASE_URL ? "YES" : "NO");
-
 const app: Express = express();
-
-// Initialize Prisma after dotenv config so DATABASE_URL is available
-const prisma = new PrismaClient();
 
 // Store prisma on app locals for access in routers
 app.locals.prisma = prisma;

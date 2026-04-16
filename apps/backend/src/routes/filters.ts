@@ -1,10 +1,7 @@
 import { Router, type Request, type Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../prisma.js";
 
 const router: Router = Router();
-
-const prisma: PrismaClient = (global as any).prisma || new PrismaClient();
-if (!(global as any).prisma) (global as any).prisma = prisma;
 
 // Public endpoint to get available filters
 router.get("/", async (_req: Request, res: Response) => {

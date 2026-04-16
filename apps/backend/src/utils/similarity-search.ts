@@ -45,7 +45,8 @@ export async function createQueryEmbedding(text: string): Promise<number[]> {
 }
 
 function mapTafsirResult(tafsir: any): SimilaritySearchResult {
-  const name = tafsir.mufassir.nameEn || tafsir.mufassir.nameTr || tafsir.mufassir.nameAr;
+  const name =
+    tafsir.mufassir.nameEn || tafsir.mufassir.nameTr || tafsir.mufassir.nameAr;
   const shortName = tafsir.mufassir.nameEn || tafsir.mufassir.nameTr;
   return {
     tafsirId: tafsir.id,
@@ -68,6 +69,32 @@ function mapTafsirResult(tafsir: any): SimilaritySearchResult {
   };
 }
 
+const tafsirSelection = {
+  id: true,
+  verseId: true,
+  tafsirText: true,
+  mufassir: {
+    select: {
+      id: true,
+      nameEn: true,
+      nameTr: true,
+      nameAr: true,
+      century: true,
+      madhab: true,
+      period: true,
+      environment: true,
+      originCountry: true,
+      reputationScore: true,
+    },
+  },
+  verse: {
+    select: {
+      surahNumber: true,
+      verseNumber: true,
+    },
+  },
+} as const;
+
 export async function performSimilaritySearch(
   prisma: PrismaClient,
   options: SimilaritySearchOptions,
@@ -88,7 +115,7 @@ export async function performSimilaritySearch(
   if (process.env.SIMILARITY_MODE === "sample" || !openai) {
     const sampleTafsirs = await prisma.tafsir.findMany({
       where: buildWhere(),
-      include: { mufassir: true, verse: true },
+      select: tafsirSelection,
       take: limit,
     });
     return sampleTafsirs.map(mapTafsirResult);
@@ -97,7 +124,7 @@ export async function performSimilaritySearch(
   try {
     const sampleTafsirs = await prisma.tafsir.findMany({
       where: buildWhere(),
-      include: { mufassir: true, verse: true },
+      select: tafsirSelection,
       take: limit,
     });
     if (sampleTafsirs.length === 0) return [];
@@ -135,7 +162,7 @@ export async function performSimilaritySearch(
     console.error("Similarity search error:", error);
     const sampleTafsirs = await prisma.tafsir.findMany({
       where: buildWhere(),
-      include: { mufassir: true, verse: true },
+      select: tafsirSelection,
       take: limit,
     });
     return sampleTafsirs.map(mapTafsirResult);
