@@ -10,7 +10,7 @@ COPY package-lock.json* ./
 RUN npm install
 
 COPY packages/database/prisma ./packages/database/prisma
-RUN cd packages/database && npx prisma generate && ls -la node_modules/.prisma/client/
+RUN cd packages/database && npx prisma generate
 
 COPY . .
 
