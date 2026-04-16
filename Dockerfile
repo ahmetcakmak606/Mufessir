@@ -12,6 +12,7 @@ RUN cd packages/database && npx prisma generate
 
 COPY . .
 
+# Build the backend app
 RUN npm run build --workspace=@mufessir/backend
 
 EXPOSE 4000
