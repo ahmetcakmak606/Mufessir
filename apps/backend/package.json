@@ -5,10 +5,9 @@
   "main": "dist/src/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "cd /app/packages/database && npx prisma generate && cd /app/apps/backend && tsc -p tsconfig.json",
+    "build": "bash -c \"test -d /app && cd /app/packages/database && npx prisma generate && cd /app/apps/backend && tsc -p tsconfig.json || (cd ../../packages/database && npx prisma generate && cd ../../apps/backend && tsc -p tsconfig.json)\"",
     "check-types": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/src/index.js",
-    "postinstall": "cd /app/packages/database && npx prisma generate",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:traceability": "vitest run tests/traceability.test.ts",
