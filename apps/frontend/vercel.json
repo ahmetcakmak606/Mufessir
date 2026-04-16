@@ -4,8 +4,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "env": {
-    "NEXT_PUBLIC_API_URL": "${VERCEL_BACKEND_URL}"
+    "NEXT_PUBLIC_API_URL": "https://mufessirbackend-production.up.railway.app"
   }
 }
-
-
