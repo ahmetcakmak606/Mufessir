@@ -10,11 +10,10 @@ COPY package-lock.json* ./
 RUN npm install
 
 COPY packages/database/prisma ./packages/database/prisma
-RUN cd packages/database && npx prisma generate
+RUN cd packages/database && npx prisma generate && ls -la node_modules/.prisma/client/
 
 COPY . .
 
-# Build the backend app
 RUN npm run build --workspace=@mufessir/backend
 
 EXPOSE 4000
