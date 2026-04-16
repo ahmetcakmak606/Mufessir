@@ -2,6 +2,8 @@ FROM node:18-slim
 
 WORKDIR /app
 
+RUN apt-get update -y && apt-get install -y openssl
+
 COPY package*.json packages/database/package*.json apps/backend/package*.json ./
 COPY package-lock.json* ./
 
