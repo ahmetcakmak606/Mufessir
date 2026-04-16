@@ -16,4 +16,4 @@ RUN cd apps/backend && npx tsc -p tsconfig.json
 
 EXPOSE 4000
 
-CMD ["node", "apps/backend/dist/src/index.js"]
+CMD ["node", "/app/apps/backend/dist/src/index.js"]
