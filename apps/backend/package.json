@@ -5,7 +5,7 @@
   "main": "dist/src/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "bash -c \"test -d /app && cd /app/packages/database && npx prisma generate && cd /app/apps/backend && node /app/node_modules/typescript/bin/tsc -p tsconfig.json || (cd ../../packages/database && npx prisma generate && cd ../../apps/backend && node ../../node_modules/typescript/bin/tsc -p tsconfig.json)\"",
+    "build": "tsc -p tsconfig.json",
     "check-types": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/src/index.js",
     "test": "vitest run",
