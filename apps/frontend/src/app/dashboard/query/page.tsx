@@ -143,7 +143,10 @@ export default function QueryWorkspacePage() {
     let items = (availableFilters?.scholars as ScholarOption[]) || [];
     if (scholarQuery.trim()) {
       const q = scholarQuery.toLowerCase();
-      items = items.filter((scholar) => scholar.name.toLowerCase().includes(q));
+      items = items.filter((scholar) => {
+        const name = scholar.nameTr || scholar.nameEn || "";
+        return name.toLowerCase().includes(q);
+      });
     }
     if (filters.periodCodes?.length) {
       items = items.filter(
@@ -156,20 +159,6 @@ export default function QueryWorkspacePage() {
       items = items.filter(
         (scholar) =>
           scholar.madhab && filters.madhabs?.includes(scholar.madhab),
-      );
-    }
-    if (filters.sourceAccessibilities?.length) {
-      items = items.filter(
-        (scholar) =>
-          scholar.sourceAccessibility &&
-          filters.sourceAccessibilities?.includes(scholar.sourceAccessibility),
-      );
-    }
-    if (filters.traditions?.length) {
-      items = items.filter((scholar) =>
-        scholar.traditionAcceptance.some((tag) =>
-          filters.traditions?.includes(tag),
-        ),
       );
     }
     if (filters.tafsirTypes?.length) {

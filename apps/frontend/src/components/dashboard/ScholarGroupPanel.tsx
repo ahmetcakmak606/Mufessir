@@ -233,9 +233,7 @@ export function ScholarGroupPanel({
                       <div className="flex items-center gap-2">
                         <p className="truncate text-sm font-medium text-[var(--text-primary)]">
                           {formatScholarName(
-                            scholar.mufassirTr ||
-                              scholar.mufassirEn ||
-                              scholar.name,
+                            scholar.nameTr || scholar.nameEn || "",
                           )}
                         </p>
                         {score !== null && score !== undefined && (

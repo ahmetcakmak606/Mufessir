@@ -16,12 +16,11 @@ export interface Filters {
 export type RunDraftFilters = Filters;
 
 export interface ScholarOption {
-  id: string;
-  name: string;
-  mufassirTr: string | null;
-  mufassirEn: string | null;
-  mufassirAr: string | null;
-  mufassirNameLong: string | null;
+  id: string | number;
+  nameEn: string;
+  nameTr: string | null;
+  nameAr: string | null;
+  nameLong: string | null;
   birthYear: number | null;
   deathYear: number | null;
   deathHijri: number | null;
@@ -32,11 +31,11 @@ export interface ScholarOption {
   environment: string | null;
   originCountry: string | null;
   reputationScore: number | null;
-  sourceAccessibility: string | null;
+  bookId: string | null;
   tafsirType1: string | null;
   tafsirType2: string | null;
-  traditionAcceptance: string[];
-  _count?: { references: number };
+  bookTafsir: string | null;
+  deathMiladi: number | null;
 }
 
 export interface FiltersResponse {
