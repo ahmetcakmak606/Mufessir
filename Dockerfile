@@ -12,7 +12,7 @@ RUN cd packages/database && npx prisma generate
 
 COPY . .
 
-RUN cd apps/backend && npx tsc -p tsconfig.json
+RUN npm run build --workspace=@mufessir/backend
 
 EXPOSE 4000
 
