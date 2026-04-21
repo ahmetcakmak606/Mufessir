@@ -1,7 +1,7 @@
 export const locales = {
   tr: {
     home: {
-      brand: "Müfessir",
+      brand: "MufessirAI",
       title: "Yapay Zeka Destekli Tefsir Platformu",
       subtitle:
         "Klasik İslami ilmin hikmetini modern yapay zeka ile buluşturun. Asırlık tefsir mirasına akıllı analiz ve kişiselleştirilebilir ayarlarla erişin.",
