@@ -1225,6 +1225,7 @@ router.post(
 
             const saveTafsirId =
               mostSimilar?.tafsirId || similarTafsirs[0]?.tafsirId;
+            let citationKey: string | undefined;
             if (saveTafsirId) {
               await prisma.searchResult.create({
                 data: {
@@ -1237,7 +1238,7 @@ router.post(
                 },
               });
 
-              await createAcademicSnapshot({
+              const snapshot = await createAcademicSnapshot({
                 verseId,
                 searchQuery,
                 promptOptions,
@@ -1249,41 +1250,28 @@ router.post(
                 provenance,
                 citations,
                 searchId: search.id,
-              }).then((snapshot) => {
-                if (snapshot) {
-                  res.write(
-                    `data: ${JSON.stringify({
-                      type: "complete",
-                      searchId: search.id,
-                      runId: search.id,
-                      usage: result.usage,
-                      confidence,
-                      provenance,
-                      citations,
-                      sourceExcerpts,
-                      arabicTafsir,
-                      turkishTafsir,
-                      citationKey: snapshot.citationKey,
-                    })}\n\n`,
-                  );
-                } else {
-                  res.write(
-                    `data: ${JSON.stringify({
-                      type: "complete",
-                      searchId: search.id,
-                      runId: search.id,
-                      usage: result.usage,
-                      confidence,
-                      provenance,
-                      citations,
-                      sourceExcerpts,
-                      arabicTafsir,
-                      turkishTafsir,
-                    })}\n\n`,
-                  );
-                }
               });
+              if (snapshot?.citationKey) {
+                citationKey = snapshot.citationKey;
+              }
             }
+
+            // Always emit a terminal complete event so frontend can finalize UI state.
+            res.write(
+              `data: ${JSON.stringify({
+                type: "complete",
+                searchId: search.id,
+                runId: search.id,
+                usage: result.usage,
+                confidence,
+                provenance,
+                citations,
+                sourceExcerpts,
+                arabicTafsir,
+                turkishTafsir,
+                citationKey,
+              })}\n\n`,
+            );
           } catch (streamError) {
             // Handle streaming errors
             res.write(
