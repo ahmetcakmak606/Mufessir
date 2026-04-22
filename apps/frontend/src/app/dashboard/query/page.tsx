@@ -260,6 +260,10 @@ export default function QueryWorkspacePage() {
     setStatus("");
     setIsAnalyzing(true);
     setStreamContent("");
+    setArabicTafsir(undefined);
+    setTurkishTafsir(undefined);
+    setNoTafsirMessage(null);
+    setMissingScholars([]);
     setUsage(null);
     setStartedAt(null);
     setFirstByteAt(null);
@@ -273,9 +277,9 @@ export default function QueryWorkspacePage() {
     let accumulated = "";
 
     try {
-      const verse = verseId
-        ? { id: verseId, surahNumber, surahName, verseNumber }
-        : await resolveVerse();
+      // Always resolve verse from the current selector values to avoid
+      // sending a stale verseId when user quickly changes surah/ayah.
+      const verse = await resolveVerse();
       const token = tokenStorage.get();
       if (!token) throw new Error(dashboard.notAuthenticated);
 
@@ -384,10 +388,6 @@ export default function QueryWorkspacePage() {
     }
   }, [
     user,
-    verseId,
-    surahNumber,
-    surahName,
-    verseNumber,
     resolveVerse,
     filters,
     lang,
