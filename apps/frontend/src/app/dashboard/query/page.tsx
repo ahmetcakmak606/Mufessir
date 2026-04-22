@@ -64,7 +64,6 @@ export default function QueryWorkspacePage() {
 
   const [surahNumber, setSurahNumber] = useState(1);
   const [verseNumber, setVerseNumber] = useState(1);
-  const [verseId, setVerseId] = useState("");
   const [surahName, setSurahName] = useState("");
   const [revelationType, setRevelationType] = useState<
     "Mekki" | "Medeni" | "UNKNOWN"
@@ -179,12 +178,11 @@ export default function QueryWorkspacePage() {
 
   const resolveVerse = useCallback(async () => {
     const verse = await fetchVerseByNumbers(surahNumber, verseNumber);
-    setVerseId(verse.id);
     setSurahName(verse.surahName);
     const meta = surahs.find((surah) => surah.number === surahNumber);
     setRevelationType(meta?.revelation || "UNKNOWN");
     return verse;
-  }, [surahNumber, verseNumber, surahs]);
+  }, [surahNumber, verseNumber]);
 
   useEffect(() => {
     let cancelled = false;
@@ -192,13 +190,11 @@ export default function QueryWorkspacePage() {
       try {
         const verse = await fetchVerseByNumbers(surahNumber, verseNumber);
         if (cancelled) return;
-        setVerseId(verse.id);
         setSurahName(verse.surahName);
         const meta = surahs.find((surah) => surah.number === surahNumber);
         setRevelationType(meta?.revelation || "UNKNOWN");
       } catch {
         if (cancelled) return;
-        setVerseId("");
         setSurahName("");
         setRevelationType("UNKNOWN");
       }
@@ -207,7 +203,7 @@ export default function QueryWorkspacePage() {
     return () => {
       cancelled = true;
     };
-  }, [surahNumber, verseNumber, surahs]);
+  }, [surahNumber, verseNumber]);
 
   useEffect(() => {
     const detail = runDetailQuery.data;
@@ -217,7 +213,6 @@ export default function QueryWorkspacePage() {
     setCurrentRunId(detail.runId);
     setSurahNumber(detail.verse.surahNumber);
     setVerseNumber(detail.verse.verseNumber);
-    setVerseId(detail.verse.id);
     setSurahName(detail.verse.surahName);
     setFilters({ ...defaultFilters, ...(detail.filters || {}) });
 
