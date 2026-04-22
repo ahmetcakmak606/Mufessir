@@ -610,6 +610,17 @@ router.post(
       const candidateVerseIds = await resolveTafsirVerseIds(verseId);
       const candidateVerseIdSet = new Set(candidateVerseIds);
 
+      const includeScholarIds = (
+        filters?.mufassirs && filters.mufassirs.length > 0
+          ? filters.mufassirs
+          : filters?.scholars || []
+      ).map(String);
+      const excludeScholarIds = (
+        filters?.excludeMufassirs && filters.excludeMufassirs.length > 0
+          ? filters.excludeMufassirs
+          : filters?.excludeScholars || []
+      ).map(String);
+
       // Perform vector similarity search to find relevant tafsirs
       // ALWAYS filter by verseId - semantic search should only find tafsirs FOR the queried verse
       let similarTafsirs: any[] = [];
@@ -617,16 +628,15 @@ router.post(
 
       // Check if user specified scholar filters
       const hasScholarFilter =
-        (filters?.mufassirs && filters.mufassirs.length > 0) ||
-        (filters?.excludeScholars && filters.excludeScholars.length > 0);
+        includeScholarIds.length > 0 || excludeScholarIds.length > 0;
 
       try {
         similarTafsirs = await performSimilaritySearch(prisma, {
           query: searchQuery,
           verseId: verseId,
           verseIds: candidateVerseIds,
-          scholarIds: filters?.mufassirs,
-          excludeScholarIds: filters?.excludeScholars,
+          scholarIds: includeScholarIds,
+          excludeScholarIds,
           methodTags: filters?.methodTags,
           limit: 5,
           minSimilarity: 0.3,
@@ -645,7 +655,7 @@ router.post(
       // If scholar filter was used but returned no results, return info message
       // instead of showing results from unselected scholars
       if (similarTafsirs.length === 0 && hasScholarFilter) {
-        const requestedScholarIds = filters?.mufassirs || [];
+        const requestedScholarIds = includeScholarIds;
 
         // Find which of the requested scholars have tafsir for this verse
         const existingTafsirs = await prisma.tafsir.findMany({
@@ -702,11 +712,82 @@ router.post(
           query: searchQuery,
           verseId,
           verseIds: candidateVerseIds,
+          scholarIds: includeScholarIds,
+          excludeScholarIds,
           limit: 3,
         });
         similarTafsirs = sampleTafsirs.map((result: any) => ({
           ...result,
           verseId,
+        }));
+      }
+
+      // Final DB fallback: if similarity lookup misses but tafsir rows exist,
+      // return deterministic rows from tafsir table.
+      if (similarTafsirs.length === 0) {
+        const fallbackRows = await prisma.tafsir.findMany({
+          where: {
+            verseId: { in: candidateVerseIds },
+            ...(includeScholarIds.length > 0
+              ? { mufassirId: { in: includeScholarIds.map(Number) } }
+              : {}),
+            ...(excludeScholarIds.length > 0
+              ? { mufassirId: { notIn: excludeScholarIds.map(Number) } }
+              : {}),
+            ...(filters?.methodTags && filters.methodTags.length > 0
+              ? { methodTags: { hasSome: filters.methodTags } }
+              : {}),
+          },
+          include: {
+            verse: {
+              select: { surahNumber: true, verseNumber: true },
+            },
+            mufassir: {
+              select: {
+                id: true,
+                nameEn: true,
+                nameTr: true,
+                nameAr: true,
+                century: true,
+                madhab: true,
+                period: true,
+                environment: true,
+                originCountry: true,
+                reputationScore: true,
+              },
+            },
+          },
+          take: 5,
+        });
+
+        similarTafsirs = fallbackRows.map((row: any) => ({
+          tafsirId: String(row.id),
+          scholarName: row.mufassir.nameTr || row.mufassir.nameEn || "Unknown",
+          tafsirText: row.tafsirText || "",
+          similarityScore: 0.8,
+          verseId,
+          surahNumber: row.verse?.surahNumber || verse.surahNumber,
+          verseNumber: row.verse?.verseNumber || verse.verseNumber,
+          scholar: {
+            id: String(row.mufassir.id),
+            name: row.mufassir.nameEn || row.mufassir.nameTr || "Unknown",
+            century: row.mufassir.century || 0,
+            madhab: row.mufassir.madhab,
+            period: row.mufassir.period,
+            environment: row.mufassir.environment,
+            originCountry: row.mufassir.originCountry,
+            reputationScore: row.mufassir.reputationScore,
+          },
+          mufassir: {
+            id: String(row.mufassir.id),
+            name: row.mufassir.nameTr || row.mufassir.nameEn || "Unknown",
+            century: row.mufassir.century || 0,
+            madhab: row.mufassir.madhab,
+            period: row.mufassir.period,
+            environment: row.mufassir.environment,
+            originCountry: row.mufassir.originCountry,
+            reputationScore: row.mufassir.reputationScore,
+          },
         }));
       }
 
