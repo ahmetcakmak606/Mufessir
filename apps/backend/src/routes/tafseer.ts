@@ -547,12 +547,19 @@ router.post(
   decrementQuota(prisma),
   async (req, res) => {
     try {
-      const resolveTafsirVerseIds = async (canonicalVerseId: string) => {
-        const verseIds = [canonicalVerseId];
-        const maybeComposite = canonicalVerseId.split("-");
-        if (maybeComposite.length !== 2) {
-          return verseIds;
-        }
+      const resolveTafsirVerseIds = async (params: {
+        canonicalVerseId: string;
+        surahNumber: number;
+        verseNumber: number;
+      }) => {
+        const { canonicalVerseId, surahNumber, verseNumber } = params;
+        const verseIds = new Set<string>([
+          canonicalVerseId,
+          // Legacy import formats seen across datasets/scripts.
+          `verse-${surahNumber}-${verseNumber}`,
+          `${surahNumber}:${verseNumber}`,
+          `${surahNumber}-${verseNumber}`,
+        ]);
 
         const [legacyRow] = await prisma.$queryRawUnsafe<
           Array<{ legacy_id: number }>
@@ -568,9 +575,9 @@ router.post(
         );
 
         if (legacyRow?.legacy_id) {
-          verseIds.push(String(legacyRow.legacy_id));
+          verseIds.add(String(legacyRow.legacy_id));
         }
-        return verseIds;
+        return Array.from(verseIds);
       };
 
       const {
@@ -607,7 +614,11 @@ router.post(
       // Build search query from verse text
       const searchQuery =
         `${verse.arabicText} ${verse.translation || ""}`.trim();
-      const candidateVerseIds = await resolveTafsirVerseIds(verseId);
+      const candidateVerseIds = await resolveTafsirVerseIds({
+        canonicalVerseId: verseId,
+        surahNumber: verse.surahNumber,
+        verseNumber: verse.verseNumber,
+      });
       const candidateVerseIdSet = new Set(candidateVerseIds);
 
       const includeScholarIds = (

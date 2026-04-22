@@ -122,7 +122,10 @@ async function runSampleSearch(
         id,
         surah_id,
         ayah_number,
-        ROW_NUMBER() OVER (ORDER BY surah_id ASC, ayah_number ASC)::text AS legacy_id
+        ROW_NUMBER() OVER (ORDER BY surah_id ASC, ayah_number ASC)::text AS legacy_id,
+        ('verse-' || surah_id::text || '-' || ayah_number::text) AS composite_id,
+        (surah_id::text || ':' || ayah_number::text) AS colon_id,
+        (surah_id::text || '-' || ayah_number::text) AS dash_id
       FROM ayahs
     )
     SELECT
@@ -141,7 +144,12 @@ async function runSampleSearch(
       m.reputation_score
     FROM all_tafsirs t
     JOIN mufassirs m ON m.mufassir_id = t.mufassir_id
-    JOIN ayah_map v ON t.verse_id = v.id OR t.verse_id = v.legacy_id
+    JOIN ayah_map v
+      ON t.verse_id = v.id
+      OR t.verse_id = v.legacy_id
+      OR t.verse_id = v.composite_id
+      OR t.verse_id = v.colon_id
+      OR t.verse_id = v.dash_id
     ${whereSql}
     ORDER BY t.id ASC
     LIMIT $${idx}
@@ -196,7 +204,43 @@ export async function performSimilaritySearch(
     const queryEmbedding = await createQueryEmbedding(options.query);
     const vectorLiteral = "[" + queryEmbedding.join(",") + "]";
 
-    const query = "SELECT t.id as tafsirId, m.name_en as scholarName, t.tafsir_text as tafsirText, 1 - (t.embedding <=> $1::vector) as similarityScore, t.verse_id as verseId, v.surah_number as surahNumber, v.ayah_number as verseNumber, m.mufassir_id as scholarId, m.century, m.madhab, m.period, m.environment, m.origin_country as originCountry, m.reputation_score as reputationScore FROM all_tafsirs t JOIN mufassirs m ON t.mufassir_id = m.mufassir_id JOIN ayahs v ON t.verse_id = v.id WHERE t.embedding IS NOT NULL ORDER BY t.embedding <=> $1::vector LIMIT $2";
+    const query = `
+      WITH ayah_map AS (
+        SELECT
+          id,
+          surah_id AS surah_number,
+          ayah_number,
+          ('verse-' || surah_id::text || '-' || ayah_number::text) AS composite_id,
+          (surah_id::text || ':' || ayah_number::text) AS colon_id,
+          (surah_id::text || '-' || ayah_number::text) AS dash_id
+        FROM ayahs
+      )
+      SELECT
+        t.id as tafsirId,
+        m.name_en as scholarName,
+        t.tafsir_text as tafsirText,
+        1 - (t.embedding <=> $1::vector) as similarityScore,
+        t.verse_id as verseId,
+        v.surah_number as surahNumber,
+        v.ayah_number as verseNumber,
+        m.mufassir_id as scholarId,
+        m.century,
+        m.madhab,
+        m.period,
+        m.environment,
+        m.origin_country as originCountry,
+        m.reputation_score as reputationScore
+      FROM all_tafsirs t
+      JOIN mufassirs m ON t.mufassir_id = m.mufassir_id
+      JOIN ayah_map v
+        ON t.verse_id = v.id
+        OR t.verse_id = v.composite_id
+        OR t.verse_id = v.colon_id
+        OR t.verse_id = v.dash_id
+      WHERE t.embedding IS NOT NULL
+      ORDER BY t.embedding <=> $1::vector
+      LIMIT $2
+    `;
 
     const results = await prisma.$queryRawUnsafe(query, vectorLiteral, limit);
 
