@@ -184,7 +184,7 @@ export default function QueryWorkspacePage() {
     const meta = surahs.find((surah) => surah.number === surahNumber);
     setRevelationType(meta?.revelation || "UNKNOWN");
     return verse;
-  }, [surahNumber, verseNumber]);
+  }, [surahNumber, verseNumber, surahs]);
 
   useEffect(() => {
     let cancelled = false;
@@ -207,7 +207,7 @@ export default function QueryWorkspacePage() {
     return () => {
       cancelled = true;
     };
-  }, [surahNumber, verseNumber]);
+  }, [surahNumber, verseNumber, surahs]);
 
   useEffect(() => {
     const detail = runDetailQuery.data;
