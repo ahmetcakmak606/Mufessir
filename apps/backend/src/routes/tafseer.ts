@@ -1012,6 +1012,7 @@ router.post(
             provenance: cachedProvenance,
             citations: cachedCitations,
             sourceExcerpts,
+            verseTextTr: verse.translation ?? null,
             searchId: existingSearch.id,
             runId: existingSearch.id,
             usage: null,
