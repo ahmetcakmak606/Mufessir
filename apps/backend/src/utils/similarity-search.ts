@@ -45,40 +45,6 @@ export async function createQueryEmbedding(text: string): Promise<number[]> {
   return embedding;
 }
 
-function mapTafsirResult(tafsir: any): SimilaritySearchResult & { mufassir: any } {
-  const name =
-    tafsir.mufassir.nameEn || tafsir.mufassir.nameTr || tafsir.mufassir.nameAr;
-  const shortName = tafsir.mufassir.nameEn || tafsir.mufassir.nameTr;
-  return {
-    tafsirId: tafsir.id,
-    scholarName: name,
-    tafsirText: tafsir.tafsirText,
-    similarityScore: 0.8,
-    verseId: tafsir.verseId,
-    surahNumber: tafsir.verse.surahNumber,
-    verseNumber: tafsir.verse.verseNumber,
-    scholar: {
-      id: String(tafsir.mufassir.id),
-      name: shortName,
-      century: tafsir.mufassir.century,
-      madhab: tafsir.mufassir.madhab,
-      period: tafsir.mufassir.period,
-      environment: tafsir.mufassir.environment,
-      originCountry: tafsir.mufassir.originCountry,
-      reputationScore: tafsir.mufassir.reputationScore,
-    },
-    mufassir: {
-      id: String(tafsir.mufassir.id),
-      name,
-      century: tafsir.mufassir.century,
-      madhab: tafsir.mufassir.madhab,
-      period: tafsir.mufassir.period,
-      environment: tafsir.mufassir.environment,
-      originCountry: tafsir.mufassir.originCountry,
-      reputationScore: tafsir.mufassir.reputationScore,
-    },
-  };
-}
 
 async function runSampleSearch(
   prisma: PrismaClient,
@@ -203,6 +169,38 @@ export async function performSimilaritySearch(
 
     const queryEmbedding = await createQueryEmbedding(options.query);
     const vectorLiteral = "[" + queryEmbedding.join(",") + "]";
+    const verseIds = options.verseIds?.length
+      ? options.verseIds
+      : options.verseId
+        ? [options.verseId]
+        : [];
+    const conditions: string[] = ["t.embedding IS NOT NULL"];
+    const params: unknown[] = [vectorLiteral];
+    let idx = 2;
+
+    if (verseIds.length > 0) {
+      conditions.push(`t.verse_id = ANY($${idx}::text[])`);
+      params.push(verseIds);
+      idx += 1;
+    }
+    if (options.scholarIds && options.scholarIds.length > 0) {
+      conditions.push(`t.mufassir_id = ANY($${idx}::int[])`);
+      params.push(options.scholarIds.map(Number));
+      idx += 1;
+    }
+    if (options.excludeScholarIds && options.excludeScholarIds.length > 0) {
+      conditions.push(`NOT (t.mufassir_id = ANY($${idx}::int[]))`);
+      params.push(options.excludeScholarIds.map(Number));
+      idx += 1;
+    }
+    if (options.methodTags && options.methodTags.length > 0) {
+      conditions.push(
+        `COALESCE(t.method_tags, ARRAY[]::text[]) && $${idx}::text[]`,
+      );
+      params.push(options.methodTags);
+      idx += 1;
+    }
+    const whereSql = conditions.join(" AND ");
 
     const query = `
       WITH ayah_map AS (
@@ -210,6 +208,7 @@ export async function performSimilaritySearch(
           id,
           surah_id AS surah_number,
           ayah_number,
+          ROW_NUMBER() OVER (ORDER BY surah_id ASC, ayah_number ASC)::text AS legacy_id,
           ('verse-' || surah_id::text || '-' || ayah_number::text) AS composite_id,
           (surah_id::text || ':' || ayah_number::text) AS colon_id,
           (surah_id::text || '-' || ayah_number::text) AS dash_id
@@ -217,8 +216,8 @@ export async function performSimilaritySearch(
       )
       SELECT
         t.id as tafsirId,
-        m.name_en as scholarName,
-        t.tafsir_text as tafsirText,
+        COALESCE(m.mufassir_en, m.mufassir_tr, m.mufassir_ar, 'Unknown') as scholarName,
+        t.commentary as tafsirText,
         1 - (t.embedding <=> $1::vector) as similarityScore,
         t.verse_id as verseId,
         v.surah_number as surahNumber,
@@ -234,15 +233,17 @@ export async function performSimilaritySearch(
       JOIN mufassirs m ON t.mufassir_id = m.mufassir_id
       JOIN ayah_map v
         ON t.verse_id = v.id
+        OR t.verse_id = v.legacy_id
         OR t.verse_id = v.composite_id
         OR t.verse_id = v.colon_id
         OR t.verse_id = v.dash_id
-      WHERE t.embedding IS NOT NULL
+      WHERE ${whereSql}
       ORDER BY t.embedding <=> $1::vector
-      LIMIT $2
+      LIMIT $${idx}
     `;
+    params.push(limit);
 
-    const results = await prisma.$queryRawUnsafe(query, vectorLiteral, limit);
+    const results = await prisma.$queryRawUnsafe(query, ...params);
 
     return (results as unknown[]).filter((r: unknown) => (r as any).similarityScore >= (options.minSimilarity || 0.5)).map((result: unknown) => {
       const res = result as Record<string, unknown>;
