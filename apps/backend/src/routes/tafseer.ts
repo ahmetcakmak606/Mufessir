@@ -991,6 +991,7 @@ router.post(
               provenance: cachedProvenance,
               citations: cachedCitations,
               sourceExcerpts,
+              verseTextTr: verse.translation ?? null,
             })}\n\n`,
           );
           res.end();
@@ -1291,6 +1292,7 @@ router.post(
                 arabicTafsir,
                 turkishTafsir,
                 citationKey,
+                verseTextTr: verse.translation ?? null,
               })}\n\n`,
             );
           } catch (streamError) {
@@ -1418,6 +1420,7 @@ router.post(
             aiResponse: aiResponse,
             arabicTafsir,
             turkishTafsir,
+            verseTextTr: verse.translation ?? null,
             similarityScore: mostSimilar?.similarityScore || null,
             confidence,
             provenance,

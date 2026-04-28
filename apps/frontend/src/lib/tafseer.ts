@@ -249,6 +249,7 @@ export type StreamEvent = {
   noTafsirForSelectedScholars?: boolean;
   noTafsirMessage?: string;
   missingScholarNames?: string[];
+  verseTextTr?: string | null;
 };
 
 export async function startTafseerStream(

@@ -97,6 +97,7 @@ export default function QueryWorkspacePage() {
   const [citations, setCitations] = useState<Citation[]>([]);
   const [sourceExcerpts, setSourceExcerpts] = useState<SourceExcerpt[]>([]);
   const [citationKey, setCitationKey] = useState<string | null>(null);
+  const [verseTextTr, setVerseTextTr] = useState<string | null>(null);
 
   const [comparisonRuns, setComparisonRuns] = useState<ComparisonRunModel>({
     primaryRun: null,
@@ -268,6 +269,7 @@ export default function QueryWorkspacePage() {
     setCitations([]);
     setSourceExcerpts([]);
     setCitationKey(null);
+    setVerseTextTr(null);
 
     let accumulated = "";
 
@@ -332,6 +334,9 @@ export default function QueryWorkspacePage() {
             }
             if (evt.citationKey) {
               setCitationKey(evt.citationKey);
+            }
+            if (evt.verseTextTr) {
+              setVerseTextTr(evt.verseTextTr);
             }
 
             // Handle case where selected scholars have no tafsir for this verse
@@ -682,6 +687,24 @@ export default function QueryWorkspacePage() {
               </div>
             )}
           </div>
+
+          {(verseTextTr || sourceExcerpts.length > 0) && (
+            <div className="space-y-3">
+              {verseTextTr && (
+                <div className="ui-panel-strong px-4 py-4">
+                  <p className="ui-muted mb-1 text-xs font-semibold uppercase tracking-wide">Ayet Meali</p>
+                  <p className="text-sm text-[var(--text-strong)] leading-relaxed">{verseTextTr}</p>
+                </div>
+              )}
+              {sourceExcerpts.length > 0 && (
+                <SourceSnippetPanel
+                  title={dashboard.snippetsTitle}
+                  empty={t.emptySnippets}
+                  excerpts={sourceExcerpts}
+                />
+              )}
+            </div>
+          )}
 
           <div className="ui-panel-strong px-4 py-4 xl:hidden">
             <div className="mb-3 flex flex-wrap gap-2">
