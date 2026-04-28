@@ -76,7 +76,7 @@ async function runSampleSearch(
     idx += 1;
   }
   if (options.methodTags && options.methodTags.length > 0) {
-    conditions.push(`COALESCE(t.method_tags, ARRAY[]::text[]) && $${idx}::text[]`);
+    conditions.push(`COALESCE(t."methodTags", ARRAY[]::text[]) && $${idx}::text[]`);
     params.push(options.methodTags);
     idx += 1;
   }
@@ -195,7 +195,7 @@ export async function performSimilaritySearch(
     }
     if (options.methodTags && options.methodTags.length > 0) {
       conditions.push(
-        `COALESCE(t.method_tags, ARRAY[]::text[]) && $${idx}::text[]`,
+        `COALESCE(t."methodTags", ARRAY[]::text[]) && $${idx}::text[]`,
       );
       params.push(options.methodTags);
       idx += 1;
