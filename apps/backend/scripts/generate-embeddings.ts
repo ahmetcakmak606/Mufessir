@@ -8,107 +8,71 @@ import OpenAI from "openai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-config({ path: resolve(__dirname, "../../../.env") });
 
-const prisma = new PrismaClient();
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-const BATCH_SIZE = 100;
-const MODEL = "text-embedding-3-small";
-
-interface TafsirRow {
-  id: string;
-  tafsirText: string;
+if (!process.env.DATABASE_URL) {
+  config({ path: resolve(__dirname, "../../../.env") });
 }
 
+const prisma = new PrismaClient();
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+const BATCH_SIZE = 50;
+const MODEL = "text-embedding-3-small";
+
 async function generateEmbedding(text: string): Promise<number[]> {
-  const response = await openai.embeddings.create({
-    model: MODEL,
-    input: text,
-  });
+  const response = await openai.embeddings.create({ model: MODEL, input: text });
   return response.data[0].embedding;
 }
 
-async function generateEmbeddings() {
-  console.log("Starting embedding generation...\n");
+async function main() {
+  console.log("Starting embedding generation (OpenAI text-embedding-3-small)...\n");
 
   const countResult = await prisma.$queryRawUnsafe<[{ count: bigint }]>(
-    `SELECT COUNT(*) as count FROM "Tafsir" WHERE embedding IS NULL`,
+    `SELECT COUNT(*) as count FROM all_tafsirs WHERE embedding IS NULL`,
   );
-  const totalTafsirs = Number(countResult[0]?.count || 0);
-
-  console.log(`Total tafsirs without embeddings: ${totalTafsirs}`);
+  const total = Number(countResult[0]?.count || 0);
+  console.log(`Tafsirs without embeddings: ${total}`);
 
   let processed = 0;
   let errors = 0;
 
   while (true) {
-    const tafsirs = await prisma.$queryRawUnsafe<TafsirRow[]>(
-      `SELECT id, "tafsirText" FROM "Tafsir" WHERE embedding IS NULL LIMIT ${BATCH_SIZE}`,
+    const rows = await prisma.$queryRawUnsafe<{ id: string; commentary: string }[]>(
+      `SELECT id, commentary FROM all_tafsirs WHERE embedding IS NULL AND LENGTH(commentary) > 20 LIMIT ${BATCH_SIZE}`,
     );
 
-    if (tafsirs.length === 0) {
-      console.log("\nNo more tafsirs to process!");
-      break;
-    }
+    if (rows.length === 0) break;
 
-    console.log(`Processing batch of ${tafsirs.length}...`);
+    console.log(`Processing batch of ${rows.length}...`);
 
-    for (const tafsir of tafsirs) {
+    for (const row of rows) {
       try {
-        if (!tafsir.tafsirText || tafsir.tafsirText.trim().length === 0) {
-          console.log(`  Skipping ${tafsir.id} - empty text`);
-          continue;
-        }
-
-        const embedding = await generateEmbedding(tafsir.tafsirText);
-
+        const embedding = await generateEmbedding(row.commentary);
         const vectorStr = `[${embedding.join(",")}]`;
-
-        await prisma.$executeRaw`
-          UPDATE "Tafsir"
-          SET embedding = ${vectorStr}::vector
-          WHERE id = ${tafsir.id}
-        `;
-
+        await prisma.$executeRawUnsafe(
+          `UPDATE all_tafsirs SET embedding = $1::vector WHERE id = $2`,
+          vectorStr,
+          row.id,
+        );
         processed++;
-        if (processed % 100 === 0) {
-          console.log(`  Processed ${processed} tafsirs...`);
-        }
+        if (processed % 50 === 0) console.log(`  Processed ${processed}...`);
       } catch (err) {
         errors++;
-        console.error(
-          `  Error processing ${tafsir.id}:`,
-          err instanceof Error ? err.message : "Unknown error",
-        );
-
-        if (
-          err instanceof Error &&
-          err.message.toLowerCase().includes("rate")
-        ) {
-          console.log("Rate limited, waiting 5 seconds...");
-          await new Promise((r) => setTimeout(r, 5000));
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`  Error on ${row.id}: ${msg}`);
+        if (msg.toLowerCase().includes("rate")) {
+          console.log("Rate limited, waiting 10s...");
+          await new Promise((r) => setTimeout(r, 10000));
         }
       }
     }
 
-    await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 200));
   }
 
-  console.log(`\n=== Summary ===`);
-  console.log(`Processed: ${processed}`);
-  console.log(`Errors: ${errors}`);
+  console.log(`\n=== Done ===`);
+  console.log(`Processed: ${processed}, Errors: ${errors}`);
+  await prisma.$disconnect();
 }
 
-async function main() {
-  try {
-    await generateEmbeddings();
-  } catch (error) {
-    console.error("Fatal error:", error);
-  } finally {
-    await prisma.$disconnect();
-  }
-}
-
-main();
+main().catch((e) => { console.error(e); process.exit(1); });
