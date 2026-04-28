@@ -1,0 +1,39 @@
+version: '3.9'
+
+services:
+  db:
+    image: ankane/pgvector:latest
+    container_name: mufessir-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: apps/backend
+      dockerfile: Dockerfile
+    container_name: mufessir-backend
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/mufessir
+      SHADOW_DB_URL: postgresql://postgres:postgres@db:5432/mufessir_shadow
+      JWT_SECRET: change_me_in_prod
+      FREE_DAILY_QUOTA: "10"
+      APP_URL: http://localhost:3000
+      SIMILARITY_MODE: sample
+    ports:
+      - "4000:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: npm run dev
