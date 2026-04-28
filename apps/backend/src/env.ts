@@ -17,6 +17,6 @@ for (const envPath of candidateEnvPaths) {
     continue;
   }
 
-  config({ path: envPath, override: true });
+  config({ path: envPath });
   break;
 }

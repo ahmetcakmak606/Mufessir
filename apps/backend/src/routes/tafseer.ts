@@ -602,10 +602,20 @@ router.post(
         return res.status(400).json({ error: "Verse ID is required" });
       }
 
-      // Get verse details
-      const verse = await prisma.verse.findUnique({
-        where: { id: verseId },
-      });
+      // Get verse details — try direct ID first, then parse surah:verse format
+      let verse = await prisma.verse.findUnique({ where: { id: verseId } });
+
+      if (!verse) {
+        const colonMatch = verseId.match(/^(\d+):(\d+)$/);
+        const dashMatch = verseId.match(/^(\d+)-(\d+)$/);
+        const verseMatch = verseId.match(/^verse-(\d+)-(\d+)$/);
+        const m = colonMatch || dashMatch || verseMatch;
+        if (m) {
+          verse = await prisma.verse.findUnique({
+            where: { surahNumber_verseNumber: { surahNumber: Number(m[1]), verseNumber: Number(m[2]) } },
+          });
+        }
+      }
 
       if (!verse) {
         return res.status(404).json({ error: "Verse not found" });
@@ -615,7 +625,7 @@ router.post(
       const searchQuery =
         `${verse.arabicText} ${verse.translation || ""}`.trim();
       const candidateVerseIds = await resolveTafsirVerseIds({
-        canonicalVerseId: verseId,
+        canonicalVerseId: verse.id,
         surahNumber: verse.surahNumber,
         verseNumber: verse.verseNumber,
       });
