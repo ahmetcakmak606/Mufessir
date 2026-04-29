@@ -624,7 +624,10 @@ router.post(
       }
 
       // Get verse details — try direct ID first, then parse surah:verse format
-      let verse = await prisma.verse.findUnique({ where: { id: verseId } });
+      // Guard: verseId may be undefined in range-only mode
+      let verse = verseId
+        ? await prisma.verse.findUnique({ where: { id: verseId } })
+        : null;
 
       if (!verse) {
         const colonMatch = verseId?.match(/^(\d+):(\d+)$/);
@@ -648,6 +651,10 @@ router.post(
 
       // For range mode ensure rangeVerses includes at least the anchor verse
       if (isRange && rangeVerses.length === 0) rangeVerses = [verse];
+
+      // Stable verse ID for cache keys and DB records — use the canonical DB id
+      // when verseId is undefined (range-only mode) to avoid null constraint errors.
+      const effectiveVerseId = verseId ?? verse.id;
 
       // Build search query from verse text(s)
       const searchQuery = isRange
@@ -703,7 +710,7 @@ router.post(
         similarTafsirs = similarTafsirs.map((result: any) => ({
           ...result,
           verseId: candidateVerseIdSet.has(result.verseId)
-            ? verseId
+            ? effectiveVerseId
             : result.verseId,
         }));
         usedScholarFilter = hasScholarFilter === true;
@@ -853,7 +860,7 @@ router.post(
       // Validate that retrieved sources are from the queried verse
       // This catches edge cases where vector search might return wrong results
       const sourceVerseMatch = similarTafsirs.every(
-        (t: any) => t.verseId === verseId || candidateVerseIdSet.has(t.verseId),
+        (t: any) => t.verseId === effectiveVerseId || candidateVerseIdSet.has(t.verseId),
       );
 
       // Log warning if source-verse mismatch detected
@@ -969,7 +976,7 @@ router.post(
 
       // Check for existing cached results using a stable cacheKey
       const cacheKey = JSON.stringify({
-        verseId,
+        verseId: effectiveVerseId,
         filters: filters || {},
         userId: (req as any).user!.id,
       });
@@ -977,7 +984,7 @@ router.post(
       const existingSearch = await prisma.search.findFirst({
         where: {
           userId: (req as any).user!.id,
-          verseId,
+          verseId: effectiveVerseId,
           query: {
             path: ["cacheKey"],
             equals: cacheKey,
@@ -1166,10 +1173,10 @@ router.post(
       const search = await prisma.search.create({
         data: {
           userId: (req as any).user!.id,
-          verseId,
+          verseId: effectiveVerseId,
           query: {
             filters,
-            verseId,
+            verseId: effectiveVerseId,
             cacheKey,
             timestamp: new Date().toISOString(),
           },
@@ -1308,7 +1315,7 @@ router.post(
               });
 
               const snapshot = await createAcademicSnapshot({
-                verseId,
+                verseId: effectiveVerseId,
                 searchQuery,
                 promptOptions,
                 aiResponse: arabicTafsir,
@@ -1445,7 +1452,7 @@ router.post(
             });
 
             const snapshot = await createAcademicSnapshot({
-              verseId,
+              verseId: effectiveVerseId,
               searchQuery,
               promptOptions,
               aiResponse: displayTafsir,
@@ -1546,7 +1553,7 @@ ${similarTafsirs
           });
 
           await createAcademicSnapshot({
-            verseId,
+            verseId: effectiveVerseId,
             searchQuery,
             promptOptions,
             aiResponse: fallbackResponse,

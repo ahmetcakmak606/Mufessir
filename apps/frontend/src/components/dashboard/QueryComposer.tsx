@@ -102,6 +102,7 @@ export function QueryComposer({
 }: QueryComposerProps) {
   const { lang } = useLang();
   const selectedLanguage = filters.language || "Turkish";
+  const maxVerse = surahOptions.find((s) => s.number === surahNumber)?.totalAyahs ?? 286;
 
   return (
     <div className="space-y-4">
@@ -134,9 +135,10 @@ export function QueryComposer({
               <input
                 type="number"
                 min={1}
+                max={maxVerse}
                 value={verseNumber}
                 onChange={(e) => {
-                  const v = Math.max(1, Number(e.target.value) || 1);
+                  const v = Math.min(maxVerse, Math.max(1, Number(e.target.value) || 1));
                   onVerseNumberChange(v);
                   if (endVerseNumber < v) onEndVerseNumberChange(v);
                 }}
@@ -150,10 +152,11 @@ export function QueryComposer({
               <input
                 type="number"
                 min={verseNumber}
+                max={maxVerse}
                 value={endVerseNumber}
                 onChange={(e) =>
                   onEndVerseNumberChange(
-                    Math.max(verseNumber, Number(e.target.value) || verseNumber),
+                    Math.min(maxVerse, Math.max(verseNumber, Number(e.target.value) || verseNumber)),
                   )
                 }
                 className="ui-input"

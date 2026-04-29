@@ -540,7 +540,11 @@ export default function QueryWorkspacePage() {
         canAnalyze={canAnalyze}
         isAnalyzing={isAnalyzing}
         error={error}
-        onSurahNumberChange={(v) => { setSurahNumber(v); setEndVerseNumber(verseNumber); }}
+        onSurahNumberChange={(v) => {
+          setSurahNumber(v);
+          setVerseNumber(1);
+          setEndVerseNumber(1);
+        }}
         onVerseNumberChange={(v) => { setVerseNumber(v); setEndVerseNumber(v); }}
         onEndVerseNumberChange={setEndVerseNumber}
         onFilterChange={setFilters}
