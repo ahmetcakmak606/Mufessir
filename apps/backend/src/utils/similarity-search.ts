@@ -13,6 +13,7 @@ export interface SimilaritySearchOptions {
   excludeScholarIds?: string[];
   minSimilarity?: number;
   methodTags?: string[];
+  rangeFilter?: { surahNumber: number; startVerse: number; endVerse: number };
 }
 
 export interface SimilaritySearchResult {
@@ -51,6 +52,7 @@ async function runSampleSearch(
   options: SimilaritySearchOptions,
   limit: number,
 ): Promise<Array<SimilaritySearchResult & { mufassir: any }>> {
+  const { rangeFilter } = options;
   const verseIds = options.verseIds?.length
     ? options.verseIds
     : options.verseId
@@ -60,11 +62,20 @@ async function runSampleSearch(
   const params: unknown[] = [];
   let idx = 1;
 
-  if (verseIds.length > 0) {
+  // When a rangeFilter is provided we constrain the ayah_map CTE by surah/verse
+  // range and skip the verse_id = ANY(...) condition entirely. This prevents
+  // false positives from legacy numeric IDs (e.g. '3') matching unrelated surahs.
+  let ayahMapFilter = "";
+  if (rangeFilter) {
+    ayahMapFilter = `WHERE surah_id = $${idx} AND ayah_number >= $${idx + 1} AND ayah_number <= $${idx + 2}`;
+    params.push(rangeFilter.surahNumber, rangeFilter.startVerse, rangeFilter.endVerse);
+    idx += 3;
+  } else if (verseIds.length > 0) {
     conditions.push(`t.verse_id = ANY($${idx}::text[])`);
     params.push(verseIds);
     idx += 1;
   }
+
   if (options.scholarIds && options.scholarIds.length > 0) {
     conditions.push(`t.mufassir_id = ANY($${idx}::int[])`);
     params.push(options.scholarIds.map(Number));
@@ -93,6 +104,7 @@ async function runSampleSearch(
         (surah_id::text || ':' || ayah_number::text) AS colon_id,
         (surah_id::text || '-' || ayah_number::text) AS dash_id
       FROM ayahs
+      ${ayahMapFilter}
     )
     SELECT
       t.id::text AS tafsir_id,
@@ -169,6 +181,7 @@ export async function performSimilaritySearch(
 
     const queryEmbedding = await createQueryEmbedding(options.query);
     const vectorLiteral = "[" + queryEmbedding.join(",") + "]";
+    const { rangeFilter } = options;
     const verseIds = options.verseIds?.length
       ? options.verseIds
       : options.verseId
@@ -178,11 +191,17 @@ export async function performSimilaritySearch(
     const params: unknown[] = [vectorLiteral];
     let idx = 2;
 
-    if (verseIds.length > 0) {
+    let ayahMapFilter = "";
+    if (rangeFilter) {
+      ayahMapFilter = `WHERE surah_id = $${idx} AND ayah_number >= $${idx + 1} AND ayah_number <= $${idx + 2}`;
+      params.push(rangeFilter.surahNumber, rangeFilter.startVerse, rangeFilter.endVerse);
+      idx += 3;
+    } else if (verseIds.length > 0) {
       conditions.push(`t.verse_id = ANY($${idx}::text[])`);
       params.push(verseIds);
       idx += 1;
     }
+
     if (options.scholarIds && options.scholarIds.length > 0) {
       conditions.push(`t.mufassir_id = ANY($${idx}::int[])`);
       params.push(options.scholarIds.map(Number));
@@ -213,6 +232,7 @@ export async function performSimilaritySearch(
           (surah_id::text || ':' || ayah_number::text) AS colon_id,
           (surah_id::text || '-' || ayah_number::text) AS dash_id
         FROM ayahs
+        ${ayahMapFilter}
       )
       SELECT
         t.id as tafsirId,
@@ -245,7 +265,7 @@ export async function performSimilaritySearch(
 
     const results = await prisma.$queryRawUnsafe(query, ...params);
 
-    return (results as unknown[]).filter((r: unknown) => (r as any).similarityScore >= (options.minSimilarity || 0.5)).map((result: unknown) => {
+    const vectorResults = (results as unknown[]).filter((r: unknown) => (r as any).similarityScore >= (options.minSimilarity || 0.5)).map((result: unknown) => {
       const res = result as Record<string, unknown>;
       return {
         tafsirId: String(res.tafsirId),
@@ -267,6 +287,7 @@ export async function performSimilaritySearch(
         },
       };
     });
+    return vectorResults.length > 0 ? vectorResults : sampleTafsirs;
   } catch (error) {
     console.error("Similarity search error:", error);
     return runSampleSearch(prisma, options, limit);

@@ -706,6 +706,13 @@ router.post(
           methodTags: filters?.methodTags,
           limit: isRange ? Math.min(rangeVerses.length * 3, 15) : 5,
           minSimilarity: 0.3,
+          rangeFilter: isRange
+            ? {
+                surahNumber: verseRange!.surahNumber,
+                startVerse: verseRange!.startVerse,
+                endVerse: Math.min(verseRange!.endVerse, verseRange!.startVerse + 9),
+              }
+            : undefined,
         });
         similarTafsirs = similarTafsirs.map((result: any) => ({
           ...result,
@@ -781,10 +788,17 @@ router.post(
           scholarIds: includeScholarIds,
           excludeScholarIds,
           limit: 3,
+          rangeFilter: isRange
+            ? {
+                surahNumber: verseRange!.surahNumber,
+                startVerse: verseRange!.startVerse,
+                endVerse: Math.min(verseRange!.endVerse, verseRange!.startVerse + 9),
+              }
+            : undefined,
         });
         similarTafsirs = sampleTafsirs.map((result: any) => ({
           ...result,
-          verseId,
+          verseId: effectiveVerseId,
         }));
       }
 
@@ -1206,15 +1220,29 @@ router.post(
             requestedLang === "Turkish" ? "Meal" : "Meaning";
           const tafsirHeader =
             requestedLang === "Turkish" ? "Tefsir" : "Tafsir";
-          const prefaceLines = [
-            `Arabic: ${verse.arabicText}`,
-            verse.translation
-              ? `${translationLabel}: ${verse.translation}`
-              : undefined,
-            "",
-            `${tafsirHeader}:`,
-            "",
-          ]
+          const prefaceLines = (
+            isRange && rangeVerses.length > 1
+              ? [
+                  ...rangeVerses.flatMap((v) => [
+                    `Arabic (${v!.verseNumber}): ${v!.arabicText}`,
+                    v!.translation
+                      ? `${translationLabel} (${v!.verseNumber}): ${v!.translation}`
+                      : undefined,
+                  ]),
+                  "",
+                  `${tafsirHeader}:`,
+                  "",
+                ]
+              : [
+                  `Arabic: ${verse.arabicText}`,
+                  verse.translation
+                    ? `${translationLabel}: ${verse.translation}`
+                    : undefined,
+                  "",
+                  `${tafsirHeader}:`,
+                  "",
+                ]
+          )
             .filter(Boolean)
             .join("\n");
           res.write(
@@ -1412,12 +1440,32 @@ router.post(
           // Use Turkish if requested, otherwise Arabic
           const displayTafsir =
             requestedLang === "Turkish" ? turkishTafsir : arabicTafsir;
-          const preface =
-            `Arabic: ${verse.arabicText}\n` +
-            (verse.translation
-              ? `${translationLabel}: ${verse.translation}\n\n${tafsirHeader}:\n`
-              : `\n${tafsirHeader}:\n`);
-          aiResponse = preface + displayTafsir;
+          const preface = (
+            isRange && rangeVerses.length > 1
+              ? [
+                  ...rangeVerses.flatMap((v) => [
+                    `Arabic (${v!.verseNumber}): ${v!.arabicText}`,
+                    v!.translation
+                      ? `${translationLabel} (${v!.verseNumber}): ${v!.translation}`
+                      : undefined,
+                  ]),
+                  "",
+                  `${tafsirHeader}:`,
+                  "",
+                ]
+              : [
+                  `Arabic: ${verse.arabicText}`,
+                  verse.translation
+                    ? `${translationLabel}: ${verse.translation}`
+                    : undefined,
+                  "",
+                  `${tafsirHeader}:`,
+                  "",
+                ]
+          )
+            .filter(Boolean)
+            .join("\n");
+          aiResponse = preface + "\n" + displayTafsir;
 
           // Calculate similarity to existing tafsirs
           const mostSimilar = await findMostSimilarTafsir(
