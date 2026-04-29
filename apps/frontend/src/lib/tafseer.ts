@@ -80,8 +80,15 @@ export interface SourceExcerpt {
 
 export type ProvenanceIndicator = "PRIMARY" | "MIXED" | "NONE";
 
+export interface VerseRange {
+  surahNumber: number;
+  startVerse: number;
+  endVerse: number;
+}
+
 export interface TafseerRequestBody {
-  verseId: string;
+  verseId?: string;
+  verseRange?: VerseRange;
   filters?: Filters;
   stream?: boolean;
 }
@@ -250,6 +257,7 @@ export type StreamEvent = {
   noTafsirMessage?: string;
   missingScholarNames?: string[];
   verseTextTr?: string | null;
+  verseRange?: { surahNumber: number; startVerse: number; endVerse: number; verseCount: number };
 };
 
 export async function startTafseerStream(

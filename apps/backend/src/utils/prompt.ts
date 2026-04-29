@@ -8,9 +8,17 @@ export interface ScholarMeta {
   reputationScore?: number;
 }
 
+export interface VerseEntry {
+  verseNumber: number;
+  arabicText: string;
+  translation?: string | null;
+}
+
 export interface PromptOptions {
   verseText: string;
   translation?: string;
+  /** When summarising a range, all verses are passed here (overrides verseText/translation). */
+  verses?: VerseEntry[];
   tafsirExcerpts: Array<{
     scholar: ScholarMeta;
     excerpt: string;
@@ -41,6 +49,7 @@ export function buildTafsirPrompt(opts: PromptOptions): string {
   const {
     verseText,
     translation,
+    verses,
     tafsirExcerpts,
     citations = [],
     arabicTerms = [],
@@ -48,11 +57,23 @@ export function buildTafsirPrompt(opts: PromptOptions): string {
     scholarAnalysis,
   } = opts;
 
-  let prompt = `You are an expert Islamic scholar and linguist. Your task is to generate a tafsir (exegesis) for the following Quranic verse, using ONLY the provided context and scholar excerpts.\n\n`;
+  const isRange = verses && verses.length > 1;
 
-  prompt += `Verse (Arabic):\n${verseText}\n`;
-  if (translation) {
-    prompt += `Translation:\n${translation}\n`;
+  let prompt = isRange
+    ? `You are an expert Islamic scholar and linguist. Your task is to generate a unified tafsir SUMMARY for the following range of Quranic verses, using ONLY the provided scholar excerpts. Synthesise the themes and meanings across the entire passage.\n\n`
+    : `You are an expert Islamic scholar and linguist. Your task is to generate a tafsir (exegesis) for the following Quranic verse, using ONLY the provided context and scholar excerpts.\n\n`;
+
+  if (isRange) {
+    prompt += `Verse Range (${verses.length} verses):\n`;
+    for (const v of verses) {
+      prompt += `[Verse ${v.verseNumber}] ${v.arabicText}\n`;
+      if (v.translation) prompt += `  Translation: ${v.translation}\n`;
+    }
+  } else {
+    prompt += `Verse (Arabic):\n${verseText}\n`;
+    if (translation) {
+      prompt += `Translation:\n${translation}\n`;
+    }
   }
 
   // Include key Arabic terms from sources to boost similarity
@@ -100,6 +121,9 @@ export function buildTafsirPrompt(opts: PromptOptions): string {
   prompt += `2. You MUST base your answer ONLY on the provided tafsir excerpts above.\n`;
   prompt += `3. Do NOT use any knowledge from your training data. If the provided excerpts don't contain enough information, acknowledge that limitation.\n`;
   prompt += `4. Quote or paraphrase specific phrases from the provided excerpts when making claims.\n`;
+  if (isRange) {
+    prompt += `4b. You are summarising a PASSAGE of ${verses.length} verses. Address all verses as a unified whole; identify the central theme and the progression of meaning across the passage.\n`;
+  }
 
   // Dynamic instruction based on scholar count
   if (scholarAnalysis && scholarAnalysis.totalScholars > 3) {
@@ -109,12 +133,12 @@ export function buildTafsirPrompt(opts: PromptOptions): string {
   }
 
   prompt += `6. Do NOT make up information, citations, or references not present in the provided excerpts.\n`;
-  prompt += `7. If you cannot answer based on the provided sources, state: "لا تتوفر معلومات كافية في المصادر المقدمة حول هذه الآية." (There is insufficient information in the provided sources about this verse.)\n`;
+  prompt += `7. If you cannot answer based on the provided sources, state: "${isRange ? "لا تتوفر معلومات كافية في المصادر المقدمة حول هذه الآيات." : "لا تتوفر معلومات كافية في المصادر المقدمة حول هذه الآية."}" (There is insufficient information in the provided sources about this ${isRange ? "passage" : "verse"}.)\n`;
   prompt += `8. MUST include these Arabic terms VERBATIM in your response: ${arabicTerms.join(", ")}\n`;
   prompt += `\nAdditional Instructions:\n`;
   prompt += `- Write the tafsir in Arabic (العربية).\n`;
   prompt += `- Keep statements traceable to provided excerpts; avoid unsupported claims.\n`;
-  prompt += `- Do NOT repeat the verse text or its translation in your answer. Start directly with the tafsir.\n`;
+  prompt += `- Do NOT repeat the verse text${isRange ? "s" : ""} or ${isRange ? "their" : "its"} translation in your answer. Start directly with the tafsir.\n`;
   prompt += `- Output should be scholarly, clear, and reference the scholars by name where relevant.\n`;
   prompt += `- Include Arabic technical terms from the provided excerpts when discussing concepts.\n`;
   prompt += `- When Response Length is provided, keep the output approximately within that scale: 1-3 sentences (1-3), 1-2 short paragraphs (4-6), 3-6 paragraphs (7-8), longer analytical essay (9-10).\n`;

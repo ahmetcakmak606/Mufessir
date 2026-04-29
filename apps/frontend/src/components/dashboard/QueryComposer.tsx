@@ -17,6 +17,7 @@ import {
 interface QueryComposerProps {
   surahNumber: number;
   verseNumber: number;
+  endVerseNumber: number;
   surahName: string;
   revelationLabel: string;
   surahOptions: SurahMeta[];
@@ -32,6 +33,7 @@ interface QueryComposerProps {
   error: string;
   onSurahNumberChange: (value: number) => void;
   onVerseNumberChange: (value: number) => void;
+  onEndVerseNumberChange: (value: number) => void;
   onFilterChange: (next: RunDraftFilters) => void;
   onScholarQueryChange: (value: string) => void;
   onInclude: (id: string) => void;
@@ -44,6 +46,8 @@ interface QueryComposerProps {
     verseTitle: string;
     surahLabel: string;
     verseLabel: string;
+    startVerseLabel: string;
+    endVerseLabel: string;
     revelationType: string;
     filtersTitle: string;
     methodLabel: string;
@@ -69,6 +73,7 @@ interface QueryComposerProps {
 export function QueryComposer({
   surahNumber,
   verseNumber,
+  endVerseNumber,
   surahName,
   revelationLabel,
   surahOptions,
@@ -84,6 +89,7 @@ export function QueryComposer({
   error,
   onSurahNumberChange,
   onVerseNumberChange,
+  onEndVerseNumberChange,
   onFilterChange,
   onScholarQueryChange,
   onInclude,
@@ -104,7 +110,7 @@ export function QueryComposer({
           <h3 className="ui-title text-lg font-semibold">
             {labels.verseTitle}
           </h3>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="ui-muted mb-1 block text-xs font-semibold uppercase tracking-[0.08em]">
                 {labels.surahLabel}
@@ -123,14 +129,32 @@ export function QueryComposer({
             </div>
             <div>
               <label className="ui-muted mb-1 block text-xs font-semibold uppercase tracking-[0.08em]">
-                {labels.verseLabel}
+                {labels.startVerseLabel}
               </label>
               <input
                 type="number"
                 min={1}
                 value={verseNumber}
+                onChange={(e) => {
+                  const v = Math.max(1, Number(e.target.value) || 1);
+                  onVerseNumberChange(v);
+                  if (endVerseNumber < v) onEndVerseNumberChange(v);
+                }}
+                className="ui-input"
+              />
+            </div>
+            <div>
+              <label className="ui-muted mb-1 block text-xs font-semibold uppercase tracking-[0.08em]">
+                {labels.endVerseLabel}
+              </label>
+              <input
+                type="number"
+                min={verseNumber}
+                value={endVerseNumber}
                 onChange={(e) =>
-                  onVerseNumberChange(Math.max(1, Number(e.target.value) || 1))
+                  onEndVerseNumberChange(
+                    Math.max(verseNumber, Number(e.target.value) || verseNumber),
+                  )
                 }
                 className="ui-input"
               />
@@ -139,6 +163,11 @@ export function QueryComposer({
           <div className="ui-muted flex items-center justify-between text-xs">
             <p>
               {labels.surahLabel}: {surahNumber} · {surahName}
+              {endVerseNumber > verseNumber && (
+                <span className="ml-1 font-medium">
+                  ({verseNumber}–{endVerseNumber})
+                </span>
+              )}
             </p>
             <p>
               {labels.revelationType}: {revelationLabel}

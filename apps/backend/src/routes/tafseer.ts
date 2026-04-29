@@ -582,10 +582,12 @@ router.post(
 
       const {
         verseId,
+        verseRange,
         filters,
         stream = false,
       } = req.body as {
         verseId: string;
+        verseRange?: { surahNumber: number; startVerse: number; endVerse: number };
         filters?: {
           scholars?: string[];
           excludeScholars?: string[];
@@ -598,22 +600,45 @@ router.post(
         stream?: boolean;
       };
 
-      if (!verseId) {
+      if (!verseId && !verseRange) {
         return res.status(400).json({ error: "Verse ID is required" });
+      }
+
+      // Resolve verse range: fetch all verses in range (max 10)
+      const isRange = verseRange && verseRange.endVerse > verseRange.startVerse;
+      let rangeVerses: typeof verse[] = [];
+
+      if (isRange) {
+        const start = verseRange.startVerse;
+        const end = Math.min(verseRange.endVerse, start + 9); // cap at 10 verses
+        rangeVerses = await prisma.verse.findMany({
+          where: {
+            surahNumber: verseRange.surahNumber,
+            verseNumber: { gte: start, lte: end },
+          },
+          orderBy: { verseNumber: "asc" },
+        });
+        if (rangeVerses.length === 0) {
+          return res.status(404).json({ error: "No verses found in range" });
+        }
       }
 
       // Get verse details — try direct ID first, then parse surah:verse format
       let verse = await prisma.verse.findUnique({ where: { id: verseId } });
 
       if (!verse) {
-        const colonMatch = verseId.match(/^(\d+):(\d+)$/);
-        const dashMatch = verseId.match(/^(\d+)-(\d+)$/);
-        const verseMatch = verseId.match(/^verse-(\d+)-(\d+)$/);
+        const colonMatch = verseId?.match(/^(\d+):(\d+)$/);
+        const dashMatch = verseId?.match(/^(\d+)-(\d+)$/);
+        const verseMatch = verseId?.match(/^verse-(\d+)-(\d+)$/);
         const m = colonMatch || dashMatch || verseMatch;
         if (m) {
           verse = await prisma.verse.findUnique({
             where: { surahNumber_verseNumber: { surahNumber: Number(m[1]), verseNumber: Number(m[2]) } },
           });
+        }
+        // For range mode derive first verse from rangeVerses
+        if (!verse && isRange && rangeVerses[0]) {
+          verse = rangeVerses[0] as NonNullable<typeof verse>;
         }
       }
 
@@ -621,14 +646,27 @@ router.post(
         return res.status(404).json({ error: "Verse not found" });
       }
 
-      // Build search query from verse text
-      const searchQuery =
-        `${verse.arabicText} ${verse.translation || ""}`.trim();
-      const candidateVerseIds = await resolveTafsirVerseIds({
-        canonicalVerseId: verse.id,
-        surahNumber: verse.surahNumber,
-        verseNumber: verse.verseNumber,
-      });
+      // For range mode ensure rangeVerses includes at least the anchor verse
+      if (isRange && rangeVerses.length === 0) rangeVerses = [verse];
+
+      // Build search query from verse text(s)
+      const searchQuery = isRange
+        ? rangeVerses.map((v) => `${v!.arabicText} ${v!.translation || ""}`).join(" ").trim()
+        : `${verse.arabicText} ${verse.translation || ""}`.trim();
+
+      // Collect candidate verse IDs for all verses in the range
+      const allCandidateIds: string[] = [];
+      const versesToResolve = isRange ? rangeVerses : [verse];
+      for (const v of versesToResolve) {
+        if (!v) continue;
+        const ids = await resolveTafsirVerseIds({
+          canonicalVerseId: v.id,
+          surahNumber: v.surahNumber,
+          verseNumber: v.verseNumber,
+        });
+        allCandidateIds.push(...ids);
+      }
+      const candidateVerseIds = [...new Set(allCandidateIds)];
       const candidateVerseIdSet = new Set(candidateVerseIds);
 
       const includeScholarIds = (
@@ -659,7 +697,7 @@ router.post(
           scholarIds: includeScholarIds,
           excludeScholarIds,
           methodTags: filters?.methodTags,
-          limit: 5,
+          limit: isRange ? Math.min(rangeVerses.length * 3, 15) : 5,
           minSimilarity: 0.3,
         });
         similarTafsirs = similarTafsirs.map((result: any) => ({
@@ -888,10 +926,18 @@ router.post(
       // Analyze scholars for patterns (madhab, period, tradition)
       const scholarAnalysis = analyzeScholarGroup(similarTafsirs);
 
+      const sliceLimit = isRange ? Math.min(rangeVerses.length * 3, 15) : 5;
       const promptOptions = {
         verseText: verse.arabicText,
         translation: verse.translation || undefined,
-        tafsirExcerpts: similarTafsirs.slice(0, 5).map((result: any) => ({
+        verses: isRange
+          ? rangeVerses.map((v) => ({
+              verseNumber: v!.verseNumber,
+              arabicText: v!.arabicText,
+              translation: v!.translation ?? undefined,
+            }))
+          : undefined,
+        tafsirExcerpts: similarTafsirs.slice(0, sliceLimit).map((result: any) => ({
           scholar: {
             name: result.mufassir.name,
             century: result.mufassir.century,
@@ -1294,6 +1340,14 @@ router.post(
                 turkishTafsir,
                 citationKey,
                 verseTextTr: verse.translation ?? null,
+                verseRange: isRange
+                  ? {
+                      surahNumber: rangeVerses[0]!.surahNumber,
+                      startVerse: rangeVerses[0]!.verseNumber,
+                      endVerse: rangeVerses[rangeVerses.length - 1]!.verseNumber,
+                      verseCount: rangeVerses.length,
+                    }
+                  : undefined,
               })}\n\n`,
             );
           } catch (streamError) {
@@ -1432,6 +1486,14 @@ router.post(
             runId: search.id,
             usage: result.usage,
             citationKey,
+            verseRange: isRange
+              ? {
+                  surahNumber: rangeVerses[0]!.surahNumber,
+                  startVerse: rangeVerses[0]!.verseNumber,
+                  endVerse: rangeVerses[rangeVerses.length - 1]!.verseNumber,
+                  verseCount: rangeVerses.length,
+                }
+              : undefined,
           });
         }
       } catch (openaiError) {

@@ -64,6 +64,7 @@ export default function QueryWorkspacePage() {
 
   const [surahNumber, setSurahNumber] = useState(1);
   const [verseNumber, setVerseNumber] = useState(1);
+  const [endVerseNumber, setEndVerseNumber] = useState(1);
   const [surahName, setSurahName] = useState("");
   const [revelationType, setRevelationType] = useState<
     "Mekki" | "Medeni" | "UNKNOWN"
@@ -280,9 +281,17 @@ export default function QueryWorkspacePage() {
       const token = tokenStorage.get();
       if (!token) throw new Error(dashboard.notAuthenticated);
 
+      const isRange = endVerseNumber > verseNumber;
       await startTafseerStream(
         {
-          verseId: verse.id,
+          verseId: isRange ? undefined : verse.id,
+          verseRange: isRange
+            ? {
+                surahNumber: verse.surahNumber,
+                startVerse: verse.verseNumber,
+                endVerse: endVerseNumber,
+              }
+            : undefined,
           filters: {
             ...filters,
             language:
@@ -389,6 +398,8 @@ export default function QueryWorkspacePage() {
   }, [
     user,
     resolveVerse,
+    endVerseNumber,
+    verseNumber,
     filters,
     lang,
     dashboard.notAuthenticated,
@@ -511,6 +522,7 @@ export default function QueryWorkspacePage() {
       <QueryComposer
         surahNumber={surahNumber}
         verseNumber={verseNumber}
+        endVerseNumber={endVerseNumber}
         surahName={
           surahName ||
           surahs.find((surah) => surah.number === surahNumber)?.nameTr ||
@@ -528,8 +540,9 @@ export default function QueryWorkspacePage() {
         canAnalyze={canAnalyze}
         isAnalyzing={isAnalyzing}
         error={error}
-        onSurahNumberChange={setSurahNumber}
-        onVerseNumberChange={setVerseNumber}
+        onSurahNumberChange={(v) => { setSurahNumber(v); setEndVerseNumber(verseNumber); }}
+        onVerseNumberChange={(v) => { setVerseNumber(v); setEndVerseNumber(v); }}
+        onEndVerseNumberChange={setEndVerseNumber}
         onFilterChange={setFilters}
         onScholarQueryChange={setScholarQuery}
         onInclude={includeScholar}
@@ -542,6 +555,8 @@ export default function QueryWorkspacePage() {
           verseTitle: dashboard.verseTitle,
           surahLabel: dashboard.surahLabel,
           verseLabel: dashboard.verseLabel,
+          startVerseLabel: dashboard.startVerseLabel,
+          endVerseLabel: dashboard.endVerseLabel,
           revelationType: dashboard.revelationType,
           filtersTitle: dashboard.filtersTitle,
           methodLabel: dashboard.methodLabel,

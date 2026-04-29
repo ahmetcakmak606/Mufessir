@@ -171,6 +171,9 @@ export const locales = {
       langArabic: "Arapça",
       volumeShort: "Cilt",
       pageShort: "s.",
+      startVerseLabel: "Başlangıç Ayeti",
+      endVerseLabel: "Bitiş Ayeti",
+      verseRangeLabel: "Ayet Aralığı",
     },
     dashboardShell: {
       userLabel: "Kullanıcı",
@@ -488,6 +491,9 @@ export const locales = {
       langArabic: "Arabic",
       volumeShort: "Vol",
       pageShort: "p.",
+      startVerseLabel: "Start Verse",
+      endVerseLabel: "End Verse",
+      verseRangeLabel: "Verse Range",
     },
     dashboardShell: {
       userLabel: "User",
