@@ -692,7 +692,7 @@ export default function QueryWorkspacePage() {
             <div className="space-y-3">
               {verseTextTr && (
                 <div className="ui-panel-strong px-4 py-4">
-                  <p className="ui-muted mb-1 text-xs font-semibold uppercase tracking-wide">Ayet Meali</p>
+                  <p className="ui-muted mb-1 text-xs font-semibold uppercase tracking-wide">Ayet Metni</p>
                   <p className="text-sm text-[var(--text-strong)] leading-relaxed">{verseTextTr}</p>
                 </div>
               )}
