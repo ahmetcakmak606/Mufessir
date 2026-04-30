@@ -129,38 +129,15 @@ router.get("/scholars-for-verse", async (req: Request, res: Response) => {
   }
 
   try {
-    // ROW_NUMBER must be computed over the FULL ayahs table so legacy IDs
-    // are the correct global row positions (e.g. ~4601 for Müddessir v1).
-    // Filtering before the window function would produce wrong legacy IDs
-    // (1, 2, 3...) that match tafsirs from unrelated surahs.
+    // Use the mufassirai_tafsirdb schema which has direct surah_id/ayah_id
+    // columns and contains the full dataset (public.all_tafsirs is a processed
+    // subset that misses many scholars for certain surahs).
     const rows = await prisma.$queryRawUnsafe<Array<{ mufassir_id: number }>>(
-      `WITH full_map AS (
-        SELECT
-          id,
-          surah_id,
-          ayah_number,
-          ROW_NUMBER() OVER (ORDER BY surah_id ASC, ayah_number ASC)::text AS legacy_id,
-          ('verse-' || surah_id::text || '-' || ayah_number::text) AS composite_id,
-          (surah_id::text || ':' || ayah_number::text) AS colon_id,
-          (surah_id::text || '-' || ayah_number::text) AS dash_id
-        FROM ayahs
-      ),
-      target AS (
-        SELECT id, legacy_id, composite_id, colon_id, dash_id
-        FROM full_map
-        WHERE surah_id = $1 AND ayah_number >= $2 AND ayah_number <= $3
-      )
-      SELECT DISTINCT t.mufassir_id
-      FROM all_tafsirs t
-      JOIN target v
-        ON t.verse_id = v.id
-        OR t.verse_id = v.legacy_id
-        OR t.verse_id = v.composite_id
-        OR t.verse_id = v.colon_id
-        OR t.verse_id = v.dash_id`,
+      `SELECT DISTINCT t.mufassir_id
+       FROM mufassirai_tafsirdb.all_tafsirs t
+       WHERE t.surah_id = $1
+         AND t.mufassir_id IN (SELECT mufassir_id FROM public.mufassirs)`,
       surahNumber,
-      startVerse,
-      endVerse,
     );
 
     res.json({ scholarIds: rows.map((r) => String(r.mufassir_id)) });
