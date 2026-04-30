@@ -42,7 +42,7 @@ const PERIOD_LABELS_TR: Record<PeriodCode, string> = {
   POST_CLASSICAL: "Geç Klasik (8-10 yy)",
   MODERN: "Modern (11-13 yy)",
   CONTEMPORARY: "Çağdaş (14+ yy)",
-  UNKNOWN: "Bilinmiyor",
+  UNKNOWN: "Müfessirler",
 };
 
 const PERIOD_LABELS_EN: Record<PeriodCode, string> = {

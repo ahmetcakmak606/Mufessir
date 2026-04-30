@@ -15,6 +15,7 @@ import {
   type ScholarOption,
   type SourceExcerpt,
   fetchVerseByNumbers,
+  fetchScholarsForVerse,
   normalizeTafseerResponseToRun,
   startTafseerStream,
 } from "@/lib/tafseer";
@@ -99,6 +100,7 @@ export default function QueryWorkspacePage() {
   const [sourceExcerpts, setSourceExcerpts] = useState<SourceExcerpt[]>([]);
   const [citationKey, setCitationKey] = useState<string | null>(null);
   const [verseTextTr, setVerseTextTr] = useState<string | null>(null);
+  const [verseScholarIds, setVerseScholarIds] = useState<Set<string> | null>(null);
 
   const [comparisonRuns, setComparisonRuns] = useState<ComparisonRunModel>({
     primaryRun: null,
@@ -142,6 +144,10 @@ export default function QueryWorkspacePage() {
 
   const filteredScholars = useMemo<ScholarOption[]>(() => {
     let items = (availableFilters?.scholars as ScholarOption[]) || [];
+    // Restrict to scholars who have tafsirs for the selected verse/range
+    if (verseScholarIds !== null) {
+      items = items.filter((scholar) => verseScholarIds.has(String(scholar.id)));
+    }
     if (scholarQuery.trim()) {
       const q = scholarQuery.toLowerCase();
       items = items.filter((scholar) => {
@@ -172,7 +178,7 @@ export default function QueryWorkspacePage() {
       );
     }
     return items;
-  }, [availableFilters, scholarQuery, filters]);
+  }, [availableFilters, scholarQuery, filters, verseScholarIds]);
 
   const canAnalyze = Boolean(
     user && (user.dailyQuota ?? 0) > 0 && !isAnalyzing,
@@ -206,6 +212,21 @@ export default function QueryWorkspacePage() {
       cancelled = true;
     };
   }, [surahNumber, verseNumber]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const ids = await fetchScholarsForVerse(surahNumber, verseNumber, endVerseNumber);
+        if (cancelled) return;
+        setVerseScholarIds(new Set(ids));
+      } catch {
+        if (cancelled) return;
+        setVerseScholarIds(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [surahNumber, verseNumber, endVerseNumber]);
 
   useEffect(() => {
     const detail = runDetailQuery.data;
@@ -707,22 +728,30 @@ export default function QueryWorkspacePage() {
             )}
           </div>
 
-          {(verseTextTr || sourceExcerpts.length > 0) && (
-            <div className="space-y-3">
-              {verseTextTr && (
-                <div className="ui-panel-strong px-4 py-4">
-                  <p className="ui-muted mb-1 text-xs font-semibold uppercase tracking-wide">Ayet Metni</p>
-                  <p className="text-sm text-[var(--text-strong)] leading-relaxed">{verseTextTr}</p>
-                </div>
-              )}
-              {sourceExcerpts.length > 0 && (
-                <SourceSnippetPanel
-                  title={dashboard.snippetsTitle}
-                  empty={t.emptySnippets}
-                  excerpts={sourceExcerpts}
-                />
-              )}
+
+          {/* Ayet metni — mobile only; desktop shows it in the aside */}
+          {verseTextTr && (
+            <div className="ui-panel-strong px-4 py-4 mb-4 flex flex-col gap-2 xl:hidden">
+              <div className="flex items-center justify-between">
+                <p className="ui-muted mb-1 text-xs font-semibold uppercase tracking-wide">Ayet Metni</p>
+                <button
+                  type="button"
+                  className="ui-button-ghost text-xs px-2 py-1"
+                  onClick={() => navigator.clipboard.writeText(verseTextTr)}
+                  title="Kopyala"
+                >
+                  Kopyala
+                </button>
+              </div>
+              <pre className="text-sm text-[var(--text-strong)] leading-relaxed whitespace-pre-wrap break-words select-all bg-transparent border-0 p-0 m-0">{verseTextTr}</pre>
             </div>
+          )}
+          {sourceExcerpts.length > 0 && (
+            <SourceSnippetPanel
+              title={dashboard.snippetsTitle}
+              empty={t.emptySnippets}
+              excerpts={sourceExcerpts}
+            />
           )}
 
           <div className="ui-panel-strong px-4 py-4 xl:hidden">
@@ -861,11 +890,22 @@ export default function QueryWorkspacePage() {
             </div>
           </div>
 
-          <SourceSnippetPanel
-            title={dashboard.snippetsTitle}
-            empty={t.emptySnippets}
-            excerpts={sourceExcerpts}
-          />
+          {verseTextTr && (
+            <div className="ui-panel-strong px-4 py-4 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <p className="ui-muted mb-1 text-xs font-semibold uppercase tracking-wide">Ayet Metni</p>
+                <button
+                  type="button"
+                  className="ui-button-ghost text-xs px-2 py-1"
+                  onClick={() => navigator.clipboard.writeText(verseTextTr)}
+                  title="Kopyala"
+                >
+                  Kopyala
+                </button>
+              </div>
+              <pre className="text-sm text-[var(--text-strong)] leading-relaxed whitespace-pre-wrap break-words select-all bg-transparent border-0 p-0 m-0">{verseTextTr}</pre>
+            </div>
+          )}
           <CitationPanel
             title={dashboard.academicCitationsTitle}
             empty={t.emptyCitations}

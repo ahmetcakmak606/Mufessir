@@ -656,6 +656,15 @@ router.post(
       // when verseId is undefined (range-only mode) to avoid null constraint errors.
       const effectiveVerseId = verseId ?? verse.id;
 
+      // Verse text for the response — for range mode include all verse translations
+      const verseTextTr =
+        isRange && rangeVerses.length > 1
+          ? rangeVerses
+              .map((v) => (v!.translation ? `${v!.verseNumber}. ${v!.translation}` : null))
+              .filter(Boolean)
+              .join("\n")
+          : verse.translation ?? null;
+
       // Build search query from verse text(s)
       const searchQuery = isRange
         ? rangeVerses.map((v) => `${v!.arabicText} ${v!.translation || ""}`).join(" ").trim()
@@ -1058,7 +1067,7 @@ router.post(
               provenance: cachedProvenance,
               citations: cachedCitations,
               sourceExcerpts,
-              verseTextTr: verse.translation ?? null,
+              verseTextTr,
             })}\n\n`,
           );
           res.end();
@@ -1079,7 +1088,7 @@ router.post(
             provenance: cachedProvenance,
             citations: cachedCitations,
             sourceExcerpts,
-            verseTextTr: verse.translation ?? null,
+            verseTextTr,
             searchId: existingSearch.id,
             runId: existingSearch.id,
             usage: null,
@@ -1374,7 +1383,7 @@ router.post(
                 arabicTafsir,
                 turkishTafsir,
                 citationKey,
-                verseTextTr: verse.translation ?? null,
+                verseTextTr,
                 verseRange: isRange
                   ? {
                       surahNumber: rangeVerses[0]!.surahNumber,
@@ -1530,7 +1539,7 @@ router.post(
             aiResponse: aiResponse,
             arabicTafsir,
             turkishTafsir,
-            verseTextTr: verse.translation ?? null,
+            verseTextTr,
             similarityScore: mostSimilar?.similarityScore || null,
             confidence,
             provenance,

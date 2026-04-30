@@ -118,4 +118,48 @@ router.get("/", async (_req: Request, res: Response) => {
   }
 });
 
+// Returns IDs of scholars who actually have tafsirs for the given verse/range
+router.get("/scholars-for-verse", async (req: Request, res: Response) => {
+  const surahNumber = Number(req.query.surahNumber);
+  const startVerse = Number(req.query.startVerse);
+  const endVerse = Number(req.query.endVerse ?? req.query.startVerse);
+
+  if (!surahNumber || !startVerse) {
+    return res.status(400).json({ error: "surahNumber and startVerse are required" });
+  }
+
+  try {
+    const rows = await prisma.$queryRawUnsafe<Array<{ mufassir_id: number }>>(
+      `WITH ayah_map AS (
+        SELECT
+          id,
+          surah_id,
+          ayah_number,
+          ROW_NUMBER() OVER (ORDER BY surah_id ASC, ayah_number ASC)::text AS legacy_id,
+          ('verse-' || surah_id::text || '-' || ayah_number::text) AS composite_id,
+          (surah_id::text || ':' || ayah_number::text) AS colon_id,
+          (surah_id::text || '-' || ayah_number::text) AS dash_id
+        FROM ayahs
+        WHERE surah_id = $1 AND ayah_number >= $2 AND ayah_number <= $3
+      )
+      SELECT DISTINCT t.mufassir_id
+      FROM all_tafsirs t
+      JOIN ayah_map v
+        ON t.verse_id = v.id
+        OR t.verse_id = v.legacy_id
+        OR t.verse_id = v.composite_id
+        OR t.verse_id = v.colon_id
+        OR t.verse_id = v.dash_id`,
+      surahNumber,
+      startVerse,
+      endVerse,
+    );
+
+    res.json({ scholarIds: rows.map((r) => String(r.mufassir_id)) });
+  } catch (error) {
+    console.error("Scholars-for-verse error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;

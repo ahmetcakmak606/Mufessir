@@ -225,6 +225,20 @@ export async function fetchFilters(): Promise<FiltersResponse> {
   return apiRequest<FiltersResponse>("/filters");
 }
 
+export async function fetchScholarsForVerse(
+  surahNumber: number,
+  startVerse: number,
+  endVerse: number,
+): Promise<string[]> {
+  const params = new URLSearchParams({
+    surahNumber: String(surahNumber),
+    startVerse: String(startVerse),
+    endVerse: String(endVerse),
+  });
+  const data = await apiRequest<{ scholarIds: string[] }>(`/filters/scholars-for-verse?${params}`);
+  return data.scholarIds;
+}
+
 export async function fetchVerseByNumbers(
   surahNumber: number,
   verseNumber: number,
