@@ -129,8 +129,12 @@ router.get("/scholars-for-verse", async (req: Request, res: Response) => {
   }
 
   try {
+    // ROW_NUMBER must be computed over the FULL ayahs table so legacy IDs
+    // are the correct global row positions (e.g. ~4601 for Müddessir v1).
+    // Filtering before the window function would produce wrong legacy IDs
+    // (1, 2, 3...) that match tafsirs from unrelated surahs.
     const rows = await prisma.$queryRawUnsafe<Array<{ mufassir_id: number }>>(
-      `WITH ayah_map AS (
+      `WITH full_map AS (
         SELECT
           id,
           surah_id,
@@ -140,11 +144,15 @@ router.get("/scholars-for-verse", async (req: Request, res: Response) => {
           (surah_id::text || ':' || ayah_number::text) AS colon_id,
           (surah_id::text || '-' || ayah_number::text) AS dash_id
         FROM ayahs
+      ),
+      target AS (
+        SELECT id, legacy_id, composite_id, colon_id, dash_id
+        FROM full_map
         WHERE surah_id = $1 AND ayah_number >= $2 AND ayah_number <= $3
       )
       SELECT DISTINCT t.mufassir_id
       FROM all_tafsirs t
-      JOIN ayah_map v
+      JOIN target v
         ON t.verse_id = v.id
         OR t.verse_id = v.legacy_id
         OR t.verse_id = v.composite_id

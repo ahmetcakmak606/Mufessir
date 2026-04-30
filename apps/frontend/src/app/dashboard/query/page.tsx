@@ -217,7 +217,11 @@ export default function QueryWorkspacePage() {
     let cancelled = false;
     void (async () => {
       try {
-        const ids = await fetchScholarsForVerse(surahNumber, verseNumber, endVerseNumber);
+        // Query the full surah so the scholar list shows everyone who has
+        // any tafsir for that surah, not just the selected starting verse.
+        const surahMeta = surahs.find((s) => s.number === surahNumber);
+        const totalAyahs = surahMeta?.totalAyahs ?? 300;
+        const ids = await fetchScholarsForVerse(surahNumber, 1, totalAyahs);
         if (cancelled) return;
         setVerseScholarIds(new Set(ids));
       } catch {
@@ -226,7 +230,7 @@ export default function QueryWorkspacePage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [surahNumber, verseNumber, endVerseNumber]);
+  }, [surahNumber]);
 
   useEffect(() => {
     const detail = runDetailQuery.data;
