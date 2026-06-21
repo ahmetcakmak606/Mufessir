@@ -36,7 +36,7 @@ async function generateEmbeddings() {
   console.log("Starting embedding generation...\n");
 
   const countResult = await prisma.$queryRawUnsafe<[{ count: bigint }]>(
-    `SELECT COUNT(*) as count FROM "Tafsir" WHERE embedding IS NULL`,
+    `SELECT COUNT(*) as count FROM "Tafsir" WHERE embedding IS NULL AND embed = TRUE AND LENGTH("tafsirText") > 20 AND NOT EXISTS (SELECT 1 FROM tafsir_chunks c WHERE c.parent_id = "Tafsir".id)`,
   );
   const totalTafsirs = Number(countResult[0]?.count || 0);
 
@@ -47,7 +47,7 @@ async function generateEmbeddings() {
 
   while (true) {
     const tafsirs = await prisma.$queryRawUnsafe<TafsirRow[]>(
-      `SELECT id, "tafsirText" FROM "Tafsir" WHERE embedding IS NULL LIMIT ${BATCH_SIZE}`,
+      `SELECT id, "tafsirText" FROM "Tafsir" WHERE embedding IS NULL AND embed = TRUE AND LENGTH("tafsirText") > 20 AND NOT EXISTS (SELECT 1 FROM tafsir_chunks c WHERE c.parent_id = "Tafsir".id) LIMIT ${BATCH_SIZE}`,
     );
 
     if (tafsirs.length === 0) {
