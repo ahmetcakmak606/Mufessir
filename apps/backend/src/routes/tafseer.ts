@@ -931,6 +931,27 @@ router.post(
         return;
       }
 
+      // A6.5: CHUNK_TEXT_MODE — replace chunk text with full parent commentary
+      if (process.env.CHUNK_TEXT_MODE !== "chunk") {
+        const parentIds = similarTafsirs.map((t: any) => String(t.tafsirId));
+        const parentRows = await prisma.$queryRawUnsafe<
+          Array<{ id: string; commentary: string }>
+        >(
+          `SELECT id::text, commentary FROM all_tafsirs WHERE id::text = ANY($1::text[])`,
+          parentIds,
+        );
+        const parentMap = new Map(parentRows.map((r) => [r.id, r.commentary]));
+        for (const t of similarTafsirs) {
+          const full = parentMap.get(String(t.tafsirId));
+          if (full) {
+            t.tafsirText = full;
+          }
+        }
+        console.log(
+          `CHUNK_TEXT_MODE=parent: resolved ${parentMap.size} full commentaries`,
+        );
+      }
+
       // Build prompt options (clip excerpts for cost and speed)
       const citations = await loadCitations(prisma, similarTafsirs);
       const sourceExcerpts = buildSourceExcerpts(similarTafsirs);
