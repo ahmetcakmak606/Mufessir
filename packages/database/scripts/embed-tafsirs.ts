@@ -1,7 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 import OpenAI from "openai";
 import "dotenv/config";
-import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from "../../apps/backend/src/embedding-constants.js";
+
+const EMBEDDING_MODEL = "text-embedding-3-large" as const;
+const EMBEDDING_DIMENSIONS = 1536 as const;
 
 const prisma = new PrismaClient();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
