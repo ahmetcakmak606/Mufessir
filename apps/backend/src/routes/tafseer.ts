@@ -17,6 +17,7 @@ import { buildTafsirPrompt, type ScholarMeta } from "../utils/prompt.js";
 import { finalizeResponse } from "../utils/text.js";
 import { performSimilaritySearch } from "../utils/similarity-search.js";
 import { findMostSimilarTafsir } from "../utils/similarity-calculation.js";
+import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from "../embedding-constants.js";
 import {
   computeConfidenceScore,
   deriveProvenanceIndicator,
@@ -29,7 +30,6 @@ import { prisma } from "../prisma.js";
 const router: Router = Router();
 
 const CURRENT_VERSION = "1.2";
-const EMBEDDING_MODEL = "text-embedding-3-small";
 const LLM_MODEL = "gpt-4o";
 
 function generateSnapshotId(): string {

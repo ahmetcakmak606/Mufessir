@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import OpenAI from "openai";
 import "dotenv/config";
+import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from "../../apps/backend/src/embedding-constants.js";
 
 const prisma = new PrismaClient();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -31,7 +32,8 @@ async function embedBatch(batchSize: number) {
       if (!textToEmbed) continue;
 
       const response = await openai.embeddings.create({
-        model: "text-embedding-3-small",
+        model: EMBEDDING_MODEL,
+        dimensions: EMBEDDING_DIMENSIONS,
         input: textToEmbed,
       });
 
