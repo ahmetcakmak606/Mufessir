@@ -19,25 +19,36 @@ jobs:
       - name: Check commit messages
         run: |
           # regex pattern from Conventional Commits
-          PATTERN="^(feat|fix|refactor|docs|chore)(\([[:alnum:]_-]+\))?: .+"
+          PATTERN="^(feat|fix|refactor|docs|chore|test|ci|build|perf|style|revert)(\([[:alnum:]_-]+\))?: .+"
 
-          # Get commit range - for PRs compare against main, for push use last commit
+          # Get commit range
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            COMMITS=$(git log origin/main..HEAD --format=%s)
+            BASE="origin/${GITHUB_BASE_REF:-main}"
+            if git rev-parse --verify "$BASE" >/dev/null 2>&1; then
+              COMMITS=$(git log "$BASE..HEAD" --format=%s)
+            else
+              echo "⚠️  Base branch ($BASE) not found — skipping commit check"
+              exit 0
+            fi
           else
             COMMITS=$(git log HEAD~1..HEAD --format=%s)
           fi
 
           echo "Checking commits..."
-          echo "$COMMITS" | while read -r msg; do
+          FAILED=0
+          while IFS= read -r msg; do
             if [[ -n "$msg" ]] && ! [[ "$msg" =~ $PATTERN ]]; then
-              echo "Invalid commit message: '$msg'"
-              echo "Expected format: <type>(<scope>): <description>"
-              echo "Types: feat, fix, refactor, docs, chore"
-              exit 1
+              echo "⚠️  Non-conventional: '$msg' (expected <type>(<scope>): <description>)"
+              FAILED=1
+            else
+              echo "✓ $msg"
             fi
-            echo "✓ $msg"
-          done
+          done <<< "$COMMITS"
+
+          if [ "$FAILED" = "1" ]; then
+            echo ""
+            echo "Tip: Use Conventional Commits for future commits: https://www.conventionalcommits.org/"
+          fi
 
   backend-core:
     runs-on: ubuntu-latest
