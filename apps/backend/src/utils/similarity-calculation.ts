@@ -1,4 +1,5 @@
 import { createQueryEmbedding } from "./similarity-search.js";
+import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from "./embedding-config.js";
 
 // Simple text similarity calculation using cosine similarity
 export function calculateTextSimilarity(text1: string, text2: string): number {
@@ -57,12 +58,14 @@ export async function calculateEmbeddingSimilarity(
     const client = new openai({ apiKey: process.env.OPENAI_API_KEY });
     const [emb1, emb2] = await Promise.all([
       client.embeddings.create({
-        model: "text-embedding-3-small",
+        model: EMBEDDING_MODEL,
         input: clip(aiResponse),
+        dimensions: EMBEDDING_DIMENSIONS,
       }),
       client.embeddings.create({
-        model: "text-embedding-3-small",
+        model: EMBEDDING_MODEL,
         input: clip(tafsirText),
+        dimensions: EMBEDDING_DIMENSIONS,
       }),
     ]);
 

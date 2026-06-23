@@ -17,6 +17,7 @@ import { buildTafsirPrompt, type ScholarMeta } from "../utils/prompt.js";
 import { finalizeResponse } from "../utils/text.js";
 import { performSimilaritySearch } from "../utils/similarity-search.js";
 import { findMostSimilarTafsir } from "../utils/similarity-calculation.js";
+import { EMBEDDING_MODEL } from "../utils/embedding-config.js";
 import {
   computeConfidenceScore,
   deriveProvenanceIndicator,
@@ -29,8 +30,11 @@ import { prisma } from "../prisma.js";
 const router: Router = Router();
 
 const CURRENT_VERSION = "1.2";
-const EMBEDDING_MODEL = "text-embedding-3-small";
 const LLM_MODEL = "gpt-4o";
+// KITE harness: RETRIEVAL_MIN_SIMILARITY=0 → top-k (eşiksiz). Üretim default 0.3.
+const RETRIEVAL_MIN_SIMILARITY = process.env.RETRIEVAL_MIN_SIMILARITY !== undefined
+  ? Number(process.env.RETRIEVAL_MIN_SIMILARITY)
+  : 0.3;
 
 function generateSnapshotId(): string {
   const dateStr = new Date().toISOString().split("T")[0] ?? "19700101";
@@ -416,7 +420,7 @@ router.patch("/runs/:runId", authenticateJWT, async (req, res) => {
   }
 });
 
-function buildSourceExcerpts(similarTafsirs: any[]): SourceExcerpt[] {
+export function buildSourceExcerpts(similarTafsirs: any[]): SourceExcerpt[] {
   return similarTafsirs.slice(0, 5).map((result: any) => ({
     scholarId: result.mufassir.id,
     scholarName: result.mufassir.name,
@@ -433,7 +437,7 @@ function extractReputationScores(similarTafsirs: any[]): number[] {
     .filter((score: number) => typeof score === "number");
 }
 
-interface ScholarGroupAnalysis {
+export interface ScholarGroupAnalysis {
   dominantMadhab: string | null;
   dominantPeriod: string | null;
   madhabCounts: Record<string, number>;
@@ -443,7 +447,7 @@ interface ScholarGroupAnalysis {
   scholarContext: string;
 }
 
-function analyzeScholarGroup(similarTafsirs: any[]): ScholarGroupAnalysis {
+export function analyzeScholarGroup(similarTafsirs: any[]): ScholarGroupAnalysis {
   const madhabCounts: Record<string, number> = {};
   const periodCounts: Record<string, number> = {};
   const traditions: Set<string> = new Set();
@@ -514,7 +518,7 @@ function analyzeScholarGroup(similarTafsirs: any[]): ScholarGroupAnalysis {
   };
 }
 
-async function loadCitations(
+export async function loadCitations(
   _prismaClient: PrismaClient,
   similarTafsirs: any[],
 ): Promise<Citation[]> {
@@ -666,9 +670,11 @@ router.post(
           : verse.translation ?? null;
 
       // Build search query from verse text(s)
+      // ayah_text_tr = Arapça metin + Latin künye (örn. "Fâtiha 1/3") — Türkçe çeviri değil.
+      // Sorguya yalnızca saf arabicText girer; translation eklenmez.
       const searchQuery = isRange
-        ? rangeVerses.map((v) => `${v!.arabicText} ${v!.translation || ""}`).join(" ").trim()
-        : `${verse.arabicText} ${verse.translation || ""}`.trim();
+        ? rangeVerses.map((v) => v!.arabicText).join(" ").trim()
+        : verse.arabicText;
 
       // Collect candidate verse IDs for all verses in the range
       const allCandidateIds: string[] = [];
@@ -714,7 +720,7 @@ router.post(
           excludeScholarIds,
           methodTags: filters?.methodTags,
           limit: isRange ? Math.min(rangeVerses.length * 3, 15) : 5,
-          minSimilarity: 0.3,
+          minSimilarity: RETRIEVAL_MIN_SIMILARITY,
           rangeFilter: isRange
             ? {
                 surahNumber: verseRange!.surahNumber,
