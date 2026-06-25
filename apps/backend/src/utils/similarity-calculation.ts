@@ -59,13 +59,13 @@ export async function calculateEmbeddingSimilarity(
     const [emb1, emb2] = await Promise.all([
       client.embeddings.create({
         model: EMBEDDING_MODEL,
-        dimensions: EMBEDDING_DIMENSIONS,
         input: clip(aiResponse),
+        dimensions: EMBEDDING_DIMENSIONS,
       }),
       client.embeddings.create({
         model: EMBEDDING_MODEL,
-        dimensions: EMBEDDING_DIMENSIONS,
         input: clip(tafsirText),
+        dimensions: EMBEDDING_DIMENSIONS,
       }),
     ]);
 
