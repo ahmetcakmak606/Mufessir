@@ -1,0 +1,54 @@
+======================================================================
+FINDING 1 — Core-5 ∩ prompt_included for M4 / M5 runs
+======================================================================
+  [PASS] 0/18 AllN runs have any Core-5 in prompt.
+         Core-5 prompt appearances: 0 / 90 possible slots (18 runs × 5 scholars).
+
+======================================================================
+FINDING 2 — Membership-level stability of top-10 passages
+(Score-level jitter expected; membership must be stable per verse)
+======================================================================
+
+  [STABLE] 20:5
+    rank-1 scores : ['0.805190', '0.805190', '0.805190']
+    unique scholars in top-10 passages: [10, 10, 10]
+
+  [STABLE] 24:35
+    rank-1 scores : ['0.883352', '0.883615', '0.883615']
+    unique scholars in top-10 passages: [10, 10, 10]
+
+  [DRIFT] 27:18-19
+    rank-1 scores : ['0.816256', '0.815898', '0.816256']
+    unique scholars in top-10 passages: [9, 9, 9]
+    rep 2 boundary swap: {'85': 'Sayyid Qutb', '86': '?'}
+
+  [STABLE] 3:7
+    rank-1 scores : ['0.808570', '0.809333', '0.808570']
+    unique scholars in top-10 passages: [10, 10, 10]
+
+  NOTE: membership drift in ['27:18-19'].
+  Core-5 exclusion (Finding 1) is unaffected by this drift —
+  no Core-5 member enters top-10 in any replication.
+  Robustness framing: displacement is stable to embedding jitter.
+
+======================================================================
+FINDING 3 — Chunk-level duplicate detection (Naml multi-verse)
+======================================================================
+  run_043_M4_27-18-19_r1 [27:18-19] chunk-dup: {'80': ('Al-Mirghani', 2)}
+    → top-10 contains 9 unique scholars, not 10.
+  run_044_M4_27-18-19_r2 [27:18-19] chunk-dup: {'80': ('Al-Mirghani', 2)}
+    → top-10 contains 9 unique scholars, not 10.
+  run_045_M4_27-18-19_r3 [27:18-19] chunk-dup: {'80': ('Al-Mirghani', 2)}
+    → top-10 contains 9 unique scholars, not 10.
+
+======================================================================
+SUMMARY
+======================================================================
+  AllN runs examined (M4 + M5) : 18
+  Core-5 appearances in prompt  : 0  [ASSERT PASSED]
+  Verses with membership drift  : ['27:18-19']
+  Chunk-dup verses              : 27:18-19 (isRange=true, 2 rows/scholar)
+
+  Causal framing: retrieval-rank + sliceLimit bottlenecks (see §3.6).
+  This is a design diagnosis, not a model-quality indictment.
+  Generation layer (GPT-4o-mini) processes what retrieval delivers.
