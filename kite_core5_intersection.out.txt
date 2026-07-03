@@ -1,0 +1,24 @@
+UYARI: 27:18-19 replikasyonları arasında top-10 listesi DEĞİŞİYOR (2 farklı liste) — retrieval deterministik varsayımı bu ayette TUTMUYOR.
+# Core-5 ∩ top-10 — cell M4, 12 run
+# Core-5 (string-normalized): ['7', '19', '22', '24', '29']
+
+run_037_M4_3-7_r1            3:7        0/10   hits: —
+run_038_M4_3-7_r2            3:7        0/10   hits: —
+run_039_M4_3-7_r3            3:7        0/10   hits: —
+run_040_M4_24-35_r1          24:35      0/10   hits: —
+run_041_M4_24-35_r2          24:35      0/10   hits: —
+run_042_M4_24-35_r3          24:35      0/10   hits: —
+run_043_M4_27-18-19_r1       27:18-19   0/10   hits: —
+run_044_M4_27-18-19_r2       27:18-19   0/10   hits: —
+run_045_M4_27-18-19_r3       27:18-19   0/10   hits: —
+run_046_M4_20-5_r1           20:5       0/10   hits: —
+run_047_M4_20-5_r2           20:5       0/10   hits: —
+run_048_M4_20-5_r3           20:5       0/10   hits: —
+
+20:5        Core-5 ∩ top-10 = 0/10  (3 replikasyon, birebir aynı)
+24:35       Core-5 ∩ top-10 = 0/10  (3 replikasyon, birebir aynı)
+27:18-19    Core-5 ∩ top-10 = 0/10  (3 replikasyon, FARKLI!)
+3:7         Core-5 ∩ top-10 = 0/10  (3 replikasyon, birebir aynı)
+
+TOPLAM: 0 Core-5 isabeti / 4 ayet × top-10
+{"cell": "M4", "topk": 10, "core5": ["7", "19", "22", "24", "29"], "per_verse": {"20:5": {"core5_hits_in_topk": 0, "topk": 10, "replications": 3, "replications_identical": true, "hit_ids": []}, "24:35": {"core5_hits_in_topk": 0, "topk": 10, "replications": 3, "replications_identical": true, "hit_ids": []}, "27:18-19": {"core5_hits_in_topk": 0, "topk": 10, "replications": 3, "replications_identical": false, "hit_ids": []}, "3:7": {"core5_hits_in_topk": 0, "topk": 10, "replications": 3, "replications_identical": true, "hit_ids": []}}, "total_core5_hits": 0, "all_replications_deterministic": false}
