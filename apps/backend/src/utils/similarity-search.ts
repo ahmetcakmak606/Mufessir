@@ -7,6 +7,13 @@ const openai = process.env.OPENAI_API_KEY && !aiDisabled ? new OpenAI({ apiKey: 
 
 export interface SimilaritySearchOptions {
   query: string;
+  /**
+   * Önceden hesaplanmış sorgu embedding'i. Verilirse createQueryEmbedding
+   * atlanır ve bu vektör kullanılır — çağıran taraf saklanan vektörle
+   * retrieval'da kullanılan vektörün BİREBİR aynı olduğunu garanti edebilir
+   * (reproducibility snapshot'ı). Verilmezse davranış eskisiyle aynıdır.
+   */
+  queryEmbedding?: number[];
   limit?: number;
   verseId?: string;
   verseIds?: string[];
@@ -198,7 +205,7 @@ export async function performSimilaritySearch(
     const sampleTafsirs = await runSampleSearch(prisma, options, limit);
     if (sampleTafsirs.length === 0) return [];
 
-    const queryEmbedding = await createQueryEmbedding(options.query);
+    const queryEmbedding = options.queryEmbedding ?? (await createQueryEmbedding(options.query));
     const vectorLiteral = "[" + queryEmbedding.join(",") + "]";
     const { rangeFilter } = options;
     const verseIds = options.verseIds?.length
