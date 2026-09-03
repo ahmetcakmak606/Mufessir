@@ -72,7 +72,9 @@ dokunur ve ayrı bir not gerektirir: gerçek payda, kodlayıcının hücre-baş�
 
 ## (c) C1 tek-kodlu mu → κ var mı?
 
-**Çapa üçüncü bir kodlayıcı öngörüyor, ama o kişi doldurulmadı; C1 için κ yok.**
+**Tek-kodlu, κ yok — ve bu "doldurulmamış TBD" değil, kapatılmış bir karardır.**
+
+Rubrik (kilitli v1.0, 2026-05-13) üçüncü kodlayıcı öngörüyordu:
 
 > - Third coder (TBD) — secondary coder on C1–C2 and C5–C8 (Quranic-studies criteria). — rubrik satır 24
 
@@ -80,29 +82,69 @@ dokunur ve ayrı bir not gerektirir: gerçek payda, kodlayıcının hücre-baş�
 > (different random subsamples for C3–C4 and C1, C2, C5–C8 respectively) for κ verification.
 > Final κ reported in Section 5.6 of the paper. — rubrik satır 229
 
-Ön-taahhüt notunda durum (`KITE_on_taahhut_notu_v1.md`):
+Ama bu plan 2026-07-09'da **resmen kapatıldı** (`Kulliyyah_Test_cati_v3_4bolum.md` satır 276):
 
-> …**C1–C2/C5–C8 hücre-düzeyi boyutlar için üçüncü kodlayıcı: TBD.** — satır 77
+> *(Superseded note, 2026-07-09: the earlier three-coder plan — "third coder TBD for C1–C2/C5–C8,
+> settle before Sprint 4" — is closed; v2 Open Question 1 resolved in favour of the two-coder design
+> with disclosed adjudication asymmetries…)* **C1–C2 and C5–C8 were single-coded by the author** under
+> the two-coder resolution above, and C4 is single-valued, so no inter-rater κ is defined for them;
+> their reliability rests on the anchored, locked codebook and on adjudication rather than on
+> inter-coder agreement. **κ is therefore reported for C3, not per axis.**
 
-> 4. Hücre-düzeyi boyutlar (C1/C2/C7/C8, N=12) B.5 uyarınca exploratory; confirmatory κ ≥ 0.75
-> yalnızca pair-düzeyi boyutlara (C3/C5/C6) uygulanır. — satır 594
+Ön-taahhüt notu (append-only, daha erken tarihli) hâlâ "üçüncü kodlayıcı: TBD" (satır 77) diyor;
+bağlayıcı olan çatı v3'teki kapanış kaydıdır. Satır 594 aynı yöne bakıyor: hücre-düzeyi boyutlar
+(C1/C2/C7/C8, N=12) exploratory; confirmatory κ ≥ 0.75 yalnız pair-düzeyi (C3/C5/C6).
 
-Artefakt teyidi: kodlama dosyalarında C1 alanı yok — `gold-coding-sheet.jsonl` alanları
-(`N_human1`, `N_human2`, `S`, `U`, `F_candidate`, `in_prompt`…) C3/NER isim-sayımına aittir;
-`adjudications.c3.jsonl` ve `adjudications.suf.jsonl` C3 hattıdır; `kite_c3_reliability.py` içinde
-C1/C2/C7/C8 geçmiyor. **C1'in ikinci kodlayıcısı ve κ'sı yok.**
+Artefakt teyidi: mevcut tek kodlama sayfası C3/NER hattıdır — `gold-coding-sheet.cuneyt.*` ve
+`.coder2.*` alanları `{runId, scholarId, scholarName, code, in_prompt[, note]}`; C1–C8 skor alanı yok.
+`kite_c3_reliability.py` içinde C1/C2/C7/C8 geçmiyor. §5.3'ün "per-axis → C3-only" düzeltmesi
+çatı v3 satır 276 ile birebir örtüşüyor.
 
-Kesinlik notu: bu bir *tasarım tercihi* değil, **doldurulmamış tasarım**dır — rubrik C1 için ikinci
-kodlayıcı ve κ öngörmüştü; kişi atanmadığı için gerçekleşmedi. §5.3'ün "per-axis → C3-only"
-düzeltmesi bu tabloyla tutarlıdır (confirmatory κ yalnız C3/C5/C6).
+## (d) C1 fiilen kodlandı mı? — **HAYIR, henüz kodlanmadı**
+
+`Kulliyyah_Test_cati_v3_4bolum.md` satır 306, §4.5.1 (Coverage) içinde açık yer-tutucu taşıyor:
+
+> …coverage scores are invariant across these cells and any observed variance is noise.
+> **⟨C1/C2 scores: pending human coding; cell-level SD across k=3: pending.⟩**
+
+Aynı biçimde satır 312 (C4 gold-NER sayımı), 316 (C3 κ/raw/PABAK), 179 (κ = ●●) de "pending".
+Hücre-düzeyi (C1/C2/C7/C8, N=12) kodlama sayfası hiçbir yerde **yok**: ne repo kökünde, ne
+`cuneyt_mehmet_coding/` altında, ne `~/Downloads/xx_desktop/cuneyt-kodlama/` altında. Tüm proje
+taramasında "C1 = <sayı>" kalıbının tek örneği rubriğin **varsayımsal** Worked Example'ıdır
+(satır 199, Q 3:7 için uydurma çıktı). Gerçek koşumlara ait tek bir C1 skoru mevcut değildir.
+
+### Öncelenen ikinci soru: kodlayıcı hangi paydayı fiilen kullandı?
+
+**Şu an cevapsız — çünkü fiilî payda henüz yok.** Soru geriye dönük bir denetim sorusu değil,
+**ileriye dönük bir ön-taahhüt sorusudur**: C1 kodlanmadığı için payda hâlâ kodlama başlamadan
+sabitlenebilir (pre-registration açısından açık pencere).
+
+Sabitlenecek üç aday payda, ve her birinin mekanik sonucu:
+
+| aday payda | değer | kaynak | M4 skoruna etkisi |
+|---|---|---|---|
+| çapadaki etiket | "All 95" | rubrik satır 67/73/75 (kilitli) | terk edilmiş sayı; hiçbir tabloya karşılık gelmiyor |
+| retrieval havuzu | 91 | çatı v3 §2.2 / satır 249 | havuz-oranı kuralına geçilirse bantlar yeniden tanımlanmalı |
+| küllî referans seti | 42 | çatı v3 satır 249 ("normative coverage benchmark") | companion'ın niyeti; çapaya hiç yazılmadı |
+| *(dördüncü, çapada geçmeyen)* per-verse havuz | 63 / 75 / 79 / 95 | fiilî `retrieved_all` | hücreden hücreye değişken payda |
+
+Mekanik not: çapanın All-hücresi bantları **mutlak sayıdır** (partial = 4–7, comprehensive = ≥8),
+paydadan bağımsızdır. Yani payda seçimi C1 skorunu ancak **oransal bir kurala geçilirse** değiştirir;
+mevcut kilitli metinle kodlanırsa payda etiketi skoru etkilemez, yalnız gerekçe cümlesini etkiler.
+Bu ayrım (a)'daki iç tutarsızlığın doğrudan sonucudur ve karar verilirken açıkça ele alınmalıdır.
 
 ## Ham bulgu özeti
 
 1. C1 çapasının paydası = hücrenin admissible pool'u ("Core 5" = 5; "All 95" = havuzun tamamı).
-   42-set çapada hiç geçmiyor; companion'ın "42 normatif benchmark" cümlesi kilitli enstrümana
-   yansımamış tasarım niyetidir.
+   42-set çapada hiç geçmiyor; companion'ın (çatı v3 satır 249) "42 normatif benchmark" cümlesi
+   kilitli enstrümana yansımamış tasarım niyetidir.
 2. Çapadaki payda etiketi ("95") 2026-06-13'te terk edilmiş sayıdır; rubrik 2026-05-13'te kilitlendi.
    Ayrıca "oransal skorla" talimatı ile mutlak bantlar (4–7, ≥8) kendi içinde çelişiyor.
 3. 42-dışı müfessirlerin C1'de nasıl sayılacağı **yazılı değil**; çapa metni bunları artı yönde
-   okumaya elverişli. Kodlayıcı doğaçladı → C1'in kodlanış biçimine dair ayrı not gerekir.
-4. C1 için ikinci kodlayıcı (TBD) hiç atanmadı; C1'de κ yok, artefaktlarla teyitli.
+   okumaya elverişli ("outside the dominant Sunni-Ashʿarī mainstream").
+4. C1 tek-kodlu ve κ'sız — **karar gereği** (üç-kodlayıcı planı 2026-07-09'da kapatıldı, çatı v3
+   satır 276), doldurulmamış TBD değil. §5.3 "per-axis → C3-only" düzeltmesiyle örtüşüyor.
+5. **C1 fiilen henüz kodlanmadı** (çatı v3 satır 306: "pending human coding"); hücre-düzeyi kodlama
+   sayfası hiçbir yerde yok. Dolayısıyla "kodlayıcı hangi paydayı kullandı" sorusunun bugün bir
+   cevabı yok — payda hâlâ kodlama öncesinde sabitlenebilir. (3) maddesindeki doğaçlama riski de
+   gerçekleşmiş bir olgu değil, **önlenebilir** bir açıktır.
