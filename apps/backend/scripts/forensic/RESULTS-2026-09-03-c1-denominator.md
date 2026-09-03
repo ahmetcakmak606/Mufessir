@@ -148,3 +148,28 @@ Bu ayrım (a)'daki iç tutarsızlığın doğrudan sonucudur ve karar verilirken
    sayfası hiçbir yerde yok. Dolayısıyla "kodlayıcı hangi paydayı kullandı" sorusunun bugün bir
    cevabı yok — payda hâlâ kodlama öncesinde sabitlenebilir. (3) maddesindeki doğaçlama riski de
    gerçekleşmiş bir olgu değil, **önlenebilir** bir açıktır.
+
+---
+
+## Kapanış (2026-09-03, aynı gün): payda kodlama başlamadan sabitlendi
+
+Yukarıdaki (d) maddesinin bıraktığı açık pencere kullanıldı. Karar **çift raporlama**:
+kodlayıcı bir kez sayar, **C1_havuz** (v1.0 tanımı + bantları, değişmedi) ve **N_küllî**
+(42-set üyeleri, **ham sayım**, bantlanmaz) mekanik türer; fark Δ ham sayılar üstünden.
+Gerekçe: kilitli enstrüman geriye dönük değiştirilmedi — v1.0'ın çapa-5'i havuzdaki
+ana-akım-dışı sesleri artı yönde ödüllendiriyor, 42-only payda bu ödülü silip enstrümanın
+yönünü tersine çevirirdi.
+
+- Ek: `KITE_rubric_anchors_v1.1_C1_eki.md` (frozen 2026-09-03, md5 `c00ee7e4065a50922971e960bfb216b2`),
+  D7/D7.1 kalıbı: kodbook'a dokunulmadı, ek yalnız raporlama katmanında bağlayıcı, geriye dönük etki yok.
+- Ön-taahhüt kaydı: `KITE_on_taahhut_notu_v1.md` **B.18** (append-only, yeni tarihli madde).
+- Kör enstrüman paketi: `cuneyt_mehmet_coding/c1-kodlama/` — 63 kalem opak id + rastgele sıra,
+  yalnız `aiResponse`; araç isim aramaz, aday listesi göstermez, skor sormaz (bant sonradan mekanik).
+  Mühürlü anahtar açılmadı.
+- **Kodlama öncesi kilitlenen ön-bulgu:** Zemahşerî (id 19) 42-set'te **yok** → Core-5 hücrelerinde
+  N_küllî en fazla 4. Δ yorumlanırken bu sabit fark anılmazsa yapay "eksik kapsam" okuması doğar.
+- Makale §5.3 düzeltildi (havuza göre puanla + küllî sete göre ayrıca raporla; κ per-axis → C3-only),
+  dipnot 30a eklendi. §4.1 ayrı olarak kapatıldı (bkz. `RESULTS-2026-09-03-core5-path.md`).
+
+Bu dosyadaki (b) maddesinin "kodlayıcı doğaçladı" riski **gerçekleşmeden** kapatıldı: 42-dışı
+isimlerin muamelesi artık yazılı ve mekaniktir.
