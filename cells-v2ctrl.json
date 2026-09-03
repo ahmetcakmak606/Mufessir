@@ -1,0 +1,16 @@
+{
+  "batchId": "probe-v2ctrl-2026-09-03",
+  "cells": [
+    {
+      "runId": "v2ctrl_20-5_core5_r1",
+      "cellId": "v2ctrl-20-5-core5",
+      "verse": { "label": "20:5", "surah": 20, "ayahStart": 5, "ayahEnd": 5 },
+      "presetName": "core5",
+      "temperature": 0,
+      "minSimilarity": 0,
+      "limit": 5,
+      "replication": 1,
+      "isTestRun": true
+    }
+  ]
+}
