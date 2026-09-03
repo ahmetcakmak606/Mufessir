@@ -129,3 +129,30 @@ Havuz: 95 satır / 58 tekil müfessir (isRange → müfessir başına 2 satır).
    uzun bir metni 24 sıra yukarı taşıyor; chunk-yolu içinde uzunluk↔rank ilişkisi kayboluyor.
 3. Preset Core-5'e kilitliyken bile 9/180 slot kaybı var; hepsi tek hücrede (27:18-19 × Râzî),
    nedeni isRange satır-çoğaltması, temsil-yolu değil.
+
+---
+
+## Düzeltme (2026-09-03, aynı gün): 27:18-19 yüzdelik paydaları
+
+Kapı sorgusu (`kite-naml-kulli-gap.ts`) 27:18-19'un gerçek havuzunun **72 tekil müfessir**
+olduğunu ölçtü; probe k=95 **satır** limiti, isRange satır-çoğaltması yüzünden yalnız 58 tekile
+ulaşıyor. Bu dosyanın ilk sürümü 58'i payda olarak kullandı.
+
+**Rank değerleri değişmedi** — dilim, skora göre tepeden alınmış bir prefikstir; dilime girmeyen
+14 müfessirin tamamı dilimdekilerin altında yer alır. Değişen yalnız yüzdeliklerdir:
+
+| müfessir | rank | eski (÷58) | **düzeltilmiş (÷72)** |
+|---|--:|--:|--:|
+| İbn Kesîr | 15 | 25.9% | **20.8%** |
+| Zemahşerî | 19 | 32.8% | **26.4%** |
+| Ṭaberî | 33 | 56.9% | **45.8%** |
+| Kurtubî | 48 | 82.8% | **66.7%** |
+| Râzî | 53 | 91.4% | **73.6%** |
+
+Bağlı düzeltme — §2 parent-only satırı: havuz-yüzdeliği medyanı **56.9% → 45.8%**,
+chars/yüzdelik Spearman ρ **+0.242 → +0.264**. chunk-only satırı etkilenmedi (27:18-19'da
+chunk-yolu hücresi yok). §1, §3 ve §4'ün rank/slot sayıları etkilenmedi.
+
+Diğer üç âyette dilim = havuz (betik artık assert ediyor): 3:7 = 75, 20:5 = 63, 24:35 = 79.
+`kite_core5_path_ranks.py` DB-ölçümlü paydaları kullanacak biçimde güncellendi; çıktı
+`kite_core5_path_ranks.out.txt` yenilendi.

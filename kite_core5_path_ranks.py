@@ -26,6 +26,13 @@ PATH_VID = {
 }
 VERSE_IDS = {"20:5":["20-5"], "24:35":["24-35"], "3:7":["3-7"], "27:18-19":["27-18","27-19"]}
 
+# Havuzun GERCEK buyuklugu (vektorlu tekil mufessir), DB'den olculdu:
+# kite-naml-kulli-gap.ts (2026-09-03). 27:18-19'da probe k=95 SATIR limiti,
+# isRange satir-cogaltmasi yuzunden yalniz 58 tekil mufessire ulasir; havuzun
+# kendisi 72'dir. Yuzdelikler bu gercek paydaya gore hesaplanir. RANK degerleri
+# etkilenmez: dilim, skora gore tepeden alinmis bir prefikstir.
+TRUE_POOL = {"20:5": 63, "24:35": 79, "3:7": 75, "27:18-19": 72}
+
 def path(vlabel, sid):
     s = {PATH_VID[(v, sid)] for v in VERSE_IDS[vlabel]}
     return s.pop() if len(s) == 1 else "MIXED"
@@ -88,15 +95,15 @@ for vlabel in ["3:7","20:5","24:35","27:18-19"]:
             rr, e = row_rank[sid]
             rows.append(dict(verse=vlabel, rep=rep["replication"], sid=sid, name=CORE5[sid],
                              path=path(vlabel, sid), row_rank=rr, pool_rows=len(ra),
-                             uniq_rank=uniq_rank[sid], pool_uniq=len(seen),
+                             uniq_rank=uniq_rank[sid], pool_uniq=len(seen), pool_true=TRUE_POOL[vlabel],
                              score=e["similarityScore"], chars=e["chars"]))
 r1 = [r for r in rows if r["rep"] == 1]
 out(f"    {'ayet':10s} {'mufessir':16s} {'yol':6s} {'rank(satir)':>12s} {'rank(tekil)':>12s} {'yuzdelik':>9s} {'skor':>8s} {'chars':>8s}")
 for r in sorted(r1, key=lambda x: (x["verse"], x["row_rank"])):
     rr = "%d/%d" % (r["row_rank"], r["pool_rows"])
-    ur = "%d/%d" % (r["uniq_rank"], r["pool_uniq"])
+    ur = "%d/%d" % (r["uniq_rank"], r["pool_true"])
     out(f"    {r['verse']:10s} {r['name']:16s} {r['path']:6s} {rr:>12s} {ur:>12s} "
-        f"{100*r['uniq_rank']/r['pool_uniq']:8.1f}% {r['score']:8.4f} {r['chars']:8,d}")
+        f"{100*r['uniq_rank']/r['pool_true']:8.1f}% {r['score']:8.4f} {r['chars']:8,d}")
 jit = defaultdict(set)
 for r in rows: jit[(r["verse"], r["sid"])].add(r["row_rank"])
 uns = {k: v for k, v in jit.items() if len(v) > 1}
@@ -109,7 +116,7 @@ out("\n[2] RANK DAGILIMI, YOLA GORE (r1, 20 hucre)")
 for p, nm in [("P","parent-only"), ("C","chunk-only ")]:
     s = [r for r in r1 if r["path"] == p]
     ur = sorted(r["uniq_rank"] for r in s)
-    pc = [100*r["uniq_rank"]/r["pool_uniq"] for r in s]
+    pc = [100*r["uniq_rank"]/r["pool_true"] for r in s]
     ch = [r["chars"] for r in s]
     out(f"    {nm} n={len(s):2d} | tekil-rank min={min(ur)} medyan={st.median(ur):.1f} maks={max(ur)}"
         f" | havuz-yuzdeligi medyan={st.median(pc):.1f}% aralik={min(pc):.1f}-{max(pc):.1f}%"
@@ -122,7 +129,7 @@ out("\n    uzunluk-esli karsilastirma (ayet-ici, 24:35):")
 for r in sorted([x for x in r1 if x["verse"] == "24:35"], key=lambda x: x["chars"]):
     yol = "parent" if r["path"] == "P" else "chunk "
     out(f"      {r['name']:16s} {yol:6s} chars={r['chars']:7,d}  "
-        f"rank={r['uniq_rank']:2d}/{r['pool_uniq']} ({100*r['uniq_rank']/r['pool_uniq']:.1f}%)")
+        f"rank={r['uniq_rank']:2d}/{r['pool_uniq']} ({100*r['uniq_rank']/r['pool_true']:.1f}%)")
 
 # ---- 3. prompt-slot dolulugu (yalniz admissible firsatlar)
 out("\n[3] PROMPT-SLOT DOLULUGU — 63 run, yalniz ADMISSIBLE firsatlar")
@@ -151,10 +158,10 @@ for (g, v, sid, p), (h, n) in sorted(cell.items()):
 # ---- 4. 27:18-19 alt-kumesi
 out("\n[4] ALT-KUME 27:18-19 — 10/10 doluluk hucresi parent-only")
 s = [r for r in r1 if r["verse"] == "27:18-19"]
-out(f"    havuz: {s[0]['pool_rows']} satir / {s[0]['pool_uniq']} tekil mufessir (isRange -> 2 satir/mufessir)")
+out(f"    havuz: {s[0]['pool_true']} tekil mufessir (vektorlu, DB); probe k=95 dilimi {s[0]['pool_rows']} satir / {s[0]['pool_uniq']} tekil")
 for r in sorted(s, key=lambda x: x["uniq_rank"]):
     out(f"      {r['name']:16s} parent  rank {r['uniq_rank']:2d}/{r['pool_uniq']} "
-        f"({100*r['uniq_rank']/r['pool_uniq']:.1f}%)  skor={r['score']:.4f}  chars={r['chars']:,d}")
+        f"({100*r['uniq_rank']/r['pool_true']:.1f}%)  skor={r['score']:.4f}  chars={r['chars']:,d}")
 allN = [r for r in runs if r["presetName"] == "allN" and r["verse"]["label"] == "27:18-19"]
 hit = sum(1 for r in allN for sid in CORE5 if sid in to_ids([e["scholarName"] for e in r["retrieved_all"]]))
 out(f"    allN top-10 icinde Core-5: {hit}/{len(allN)*5}")
