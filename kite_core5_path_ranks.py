@@ -160,7 +160,7 @@ out("\n[4] ALT-KUME 27:18-19 — 10/10 doluluk hucresi parent-only")
 s = [r for r in r1 if r["verse"] == "27:18-19"]
 out(f"    havuz: {s[0]['pool_true']} tekil mufessir (vektorlu, DB); probe k=95 dilimi {s[0]['pool_rows']} satir / {s[0]['pool_uniq']} tekil")
 for r in sorted(s, key=lambda x: x["uniq_rank"]):
-    out(f"      {r['name']:16s} parent  rank {r['uniq_rank']:2d}/{r['pool_uniq']} "
+    out(f"      {r['name']:16s} parent  rank {r['uniq_rank']:2d}/{r['pool_true']} "
         f"({100*r['uniq_rank']/r['pool_true']:.1f}%)  skor={r['score']:.4f}  chars={r['chars']:,d}")
 allN = [r for r in runs if r["presetName"] == "allN" and r["verse"]["label"] == "27:18-19"]
 hit = sum(1 for r in allN for sid in CORE5 if sid in to_ids([e["scholarName"] for e in r["retrieved_all"]]))

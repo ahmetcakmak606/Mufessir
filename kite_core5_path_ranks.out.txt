@@ -67,11 +67,11 @@ BRIEF A — Core-5 slot/rank dagilimi, temsil-yoluna gore
 
 [4] ALT-KUME 27:18-19 — 10/10 doluluk hucresi parent-only
     havuz: 72 tekil mufessir (vektorlu, DB); probe k=95 dilimi 95 satir / 58 tekil
-      Ibn Kathir       parent  rank 15/58 (20.8%)  skor=0.7490  chars=1,881
-      al-Zamakhshari   parent  rank 19/58 (26.4%)  skor=0.7381  chars=1,615
-      al-Tabari        parent  rank 33/58 (45.8%)  skor=0.7091  chars=918
-      al-Qurtubi       parent  rank 48/58 (66.7%)  skor=0.6676  chars=3,060
-      al-Razi          parent  rank 53/58 (73.6%)  skor=0.6618  chars=2,121
+      Ibn Kathir       parent  rank 15/72 (20.8%)  skor=0.7490  chars=1,881
+      al-Zamakhshari   parent  rank 19/72 (26.4%)  skor=0.7381  chars=1,615
+      al-Tabari        parent  rank 33/72 (45.8%)  skor=0.7091  chars=918
+      al-Qurtubi       parent  rank 48/72 (66.7%)  skor=0.6676  chars=3,060
+      al-Razi          parent  rank 53/72 (73.6%)  skor=0.6618  chars=2,121
     allN top-10 icinde Core-5: 0/15
     core5-preset (M1-M3) 27:18-19: al-Razi 0/9 slot — mukerrer satirlar (Ibn Kathir x2,
     al-Tabari x2) ilk 6 slotu doldurdu, Razi rank 7-8'de kaldi. Parent-yolu, chunk degil.
