@@ -23,7 +23,7 @@ export default function Home() {
     return (
       <div className="ui-shell flex items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-[rgba(14,122,105,0.2)] border-t-[var(--brand)]"></div>
+          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-[var(--highlight)] border-t-[var(--brand)]"></div>
           <p className="ui-muted mt-4 text-sm">{t.loading}</p>
         </div>
       </div>
@@ -36,8 +36,8 @@ export default function Home() {
 
   return (
     <div className="ui-shell overflow-hidden">
-      <div className="pointer-events-none absolute -left-24 top-16 h-56 w-56 rounded-full bg-[rgba(14,122,105,0.18)] blur-3xl" />
-      <div className="pointer-events-none absolute -right-20 top-20 h-64 w-64 rounded-full bg-[rgba(12,57,61,0.16)] blur-3xl" />
+      <div className="pointer-events-none absolute -left-24 top-16 h-56 w-56 rounded-full bg-[var(--highlight)] blur-3xl" />
+      <div className="pointer-events-none absolute -right-20 top-20 h-64 w-64 rounded-full bg-[var(--highlight)] blur-3xl" />
       <main className="ui-container relative flex min-h-screen flex-col py-4 sm:py-6">
         <header className="mb-8 flex items-center justify-between gap-3 sm:mb-12">
           <Link

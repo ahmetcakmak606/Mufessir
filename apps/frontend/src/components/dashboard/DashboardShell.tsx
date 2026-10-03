@@ -12,12 +12,20 @@ interface DashboardShellProps {
   children: React.ReactNode;
 }
 
+// Konular ve Semantik sayfaları henüz yer tutucu; menüde yalnızca çalışan ekranlar var.
 const navConfig = [
   { href: "/dashboard/query", key: "navQuery" },
   { href: "/dashboard/runs", key: "navRuns" },
-  { href: "/dashboard/topics", key: "navTopics" },
-  { href: "/dashboard/semantic", key: "navSemantic" },
 ] as const;
+
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toLocaleUpperCase("tr"))
+    .join("");
+}
 
 export function DashboardShell({
   user,
@@ -27,58 +35,21 @@ export function DashboardShell({
   const pathname = usePathname();
   const { lang, setLang } = useLang();
   const t = locales[lang].dashboardShell;
-  const brand = locales[lang].home.brand;
+  const q = locales[lang].queryUi;
+  const displayName = user.name || user.email;
 
   return (
     <div className="ui-shell">
-      <div className="pointer-events-none absolute -left-20 top-24 h-60 w-60 rounded-full bg-[rgba(14,122,105,0.14)] blur-3xl" />
-      <div className="pointer-events-none absolute -right-24 top-16 h-64 w-64 rounded-full bg-[rgba(12,57,61,0.14)] blur-3xl" />
+      <div className="ui-container">
+        <header className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-[var(--border-soft)] py-4">
+          <Link
+            href="/dashboard/query"
+            className="font-display text-[1.9rem] leading-none text-[var(--ink)]"
+          >
+            Müfessir<span className="text-[var(--gold-ink)]">AI</span>
+          </Link>
 
-      <div className="ui-container relative space-y-4 py-3 sm:py-5">
-        <header className="ui-panel px-4 py-4 sm:px-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h1 className="font-display ui-title text-2xl sm:text-3xl">
-                {brand}
-              </h1>
-              <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                <span className="ui-badge">
-                  {t.userLabel}: {user.name || user.email}
-                </span>
-                <span className="ui-badge">
-                  {t.quotaLabel}: {user.dailyQuota}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="ui-panel flex items-center gap-1 rounded-full p-1">
-                <span className="ui-muted px-2 text-xs">{t.langLabel}</span>
-                <button
-                  onClick={() => setLang("tr")}
-                  className="ui-button-ghost"
-                  data-active={lang === "tr"}
-                >
-                  TR
-                </button>
-                <button
-                  onClick={() => setLang("en")}
-                  className="ui-button-ghost"
-                  data-active={lang === "en"}
-                >
-                  EN
-                </button>
-              </div>
-              <button
-                onClick={onLogout}
-                className="ui-button-secondary px-4 py-2 text-sm"
-              >
-                {t.logout}
-              </button>
-            </div>
-          </div>
-
-          <nav className="mt-4 flex flex-wrap gap-2">
+          <nav className="order-3 flex w-full gap-1 sm:order-none sm:w-auto sm:flex-1">
             {navConfig.map((item) => {
               const active =
                 pathname === item.href ||
@@ -89,10 +60,11 @@ export function DashboardShell({
                   key={item.href}
                   href={item.href}
                   data-testid={`nav-${item.key}`}
-                  className={`rounded-lg border px-3 py-1.5 text-sm font-semibold ${
+                  aria-current={active ? "page" : undefined}
+                  className={`px-2.5 py-1.5 text-[0.95rem] font-medium ${
                     active
-                      ? "border-[var(--brand)] bg-[var(--brand)] text-white"
-                      : "border-[var(--border-strong)] text-[var(--text-muted)] hover:bg-white/60"
+                      ? "text-[var(--ink)] shadow-[inset_0_-2px_0_var(--gold)]"
+                      : "text-[var(--ink-soft)] hover:text-[var(--ink)]"
                   }`}
                 >
                   {t[item.key]}
@@ -100,9 +72,46 @@ export function DashboardShell({
               );
             })}
           </nav>
+
+          <div className="ml-auto flex items-center gap-3 text-sm text-[var(--text-muted)]">
+            <span className="tabular-nums" title={t.quotaLabel}>
+              {q.quotaLeft}: {user.dailyQuota}
+            </span>
+            <div
+              role="group"
+              aria-label={t.langLabel}
+              className="flex overflow-hidden rounded-full border border-[var(--border-strong)]"
+            >
+              {(["tr", "en"] as const).map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setLang(code)}
+                  aria-pressed={lang === code}
+                  className={`px-2.5 py-0.5 text-xs ${
+                    lang === code
+                      ? "bg-[var(--accent)] text-[var(--on-accent)]"
+                      : ""
+                  }`}
+                >
+                  {code.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <span
+              className="font-display grid h-8 w-8 place-items-center rounded-full border border-[var(--gold)] text-[var(--ink)]"
+              title={displayName}
+              aria-hidden="true"
+            >
+              {initials(displayName) || "·"}
+            </span>
+            <button type="button" onClick={onLogout} className="ui-link text-sm">
+              {t.logout}
+            </button>
+          </div>
         </header>
 
-        {children}
+        <div className="pt-6">{children}</div>
       </div>
     </div>
   );

@@ -77,8 +77,8 @@ export default function Login() {
 
   return (
     <div className="ui-shell flex items-center justify-center px-4 py-7 sm:px-6">
-      <div className="pointer-events-none absolute -left-20 top-16 h-56 w-56 rounded-full bg-[rgba(14,122,105,0.18)] blur-3xl" />
-      <div className="pointer-events-none absolute -right-24 bottom-10 h-64 w-64 rounded-full bg-[rgba(12,57,61,0.16)] blur-3xl" />
+      <div className="pointer-events-none absolute -left-20 top-16 h-56 w-56 rounded-full bg-[var(--highlight)] blur-3xl" />
+      <div className="pointer-events-none absolute -right-24 bottom-10 h-64 w-64 rounded-full bg-[var(--highlight)] blur-3xl" />
       <div className="relative grid w-full max-w-5xl gap-4 lg:grid-cols-[1.05fr_0.95fr]">
         <aside className="ui-panel hidden flex-col justify-between p-8 lg:flex">
           <div>

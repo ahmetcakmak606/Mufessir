@@ -17,7 +17,7 @@ export default function Error({
   return (
     <div className="flex min-h-[400px] items-center justify-center">
       <div className="text-center">
-        <h2 className="text-xl font-semibold text-red-600">
+        <h2 className="text-xl font-semibold text-[var(--danger-text)]">
           Something went wrong!
         </h2>
         <p className="mt-2 text-gray-600">
@@ -25,7 +25,7 @@ export default function Error({
         </p>
         <button
           onClick={() => router.push("/login")}
-          className="mt-4 rounded bg-[var(--brand)] px-4 py-2 text-white"
+          className="mt-4 rounded bg-[var(--brand)] px-4 py-2 text-[var(--on-accent)]"
         >
           Go to Login
         </button>

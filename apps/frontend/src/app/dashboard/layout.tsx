@@ -27,7 +27,7 @@ export default function DashboardLayout({
     return (
       <div className="ui-shell flex items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-[rgba(14,122,105,0.2)] border-t-[var(--brand)]" />
+          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-[var(--highlight)] border-t-[var(--brand)]" />
           <p className="ui-muted mt-4 text-sm">{loadingLabel}</p>
         </div>
       </div>

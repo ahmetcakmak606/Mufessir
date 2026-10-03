@@ -9,25 +9,14 @@ interface ResultStreamProps {
   turkishTafsir?: string;
   placeholder: string;
   isAnalyzing: boolean;
-  startedAt: number | null;
-  firstByteAt: number | null;
-  completedAt: number | null;
-  usage: {
-    promptTokens?: number;
-    completionTokens?: number;
-    totalTokens?: number;
-  } | null;
   noTafsirMessage?: string | null;
   missingScholars?: string[];
   labels: {
     analyzing: string;
-    perfTitle: string;
-    perfStart: string;
-    perfFirstByte: string;
-    perfTotal: string;
-    perfTokens: string;
     arabic: string;
     turkish: string;
+    noTafsirTitle: string;
+    missingScholars: string;
   };
 }
 
@@ -38,97 +27,80 @@ export function ResultStream({
   turkishTafsir,
   placeholder,
   isAnalyzing,
-  startedAt,
-  firstByteAt,
-  completedAt,
-  usage,
   noTafsirMessage,
   missingScholars,
   labels,
 }: ResultStreamProps) {
   const [displayLang, setDisplayLang] = useState<"tr" | "ar">("tr");
 
-  const hasBothLanguages = arabicTafsir && turkishTafsir;
+  const hasBothLanguages = Boolean(arabicTafsir && turkishTafsir);
+  const showArabic = hasBothLanguages && displayLang === "ar";
   const displayContent = hasBothLanguages
-    ? displayLang === "ar"
+    ? showArabic
       ? arabicTafsir
       : turkishTafsir
     : streamContent;
 
   return (
-    <section className="ui-panel-strong overflow-hidden">
-      <div className="space-y-3 px-4 py-5 sm:p-6">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="ui-title text-lg font-semibold">{title}</h3>
-          {isAnalyzing && <span className="ui-badge">{labels.analyzing}</span>}
-        </div>
-
-        <div className="ui-kpi ui-muted flex flex-wrap gap-4 text-xs">
-          <div>
-            <span className="font-semibold">{labels.perfTitle}:</span>
-          </div>
-          <div>
-            {labels.perfStart}: {startedAt ? "✓" : "—"}
-          </div>
-          <div>
-            {labels.perfFirstByte}:{" "}
-            {startedAt && firstByteAt
-              ? `${Math.max(0, Math.round(firstByteAt - startedAt))} ms`
-              : "—"}
-          </div>
-          <div>
-            {labels.perfTotal}:{" "}
-            {startedAt && completedAt
-              ? `${Math.max(0, Math.round(completedAt - startedAt))} ms`
-              : "—"}
-          </div>
-          <div>
-            {labels.perfTokens}: {usage?.totalTokens ?? "—"}
-          </div>
-        </div>
-
+    <section aria-labelledby="result-title" aria-busy={isAnalyzing}>
+      <header className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 id="result-title" className="font-display text-[1.6rem]">
+          {title}
+          {isAnalyzing && (
+            <span className="ml-3 align-middle font-sans text-sm font-normal text-[var(--gold-ink)]">
+              {labels.analyzing}
+            </span>
+          )}
+        </h2>
         {hasBothLanguages && (
-          <div className="flex gap-2 mb-2">
-            <button
-              type="button"
-              onClick={() => setDisplayLang("tr")}
-              className={`px-3 py-1 text-xs rounded ${
-                displayLang === "tr" ? "ui-button-primary" : "ui-button-ghost"
-              }`}
-            >
-              {labels.turkish}
-            </button>
-            <button
-              type="button"
-              onClick={() => setDisplayLang("ar")}
-              className={`px-3 py-1 text-xs rounded ${
-                displayLang === "ar" ? "ui-button-primary" : "ui-button-ghost"
-              }`}
-            >
-              {labels.arabic}
-            </button>
+          <div role="tablist" className="flex gap-0.5 text-sm">
+            {(
+              [
+                ["tr", labels.turkish],
+                ["ar", labels.arabic],
+              ] as const
+            ).map(([code, label]) => (
+              <button
+                key={code}
+                type="button"
+                role="tab"
+                aria-selected={displayLang === code}
+                onClick={() => setDisplayLang(code)}
+                className={`border-b-2 px-2.5 py-1 ${
+                  displayLang === code
+                    ? "border-[var(--gold)] text-[var(--ink)]"
+                    : "border-transparent text-[var(--text-muted)]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         )}
+      </header>
 
-        <div
-          className="ui-panel min-h-64 whitespace-pre-wrap p-4 text-sm leading-relaxed text-[var(--text-strong)] sm:text-[0.95rem]"
-          dir={displayLang === "ar" ? "rtl" : "ltr"}
-        >
-          {noTafsirMessage ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800">
-              <p className="font-medium">⚠️ {noTafsirMessage}</p>
-              {missingScholars && missingScholars.length > 0 && (
-                <p className="mt-2 text-sm text-amber-700">
-                  Tefsiri olmayan alimler: {missingScholars.join(", ")}
-                </p>
-              )}
-            </div>
-          ) : displayContent ? (
-            displayContent
-          ) : (
-            <p className="ui-muted">{placeholder}</p>
-          )}
-        </div>
+      <div className="mt-4 min-h-[10rem]">
+        {noTafsirMessage ? (
+          <div className="ui-warn rounded-[0.5rem] p-4 text-sm">
+            <p className="font-semibold">{labels.noTafsirTitle}</p>
+            <p className="mt-1">{noTafsirMessage}</p>
+            {missingScholars && missingScholars.length > 0 && (
+              <p className="mt-2">
+                {labels.missingScholars}: {missingScholars.join(", ")}
+              </p>
+            )}
+          </div>
+        ) : displayContent ? (
+          <div
+            className="ui-prose"
+            dir={showArabic ? "rtl" : "ltr"}
+            lang={showArabic ? "ar" : undefined}
+          >
+            {displayContent}
+          </div>
+        ) : (
+          <p className="ui-muted max-w-[60ch] text-[0.95rem]">{placeholder}</p>
+        )}
       </div>
     </section>
   );
