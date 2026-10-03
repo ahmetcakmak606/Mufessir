@@ -34,13 +34,27 @@ if (!process.env.JWT_SECRET) process.env.JWT_SECRET = "test-secret";
 // for the whole run (per TEST_RUN_ID state file); prefer it so per-file
 // teardowns don't fight each other. Recorded targets pass the SAME
 // validation as fresh ones — a stale/foreign state file aborts the run.
-const preparedUrl = readPreparedTestDatabaseUrl();
-if (preparedUrl) {
-  requireValidTestTarget(preparedUrl);
-  process.env.DATABASE_URL = preparedUrl;
+//
+// QUALITY_TESTS=1 is the conscious opt-out for data-dependent quality
+// suites (tests/trust-score.test.ts): those need the REAL corpus from
+// DATABASE_URL, so the disposable-target rewrite is skipped for them.
+// Never set QUALITY_TESTS in CI or on a machine where DATABASE_URL may
+// point at anything you are not prepared to read-load.
+if (process.env.QUALITY_TESTS === "1") {
+  // eslint-disable-next-line no-console
+  console.warn(
+    "[env-guard] QUALITY_TESTS=1 — DATABASE_URL yeniden yazılmıyor; " +
+      "testler .env içindeki GERÇEK veritabanına bağlanacak.",
+  );
 } else {
-  const testDatabaseUrl = resolveTestDatabaseUrl(process.env);
-  if (testDatabaseUrl) {
-    process.env.DATABASE_URL = testDatabaseUrl;
+  const preparedUrl = readPreparedTestDatabaseUrl();
+  if (preparedUrl) {
+    requireValidTestTarget(preparedUrl);
+    process.env.DATABASE_URL = preparedUrl;
+  } else {
+    const testDatabaseUrl = resolveTestDatabaseUrl(process.env);
+    if (testDatabaseUrl) {
+      process.env.DATABASE_URL = testDatabaseUrl;
+    }
   }
 }

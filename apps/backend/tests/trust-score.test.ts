@@ -16,6 +16,13 @@ const __dirname = dirname(__filename);
 config({ path: resolve(__dirname, "../../../.env") });
 config({ path: resolve(__dirname, "../.env") });
 
+// Bu dosya GERÇEK korpus verisi gerektiren kalite testleri içerir (erişim
+// kalitesi ~389K tefsir satırı üzerinde ölçülür). Varsayılan süit atıl test
+// DB'siyle çalıştığından bu testler bilinçli olarak ayrı çalıştırılır:
+//   QUALITY_TESTS=1 npx vitest run tests/trust-score.test.ts
+const describeQuality =
+  process.env.QUALITY_TESTS === "1" ? describe : describe.skip;
+
 if (!process.env.JWT_SECRET) {
   process.env.JWT_SECRET = "test-secret";
 }
@@ -35,7 +42,7 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-describe("Trust Score - RAG Quality Tests", () => {
+describeQuality("Trust Score - RAG Quality Tests", () => {
   let token = "";
   const testUserEmail = `trust-test-${Date.now()}@example.com`;
 
