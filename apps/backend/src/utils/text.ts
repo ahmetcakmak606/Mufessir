@@ -1,7 +1,7 @@
 export function finalizeResponse(
   text: string,
   lengthScale?: number,
-  lang?: string,
+  _lang?: string,
 ): string {
   const scale =
     typeof lengthScale === "number"

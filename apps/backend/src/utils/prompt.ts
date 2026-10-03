@@ -76,9 +76,11 @@ export function buildTafsirPrompt(opts: PromptOptions): string {
     }
   }
 
-  // Include key Arabic terms from sources to boost similarity
+  // Arabic terminology observed in the sources, offered as optional context.
+  // Never mandate verbatim inclusion: forcing terms to "boost similarity"
+  // pushes the model to use concepts the clipped excerpts may not support.
   if (arabicTerms.length > 0) {
-    prompt += `\nKey Arabic Terms from Sources (INCLUDE THESE VERBATIM):\n${arabicTerms.join(", ")}\n`;
+    prompt += `\nArabic Terms Observed in Sources (use only when relevant to the meaning):\n${arabicTerms.join(", ")}\n`;
   }
 
   // Add scholar group context if available
@@ -125,16 +127,13 @@ export function buildTafsirPrompt(opts: PromptOptions): string {
     prompt += `4b. You are summarising a PASSAGE of ${verses.length} verses. Address all verses as a unified whole; identify the central theme and the progression of meaning across the passage.\n`;
   }
 
-  // Dynamic instruction based on scholar count
-  if (scholarAnalysis && scholarAnalysis.totalScholars > 3) {
-    prompt += `5. When ${scholarAnalysis.totalScholars} or more scholars are selected, refer to them as a GROUP (e.g., "alimlerin çoğunluğu", "İslam alimleri", "mezhep alimleri") rather than naming each individual scholar. Only name specific scholars if their view is notably different from the group.\n`;
-  } else {
-    prompt += `5. Explicitly mention which scholar you're referencing.\n`;
-  }
+  // Attribution must stay individual: a handful of retrieved rows cannot
+  // support claims about "the majority of scholars" or a madhab's general
+  // view. Views are presented separately, each attributed to its scholar.
+  prompt += `5. Explicitly mention which scholar you're referencing for each view. Do NOT merge selected scholars' views into group claims such as "the majority of scholars", "Islamic scholars" or a madhab's general position; if scholars differ, present the differing views separately with their attribution. A group claim is acceptable only if a provided source explicitly states it, and then it must be reported as that source's claim.\n`;
 
   prompt += `6. Do NOT make up information, citations, or references not present in the provided excerpts.\n`;
   prompt += `7. If you cannot answer based on the provided sources, state: "${isRange ? "لا تتوفر معلومات كافية في المصادر المقدمة حول هذه الآيات." : "لا تتوفر معلومات كافية في المصادر المقدمة حول هذه الآية."}" (There is insufficient information in the provided sources about this ${isRange ? "passage" : "verse"}.)\n`;
-  prompt += `8. MUST include these Arabic terms VERBATIM in your response: ${arabicTerms.join(", ")}\n`;
   prompt += `\nAdditional Instructions:\n`;
   prompt += `- Write the tafsir in Arabic (العربية).\n`;
   prompt += `- Keep statements traceable to provided excerpts; avoid unsupported claims.\n`;

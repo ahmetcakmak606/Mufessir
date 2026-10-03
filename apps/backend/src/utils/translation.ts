@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import OpenAI from "openai";
 
 const aiDisabled =
@@ -7,6 +8,11 @@ const openai =
   process.env.OPENAI_API_KEY && !aiDisabled
     ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
     : null;
+
+// Bump when the translation prompt below changes in a way that should
+// invalidate previously cached translations. Exported for the tafsir result
+// cache key, which must also separate translation versions.
+export const TRANSLATION_PROMPT_VERSION = "v1";
 
 interface TranslationResult {
   translatedText: string;
@@ -26,9 +32,19 @@ const translationCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour cache
 const MAX_CACHE_SIZE = 1000;
 
-function getCacheKey(text: string, source: string, target: string): string {
-  const hash = Buffer.from(`${source}:${target}:${text}`).toString("base64");
-  return hash.slice(0, 200);
+// Cryptographic hash over the full text plus languages, model and prompt
+// version. The previous scheme (first 200 chars of base64) collided for any
+// two inputs sharing a ~150-byte prefix — e.g. tafsir passages from the same
+// work — and could return the first text's translation for the second.
+export function computeTranslationCacheKey(
+  text: string,
+  source: string,
+  target: string,
+): string {
+  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+  return createHash("sha256")
+    .update(`${source}:${target}:${model}:${TRANSLATION_PROMPT_VERSION}:${text}`)
+    .digest("hex");
 }
 
 function getCachedTranslation(cacheKey: string): TranslationResult | null {
@@ -67,7 +83,7 @@ export async function translateText(
     return { translatedText: "" };
   }
 
-  const cacheKey = getCacheKey(text, sourceLanguage, targetLanguage);
+  const cacheKey = computeTranslationCacheKey(text, sourceLanguage, targetLanguage);
   const cached = getCachedTranslation(cacheKey);
   if (cached) {
     return cached;
