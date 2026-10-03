@@ -8,16 +8,18 @@ import {
   enforceQuota,
   decrementQuota,
 } from "../middleware/auth.js";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import {
   generateTafsirStream,
   generateTafsirNonStreaming,
 } from "../utils/openai.js";
-import { buildTafsirPrompt, type ScholarMeta } from "../utils/prompt.js";
+import type { ScholarMeta } from "../utils/prompt.js";
 import { finalizeResponse } from "../utils/text.js";
 import { performSimilaritySearch } from "../utils/similarity-search.js";
 import { findMostSimilarTafsir } from "../utils/similarity-calculation.js";
 import { EMBEDDING_MODEL } from "../embedding-constants.js";
+import { buildTafsirCacheKey } from "../utils/tafseer-cache.js";
+import { asyncHandler } from "../utils/async-handler.js";
 import {
   computeConfidenceScore,
   deriveProvenanceIndicator,
@@ -124,7 +126,7 @@ if (demoMode) {
       Object.keys(demoMap).length,
       "precomputed entries",
     );
-  } catch (e) {
+  } catch {
     console.warn(
       "DEMO_MODE enabled but demo-tafsir.json not found or invalid.",
     );
@@ -136,13 +138,6 @@ type RunMeta = {
   notes: string | null;
   starred: boolean;
   updatedAt: string | null;
-};
-
-const DEFAULT_RUN_META: RunMeta = {
-  title: null,
-  notes: null,
-  starred: false,
-  updatedAt: null,
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -230,7 +225,7 @@ function buildRunSummary(search: any) {
   };
 }
 
-router.get("/runs", authenticateJWT, async (req, res) => {
+router.get("/runs", authenticateJWT, asyncHandler(async (req, res) => {
   try {
     const userId = (req as any).user?.id as string;
     const cursor =
@@ -272,9 +267,10 @@ router.get("/runs", authenticateJWT, async (req, res) => {
     console.error("Runs list error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
-});
+}),
+);
 
-router.get("/runs/:runId", authenticateJWT, async (req, res) => {
+router.get("/runs/:runId", authenticateJWT, asyncHandler(async (req, res) => {
   try {
     const userId = (req as any).user?.id as string;
     const runId = req.params.runId;
@@ -328,9 +324,10 @@ router.get("/runs/:runId", authenticateJWT, async (req, res) => {
     console.error("Run detail error:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
-});
+}),
+);
 
-router.patch("/runs/:runId", authenticateJWT, async (req, res) => {
+router.patch("/runs/:runId", authenticateJWT, asyncHandler(async (req, res) => {
   try {
     const userId = (req as any).user?.id as string;
     const runId = req.params.runId;
@@ -418,7 +415,8 @@ router.patch("/runs/:runId", authenticateJWT, async (req, res) => {
     console.error("Run update error:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
-});
+}),
+);
 
 export function buildSourceExcerpts(similarTafsirs: any[]): SourceExcerpt[] {
   return similarTafsirs.slice(0, 5).map((result: any) => ({
@@ -452,7 +450,14 @@ export function analyzeScholarGroup(similarTafsirs: any[]): ScholarGroupAnalysis
   const periodCounts: Record<string, number> = {};
   const traditions: Set<string> = new Set();
 
+  // Count unique scholars, not retrieval rows: in range queries the same
+  // mufassir appears once per verse, which used to inflate "totalScholars".
+  const seenScholarIds = new Set<string>();
   for (const t of similarTafsirs) {
+    const scholarId = String(t.mufassir?.id ?? "");
+    if (scholarId && seenScholarIds.has(scholarId)) continue;
+    if (scholarId) seenScholarIds.add(scholarId);
+
     const madhab = t.mufassir?.madhab;
     const period = t.mufassir?.period;
     const tradition = t.mufassir?.traditionAcceptance;
@@ -488,23 +493,18 @@ export function analyzeScholarGroup(similarTafsirs: any[]): ScholarGroupAnalysis
     }
   }
 
-  const totalScholars = similarTafsirs.length;
+  const totalScholars = seenScholarIds.size;
   const hasMultipleMadhhabs = Object.keys(madhabCounts).length > 1;
 
-  // Build contextual framing string
+  // Factual scope statement only. The previous variants asserted what "the
+  // tafsir reflects" (a madhab's/period's general view) from a handful of
+  // retrieved rows; that generalization must come from sources, if at all.
   let scholarContext = "";
-  if (totalScholars > 5) {
-    if (dominantMadhab && maxMadhabCount >= Math.ceil(totalScholars * 0.5)) {
-      scholarContext = `Bu tefsir ${dominantMadhab} alimlerinin genel görüşlerini yansıtmaktadır.`;
-    } else if (dominantPeriod) {
-      scholarContext = `Bu tefsir ${dominantPeriod} dönemindeki alimlerin yorumlarını içermektedir.`;
-    } else if (hasMultipleMadhhabs) {
-      scholarContext = `Bu tefsir farklı İslami mezheplerden alimlerin yorumlarını birleştirmektedir.`;
-    } else {
-      scholarContext = `Bu tefsir ${totalScholars} farklı alimin yorumundan derlenmiştir.`;
-    }
-  } else if (totalScholars > 1) {
-    scholarContext = `Bu tefsir ${totalScholars} alimin yorumlarına dayanmaktadır.`;
+  if (totalScholars > 1) {
+    scholarContext = `Bu tefsir yanıtında bu sorgu için getirilen ${totalScholars} farklı müfessirin pasajları kullanılmıştır.`;
+  } else if (totalScholars === 1) {
+    scholarContext =
+      "Bu tefsir yanıtında bu sorgu için getirilen tek bir müfessirin pasajları kullanılmıştır.";
   }
 
   return {
@@ -543,13 +543,47 @@ export async function loadCitations(
   }));
 }
 
+// Shown (never persisted — plan Faz 1.4) when the model call fails, so the
+// user still sees the retrieved source excerpts instead of a dead end.
+function buildOpenAiFallbackResponse(
+  verse: { verseNumber: number; arabicText: string; translation: string | null },
+  similarTafsirs: any[],
+  filters: {
+    methodTags?: string[];
+    language?: string;
+    responseLength?: number;
+  } | undefined,
+): string {
+  return `**Fallback Response** (OpenAI API not available)
+
+**Verse Analysis:** ${"Surah"} ${verse.verseNumber}
+**Arabic:** ${verse.arabicText}
+**Translation:** ${verse.translation || "Not available"}
+
+**Available Scholar Excerpts:**
+${similarTafsirs
+  .map(
+    (result: any, index: number) =>
+      `${index + 1}. **${result.mufassir.name}** (${result.mufassir.century}th century, ${result.mufassir.madhab || "Unknown"} school):
+  ${result.tafsirText.substring(0, 200)}...`,
+  )
+  .join("\n\n")}
+
+**Requested Parameters:**
+- Methodology Tags: ${filters?.methodTags?.join(", ") || "Not specified"}
+- Language: ${filters?.language || "Not specified"}
+- Response Length: ${filters?.responseLength || "Not specified"}/10
+
+*This is a fallback response. In production, this would be an AI-generated tafsir based on the provided scholar excerpts and your specified parameters.*`;
+}
+
 // Protected endpoint that requires auth and enforces quota
 router.post(
   "/",
   authenticateJWT,
   enforceQuota(prisma),
   decrementQuota(prisma),
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
     try {
       const resolveTafsirVerseIds = async (params: {
         canonicalVerseId: string;
@@ -676,6 +710,122 @@ router.post(
         ? rangeVerses.map((v) => v!.arabicText).join(" ").trim()
         : verse.arabicText;
 
+      // Result cache — checked BEFORE retrieval so repeated requests skip the
+      // expensive path. The key separates verse ranges (a single verse is
+      // normalized to start == end), language, filters and pipeline versions
+      // (corpus / prompt / model / translation), so a pipeline fix never
+      // serves stale cached answers. See utils/tafseer-cache.ts.
+      const cacheRange = {
+        surahNumber: verse.surahNumber,
+        startVerse: isRange ? rangeVerses[0]!.verseNumber : verse.verseNumber,
+        endVerse: isRange
+          ? rangeVerses[rangeVerses.length - 1]!.verseNumber
+          : verse.verseNumber,
+      };
+      const requestedLanguage = filters?.language || "Turkish";
+      const cacheKey = buildTafsirCacheKey({
+        verseId: effectiveVerseId,
+        surahNumber: cacheRange.surahNumber,
+        startVerse: cacheRange.startVerse,
+        endVerse: cacheRange.endVerse,
+        filters: filters ?? {},
+        language: requestedLanguage,
+        userId: (req as any).user!.id,
+      });
+
+      const existingSearch = await prisma.search.findFirst({
+        where: {
+          userId: (req as any).user!.id,
+          verseId: effectiveVerseId,
+          query: {
+            path: ["cacheKey"],
+            equals: cacheKey,
+          },
+        },
+        include: {
+          results: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      // If we have a recent cached result (within 1 hour), return it
+      if (
+        existingSearch?.results[0] &&
+        new Date().getTime() - existingSearch.createdAt.getTime() <
+          60 * 60 * 1000
+      ) {
+        const cachedResult = existingSearch.results[0];
+        const storedQuery = asRecord(existingSearch.query as any | null);
+        const storedExcerpts = Array.isArray(storedQuery.sourceExcerpts)
+          ? (storedQuery.sourceExcerpts as unknown as SourceExcerpt[])
+          : [];
+        const cachedCitations = Array.isArray(cachedResult.citations)
+          ? (cachedResult.citations as unknown as Citation[])
+          : [];
+        const cachedConfidence =
+          typeof cachedResult.confidenceScore === "number"
+            ? cachedResult.confidenceScore
+            : null;
+        const cachedProvenance = deriveProvenanceIndicator(cachedCitations);
+        console.log("Returning cached result for search:", existingSearch.id);
+
+        if (stream) {
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          res.setHeader("Access-Control-Allow-Headers", "Cache-Control");
+
+          res.write(
+            `data: ${JSON.stringify({ type: "start", searchId: existingSearch.id, runId: existingSearch.id, cached: true })}\n\n`,
+          );
+          res.write(
+            `data: ${JSON.stringify({ type: "chunk", content: cachedResult.aiResponse })}\n\n`,
+          );
+          res.write(
+            `data: ${JSON.stringify({
+              type: "complete",
+              searchId: existingSearch.id,
+              runId: existingSearch.id,
+              cached: true,
+              confidence: cachedConfidence,
+              provenance: cachedProvenance,
+              citations: cachedCitations,
+              sourceExcerpts: storedExcerpts,
+              verseTextTr,
+            })}\n\n`,
+          );
+          res.end();
+        } else {
+          return res.json({
+            verse: {
+              id: verse.id,
+              surahNumber: verse.surahNumber,
+              surahName: "Surah",
+              verseNumber: verse.verseNumber,
+              arabicText: verse.arabicText,
+              translation: verse.translation,
+            },
+            filters,
+            aiResponse: cachedResult.aiResponse,
+            similarityScore: cachedResult.similarityScore,
+            confidence: cachedConfidence,
+            provenance: cachedProvenance,
+            citations: cachedCitations,
+            sourceExcerpts: storedExcerpts,
+            verseTextTr,
+            searchId: existingSearch.id,
+            runId: existingSearch.id,
+            usage: null,
+            cached: true,
+          });
+        }
+        return;
+      }
+
       // Collect candidate verse IDs for all verses in the range
       const allCandidateIds: string[] = [];
       const versesToResolve = isRange ? rangeVerses : [verse];
@@ -705,7 +855,6 @@ router.post(
       // Perform vector similarity search to find relevant tafsirs
       // ALWAYS filter by verseId - semantic search should only find tafsirs FOR the queried verse
       let similarTafsirs: any[] = [];
-      let usedScholarFilter = false;
 
       // Check if user specified scholar filters
       const hasScholarFilter =
@@ -735,7 +884,6 @@ router.post(
             ? effectiveVerseId
             : result.verseId,
         }));
-        usedScholarFilter = hasScholarFilter === true;
       } catch (searchError) {
         console.error("Similarity search error:", searchError);
       }
@@ -1003,107 +1151,6 @@ router.post(
         scholarAnalysis,
       };
 
-      // Check for existing cached results using a stable cacheKey
-      const cacheKey = JSON.stringify({
-        verseId: effectiveVerseId,
-        filters: filters || {},
-        userId: (req as any).user!.id,
-      });
-
-      const existingSearch = await prisma.search.findFirst({
-        where: {
-          userId: (req as any).user!.id,
-          verseId: effectiveVerseId,
-          query: {
-            path: ["cacheKey"],
-            equals: cacheKey,
-          },
-        },
-        include: {
-          results: {
-            orderBy: { createdAt: "desc" },
-            take: 1,
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      });
-
-      // If we have a recent cached result (within 1 hour), return it
-      if (
-        existingSearch?.results[0] &&
-        new Date().getTime() - existingSearch.createdAt.getTime() <
-          60 * 60 * 1000
-      ) {
-        const cachedResult = existingSearch.results[0];
-        const cachedCitations = Array.isArray(cachedResult.citations)
-          ? (cachedResult.citations as unknown as Citation[])
-          : citations;
-        const cachedConfidence =
-          typeof cachedResult.confidenceScore === "number"
-            ? cachedResult.confidenceScore
-            : computeConfidenceScore({
-                similarityScores: [cachedResult.similarityScore || 0],
-                citationCount: cachedCitations.length,
-                excerptCount: sourceExcerpts.length,
-                sourceVerseMatch: true, // Cached results assumed valid
-              });
-        const cachedProvenance = deriveProvenanceIndicator(cachedCitations);
-        console.log("Returning cached result for search:", existingSearch.id);
-
-        if (stream) {
-          res.setHeader("Content-Type", "text/event-stream");
-          res.setHeader("Cache-Control", "no-cache");
-          res.setHeader("Connection", "keep-alive");
-          res.setHeader("Access-Control-Allow-Origin", "*");
-          res.setHeader("Access-Control-Allow-Headers", "Cache-Control");
-
-          res.write(
-            `data: ${JSON.stringify({ type: "start", searchId: existingSearch.id, runId: existingSearch.id, cached: true })}\n\n`,
-          );
-          res.write(
-            `data: ${JSON.stringify({ type: "chunk", content: cachedResult.aiResponse })}\n\n`,
-          );
-          res.write(
-            `data: ${JSON.stringify({
-              type: "complete",
-              searchId: existingSearch.id,
-              runId: existingSearch.id,
-              cached: true,
-              confidence: cachedConfidence,
-              provenance: cachedProvenance,
-              citations: cachedCitations,
-              sourceExcerpts,
-              verseTextTr,
-            })}\n\n`,
-          );
-          res.end();
-        } else {
-          return res.json({
-            verse: {
-              id: verse.id,
-              surahNumber: verse.surahNumber,
-              surahName: "Surah",
-              verseNumber: verse.verseNumber,
-              arabicText: verse.arabicText,
-              translation: verse.translation,
-            },
-            filters,
-            aiResponse: cachedResult.aiResponse,
-            similarityScore: cachedResult.similarityScore,
-            confidence: cachedConfidence,
-            provenance: cachedProvenance,
-            citations: cachedCitations,
-            sourceExcerpts,
-            verseTextTr,
-            searchId: existingSearch.id,
-            runId: existingSearch.id,
-            usage: null,
-            cached: true,
-          });
-        }
-        return;
-      }
-
       // DEMO mode: if precomputed exists, short-circuit with cached content
       if (demoMode) {
         const items = demoMap[verseId];
@@ -1207,13 +1254,16 @@ router.post(
             filters,
             verseId: effectiveVerseId,
             cacheKey,
+            // Explicit scope record so history can show what was asked,
+            // independent of the cache key format.
+            verseRange: cacheRange,
+            sourceExcerpts: sourceExcerpts as unknown as any,
             timestamp: new Date().toISOString(),
           },
         },
       });
 
       let aiResponse = "";
-      let similarityScore = null;
 
       try {
         if (stream) {
@@ -1264,8 +1314,6 @@ router.post(
             `data: ${JSON.stringify({ type: "chunk", content: prefaceLines + "\n" })}\n\n`,
           );
 
-          let streamContent = "";
-
           try {
             // Scale max tokens by desired response length (1-10)
             const lengthScale =
@@ -1278,11 +1326,9 @@ router.post(
             const result = await generateTafsirStream(
               { promptOptions, maxTokens },
               (chunk) => {
-                // For short responses, buffer chunks and emit at the end to avoid mid-sentence cutoffs
-                if (lengthScale <= 3) {
-                  streamContent += chunk;
-                } else {
-                  streamContent += chunk;
+                // For short responses, hold streaming until the finalized
+                // text is emitted below to avoid mid-sentence cutoffs.
+                if (lengthScale > 3) {
                   res.write(
                     `data: ${JSON.stringify({ type: "chunk", content: chunk })}\n\n`,
                   );
@@ -1401,7 +1447,23 @@ router.post(
               })}\n\n`,
             );
           } catch (streamError) {
-            // Handle streaming errors
+            console.error("OpenAI error:", streamError);
+            // Generation failed mid-stream: show the excerpt-based fallback
+            // (never persisted — plan Faz 1.4) so the client still receives a
+            // complete event and can finalize its UI state.
+            const fallbackResponse = buildOpenAiFallbackResponse(
+              verse,
+              similarTafsirs,
+              filters,
+            );
+            const fallbackConfidence = computeConfidenceScore({
+              similarityScores: [similarTafsirs[0]?.similarityScore || 0],
+              citationCount: citations.length,
+              excerptCount: sourceExcerpts.length,
+              fallback: true,
+              sourceVerseMatch,
+              scholarReputationScores: extractReputationScores(similarTafsirs),
+            });
             res.write(
               `data: ${JSON.stringify({
                 type: "error",
@@ -1409,6 +1471,21 @@ router.post(
                   streamError instanceof Error
                     ? streamError.message
                     : "Streaming failed",
+              })}\n\n`,
+            );
+            res.write(
+              `data: ${JSON.stringify({ type: "chunk", content: fallbackResponse })}\n\n`,
+            );
+            res.write(
+              `data: ${JSON.stringify({
+                type: "complete",
+                searchId: search.id,
+                runId: search.id,
+                confidence: fallbackConfidence,
+                provenance,
+                citations,
+                sourceExcerpts,
+                fallback: true,
               })}\n\n`,
             );
           }
@@ -1570,27 +1647,11 @@ router.post(
         console.error("OpenAI error:", openaiError);
 
         // Provide a more informative fallback response
-        const fallbackResponse = `**Fallback Response** (OpenAI API not available)
-
-**Verse Analysis:** ${"Surah"} ${verse.verseNumber}
-**Arabic:** ${verse.arabicText}
-**Translation:** ${verse.translation || "Not available"}
-
-**Available Scholar Excerpts:**
-${similarTafsirs
-  .map(
-    (result: any, index: number) =>
-      `${index + 1}. **${result.mufassir.name}** (${result.mufassir.century}th century, ${result.mufassir.madhab || "Unknown"} school):
-  ${result.tafsirText.substring(0, 200)}...`,
-  )
-  .join("\n\n")}
-
-**Requested Parameters:**
-- Methodology Tags: ${filters?.methodTags?.join(", ") || "Not specified"}
-- Language: ${filters?.language || "Not specified"}
-- Response Length: ${filters?.responseLength || "Not specified"}/10
-
-*This is a fallback response. In production, this would be an AI-generated tafsir based on the provided scholar excerpts and your specified parameters.*`;
+        const fallbackResponse = buildOpenAiFallbackResponse(
+          verse,
+          similarTafsirs,
+          filters,
+        );
 
         aiResponse = fallbackResponse;
         const confidence = computeConfidenceScore({
@@ -1602,32 +1663,10 @@ ${similarTafsirs
           scholarReputationScores: extractReputationScores(similarTafsirs),
         });
 
-        const saveTafsirId = similarTafsirs[0]?.tafsirId;
-        if (saveTafsirId) {
-          await prisma.searchResult.create({
-            data: {
-              searchId: search.id,
-              tafsirId: saveTafsirId,
-              aiResponse: fallbackResponse,
-              citations: citations as unknown as any,
-              confidenceScore: confidence,
-              similarityScore: similarTafsirs[0]?.similarityScore || null,
-            },
-          });
-
-          await createAcademicSnapshot({
-            verseId: effectiveVerseId,
-            searchQuery,
-            promptOptions,
-            aiResponse: fallbackResponse,
-            similarTafsirs,
-            confidence,
-            provenance,
-            citations,
-            searchId: search.id,
-          });
-        }
-
+        // Faz 1 (ilerleme planı 1.4): fallback responses are shown but never
+        // persisted — persisting them let a transient OpenAI outage poison the
+        // 1-hour cache and appear in history as a successful run. A proper
+        // generationStatus lands in Faz 2.
         if (stream) {
           res.write(
             `data: ${JSON.stringify({ type: "chunk", content: fallbackResponse })}\n\n`,
@@ -1672,10 +1711,10 @@ ${similarTafsirs
       console.error("Tafseer error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
-  },
+  }),
 );
 
-router.get("/snapshots/:snapshotId", authenticateJWT, async (req, res) => {
+router.get("/snapshots/:snapshotId", authenticateJWT, asyncHandler(async (req, res) => {
   try {
     const userId = (req as any).user?.id as string;
     const snapshotId = req.params.snapshotId;
@@ -1694,27 +1733,11 @@ router.get("/snapshots/:snapshotId", authenticateJWT, async (req, res) => {
       return res.status(404).json({ error: "Snapshot not found" });
     }
 
+    // Plan 1B.3 (SEC-07): a snapshot without an owning Search has no
+    // ownership check path at all — default deny. Public sharing, if ever
+    // needed, is a deliberate feature with its own policy.
     if (!snapshot.searchId) {
-      return res.json({
-        snapshotId: snapshot.snapshotId,
-        citationKey: snapshot.citationKey,
-        verse: null,
-        queryText: snapshot.queryText,
-        aiResponse: snapshot.aiResponse,
-        arabicTafsir: snapshot.arabicTafsir,
-        turkishTafsir: snapshot.turkishTafsir,
-        retrievedSources: snapshot.retrievedSources,
-        confidence: snapshot.confidence,
-        provenance: snapshot.provenance,
-        citations: snapshot.citations,
-        generatedAt: snapshot.generatedAt,
-        systemInfo: {
-          corpusVersion: snapshot.corpusVersion,
-          embeddingModel: snapshot.embeddingModel,
-          llmModel: snapshot.llmModel,
-          promptHash: snapshot.promptHash,
-        },
-      });
+      return res.status(404).json({ error: "Snapshot not found" });
     }
 
     const search = await prisma.search.findFirst({
@@ -1753,6 +1776,7 @@ router.get("/snapshots/:snapshotId", authenticateJWT, async (req, res) => {
     console.error("Snapshot retrieval error:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
-});
+}),
+);
 
 export default router;

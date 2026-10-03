@@ -1,7 +1,17 @@
 #!/usr/bin/env tsx
+function requireRailwayDatabaseUrl(): string {
+  const url = process.env.RAILWAY_DATABASE_URL;
+  if (!url) {
+    throw new Error(
+      'RAILWAY_DATABASE_URL is not set. This script no longer accepts an embedded connection string (2026-10-03, plan S.0.3).',
+    );
+  }
+  return url;
+}
+
 import pg from "pg";
 const { Client } = pg;
-const DST = "postgresql://postgres:YohCdZJubttuxsZkDtPrYyDPydDOyrrc@switchyard.proxy.rlwy.net:52129/railway";
+const DST = requireRailwayDatabaseUrl();
 
 async function main() {
   const c = new Client({ connectionString: DST });

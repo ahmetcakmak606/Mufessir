@@ -1,4 +1,14 @@
 #!/usr/bin/env tsx
+function requireRailwayDatabaseUrl(): string {
+  const url = process.env.RAILWAY_DATABASE_URL;
+  if (!url) {
+    throw new Error(
+      'RAILWAY_DATABASE_URL is not set. This script no longer accepts an embedded connection string (2026-10-03, plan S.0.3).',
+    );
+  }
+  return url;
+}
+
 /**
  * Inserts sample tafsir records for Maide 5:35 into Railway.
  * Queries actual mufassir IDs from the DB before inserting.
@@ -9,7 +19,7 @@ import pg from "pg";
 const { Client } = pg;
 
 const DST =
-  "postgresql://postgres:YohCdZJubttuxsZkDtPrYyDPydDOyrrc@switchyard.proxy.rlwy.net:52129/railway";
+  requireRailwayDatabaseUrl();
 
 const VERSE_ID = "5-35";
 

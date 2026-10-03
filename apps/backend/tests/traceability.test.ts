@@ -1,3 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unused-vars --
+   Two suites in this file are describe.skip'd (see the 2026-09-13 audit);
+   the helpers below are their scaffolding and become "unused" until the
+   suites are restored. Revisit during Faz 2/4 test work instead of deleting.
+*/
 import { describe, expect, it, beforeAll } from "vitest";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";

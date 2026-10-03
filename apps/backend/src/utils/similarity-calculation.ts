@@ -1,4 +1,3 @@
-import { createQueryEmbedding } from "./similarity-search.js";
 import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from "../embedding-constants.js";
 
 // Simple text similarity calculation using cosine similarity
@@ -92,7 +91,7 @@ export async function calculateEmbeddingSimilarity(
     if (magnitude1 === 0 || magnitude2 === 0) return 0;
 
     return dotProduct / (magnitude1 * magnitude2);
-  } catch (error) {
+  } catch {
     console.warn(
       "Could not calculate embedding similarity, falling back to text similarity",
     );

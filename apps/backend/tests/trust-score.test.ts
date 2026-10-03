@@ -37,7 +37,7 @@ afterAll(async () => {
 
 describe("Trust Score - RAG Quality Tests", () => {
   let token = "";
-  let testUserEmail = `trust-test-${Date.now()}@example.com`;
+  const testUserEmail = `trust-test-${Date.now()}@example.com`;
 
   beforeAll(async () => {
     // Create test user

@@ -1,4 +1,14 @@
 #!/usr/bin/env tsx
+function requireRailwayDatabaseUrl(): string {
+  const url = process.env.RAILWAY_DATABASE_URL;
+  if (!url) {
+    throw new Error(
+      'RAILWAY_DATABASE_URL is not set. This script no longer accepts an embedded connection string (2026-10-03, plan S.0.3).',
+    );
+  }
+  return url;
+}
+
 /**
  * Imports tafsir data from quran_db.db (SQLite) into Railway PostgreSQL.
  * Source: ~/Library/Mobile Documents/com~apple~CloudDocs/sqlite/quran_db.db
@@ -21,7 +31,7 @@ const SQLITE_PATH = path.join(
 );
 
 const DST =
-  "postgresql://postgres:YohCdZJubttuxsZkDtPrYyDPydDOyrrc@switchyard.proxy.rlwy.net:52129/railway";
+  requireRailwayDatabaseUrl();
 
 // Maps SQLite table name → Railway mufassir_id
 // Verified against Railway mufassirs table: Al-Tabari=7, Ibn Kathir=29, Al-Qurtubi=24

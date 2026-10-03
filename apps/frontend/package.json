@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.6",
-    "next": "^15.5.12",
+    "next": "15.5.27",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
@@ -32,7 +32,7 @@
     "@types/react-dom": "^19",
     "@vitest/coverage-v8": "^2.1.9",
     "eslint": "^9",
-    "eslint-config-next": "15.2.2",
+    "eslint-config-next": "15.5.27",
     "jsdom": "^26.0.0",
     "tailwindcss": "^4",
     "typescript": "^5",

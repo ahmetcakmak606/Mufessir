@@ -122,7 +122,6 @@ router.get("/", async (_req: Request, res: Response) => {
 router.get("/scholars-for-verse", async (req: Request, res: Response) => {
   const surahNumber = Number(req.query.surahNumber);
   const startVerse = Number(req.query.startVerse);
-  const endVerse = Number(req.query.endVerse ?? req.query.startVerse);
 
   if (!surahNumber || !startVerse) {
     return res.status(400).json({ error: "surahNumber and startVerse are required" });
