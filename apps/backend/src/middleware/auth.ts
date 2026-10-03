@@ -1,7 +1,9 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response, NextFunction, type RequestHandler } from "express";
 import jwt from "jsonwebtoken";
 import type { JwtPayload } from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
+import { asyncHandler } from "../utils/async-handler.js";
+import { requiresVerifiedEmailForQuota } from "../utils/account-policy.js";
 
 interface AuthenticatedRequest extends Request {
   user?: { id: string; email: string; dailyQuota?: number };
@@ -28,18 +30,24 @@ export function authenticateJWT(
   }
 }
 
-export function enforceQuota(prisma: PrismaClient) {
-  return async (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction,
-  ) => {
+export function enforceQuota(prisma: PrismaClient): RequestHandler {
+  // Wrapped with asyncHandler: a DB failure must surface as a handled 500,
+  // never an unhandled rejection (plan 1B.1 — enforceQuota is async too).
+  return asyncHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ error: "Unauthenticated" });
 
     const now = new Date();
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(401).json({ error: "Unauthenticated" });
+
+    // Plan 1B.8 (SEC-05): without a verification flow, unverified local
+    // accounts must not consume generation quota in production.
+    if (requiresVerifiedEmailForQuota() && !user.emailVerified) {
+      return res.status(403).json({
+        error: "Email verification is required to use the generation quota",
+      });
+    }
 
     let dailyQuota = user.dailyQuota;
 
@@ -61,15 +69,11 @@ export function enforceQuota(prisma: PrismaClient) {
     // Store user info for quota decrement middleware
     req.user = { ...req.user, dailyQuota } as any;
     next();
-  };
+  });
 }
 
-export function decrementQuota(prisma: PrismaClient) {
-  return async (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction,
-  ) => {
+export function decrementQuota(prisma: PrismaClient): RequestHandler {
+  return asyncHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     let decremented = false;
 
     const decrement = () => {
@@ -101,5 +105,5 @@ export function decrementQuota(prisma: PrismaClient) {
     } as any;
 
     next();
-  };
+  });
 }

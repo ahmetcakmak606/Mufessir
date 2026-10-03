@@ -1,3 +1,16 @@
-docs/MufassirAI_TafsirDB.sql
-docs/MufassirAI_TafsirDB.dump
+docs/MufessirAI_TafsirDB.sql
+docs/MufessirAI_TafsirDB.dump
 .env.local.bak
+node_modules
+
+# Secrets — never commit environment files or key material
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+
+# Run-level test database state files (per-run: .test-database-url-<run>)
+.test-database-url*

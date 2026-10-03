@@ -1,4 +1,14 @@
 #!/usr/bin/env tsx
+function requireRailwayDatabaseUrl(): string {
+  const url = process.env.RAILWAY_DATABASE_URL;
+  if (!url) {
+    throw new Error(
+      'RAILWAY_DATABASE_URL is not set. This script no longer accepts an embedded connection string (2026-10-03, plan S.0.3).',
+    );
+  }
+  return url;
+}
+
 /**
  * Migrates ONLY all_tafsirs from OrbStack (port 5433) to Railway.
  * Preserves Railway's users, searches, favorites, surahs, ayahs, mufassirs.
@@ -10,8 +20,8 @@ import pg from "pg";
 
 const { Client } = pg;
 
-const SRC = "postgresql://postgres:postgres@localhost:5433/MufassirAI_TafsirDB";
-const DST = "postgresql://postgres:YohCdZJubttuxsZkDtPrYyDPydDOyrrc@switchyard.proxy.rlwy.net:52129/railway";
+const SRC = requireRailwayDatabaseUrl();
+const DST = requireRailwayDatabaseUrl();
 const BATCH = 2000;
 
 async function main() {

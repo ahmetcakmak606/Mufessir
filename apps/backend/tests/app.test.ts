@@ -1,24 +1,33 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import request from "supertest";
 import express from "express";
-import { config } from "dotenv";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
 import healthRouter from "../src/routes/health.js";
 import authRouter from "../src/routes/auth.js";
 import filtersRouter from "../src/routes/filters.js";
 import versesRouter from "../src/routes/verses.js";
 import tafseerRouter from "../src/routes/tafseer.js";
 import { PrismaClient } from "@prisma/client";
+import { ensureTestDatabase, dropTestDatabase } from "./helpers/test-db.js";
+import { seedMinimalCorpus, SEED_VERSE_ID } from "./helpers/seed.js";
+import { buildTafsirCacheKey } from "../src/utils/tafseer-cache.js";
+import { InputPolicyError } from "../src/utils/input-policy.js";
+import crypto from "node:crypto";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-config({ path: resolve(__dirname, "../../../.env") });
-config({ path: resolve(__dirname, "../.env") });
+// Tests use passwords that satisfy the 1B.5 policy (>= 10 chars).
+const TEST_PASSWORD = "pass12345678";
 
-if (!process.env.JWT_SECRET) {
-  process.env.JWT_SECRET = "test-secret";
+function mockRandomInt(...values: number[]) {
+  const spy = vi.spyOn(crypto, "randomInt");
+  for (const value of values) {
+    spy.mockImplementationOnce(() => value as never);
+  }
+  return spy;
 }
+
+// Disposable per-run test database. The env guard (tests/setup/env-guard.ts)
+// ran before these imports and pointed DATABASE_URL at it; this must be ready
+// before any PrismaClient below issues its first query.
+await ensureTestDatabase();
 
 // Create an in-process express app using the same routers
 const app = express();
@@ -32,8 +41,29 @@ app.use("/filters", filtersRouter);
 app.use("/verses", versesRouter);
 app.use("/tafseer", tafseerRouter);
 
+// Mirror the production error handler so policy errors surface as 400 here
+// too (routers now route failures through next(err) via asyncHandler).
+app.use(
+  (
+    err: Error,
+    _req: express.Request,
+    res: express.Response,
+    _next: express.NextFunction,
+  ) => {
+    if (err instanceof InputPolicyError) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    console.error("unhandled test-app error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  },
+);
+
+await seedMinimalCorpus(prisma);
+
 afterAll(async () => {
   await prisma.$disconnect();
+  await dropTestDatabase();
 });
 
 describe("Health", () => {
@@ -53,7 +83,7 @@ describe("Auth", () => {
   it("registers a user", async () => {
     const res = await request(app).post("/auth/register").send({
       email: "testuser@example.com",
-      password: "pass1234",
+      password: TEST_PASSWORD,
       name: "Tester",
     });
     expect([200, 201, 409]).toContain(res.status); // 409 if user exists
@@ -62,7 +92,7 @@ describe("Auth", () => {
   it("logs in and returns a token", async () => {
     const res = await request(app)
       .post("/auth/login")
-      .send({ email: "testuser@example.com", password: "pass1234" });
+      .send({ email: "testuser@example.com", password: TEST_PASSWORD });
     expect(res.status).toBe(200);
     expect(res.body.token).toBeDefined();
     token = res.body.token;
@@ -178,7 +208,8 @@ describe("Auth", () => {
   });
 
   it("creates a password reset code for existing user", async () => {
-    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+    // 1B.2: kod crypto.randomInt ile üretiliyor; test değeri sabitleniyor.
+    const randomSpy = mockRandomInt(100000);
     try {
       const res = await request(app)
         .post("/auth/password/reset/request")
@@ -285,7 +316,7 @@ describe("Tafseer", () => {
   beforeAll(async () => {
     const login = await request(app)
       .post("/auth/login")
-      .send({ email: "testuser@example.com", password: "pass1234" });
+      .send({ email: "testuser@example.com", password: TEST_PASSWORD });
     token = login.body.token;
   });
 
@@ -395,5 +426,293 @@ describe("Tafseer", () => {
     expect(res.body.title).toBe("Test run");
     expect(res.body.starred).toBe(true);
     expect(res.body.notes).toBe("Updated by test");
+  });
+});
+
+describe("Tafseer result cache & fallback persistence (plan Faz 1)", () => {
+  let token = "";
+  let userId = "";
+
+  beforeAll(async () => {
+    const login = await request(app)
+      .post("/auth/login")
+      .send({ email: "testuser@example.com", password: TEST_PASSWORD });
+    token = login.body.token;
+    const user = await prisma.user.findUnique({
+      where: { email: "testuser@example.com" },
+    });
+    userId = user!.id;
+  });
+
+  it("serves a stored result from cache, before any retrieval", async () => {
+    const filters = { language: "Turkish" };
+    const cacheKey = buildTafsirCacheKey({
+      verseId: SEED_VERSE_ID,
+      surahNumber: 1,
+      startVerse: 1,
+      endVerse: 1,
+      filters,
+      language: "Turkish",
+      userId,
+    });
+    const search = await prisma.search.create({
+      data: {
+        userId,
+        verseId: SEED_VERSE_ID,
+        query: {
+          cacheKey,
+          filters,
+          verseRange: { surahNumber: 1, startVerse: 1, endVerse: 1 },
+          sourceExcerpts: [],
+        },
+      },
+    });
+    await prisma.searchResult.create({
+      data: {
+        searchId: search.id,
+        tafsirId: "seed-tafsir",
+        aiResponse: "ÖNBELLEK YANITI",
+        citations: [],
+        confidenceScore: 0.5,
+      },
+    });
+
+    const res = await request(app)
+      .post("/tafseer")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ verseId: SEED_VERSE_ID, filters, stream: false });
+
+    expect(res.status).toBe(200);
+    expect(res.body.cached).toBe(true);
+    expect(res.body.aiResponse).toBe("ÖNBELLEK YANITI");
+    expect(res.body.searchId).toBe(search.id);
+  });
+
+  it("separates a range from the single verse it starts with (cache key regression)", async () => {
+    // The single verse 1:1 is cached by the previous test. A 1:1–2 range
+    // shares the first verse but must NOT reuse that answer.
+    const res = await request(app)
+      .post("/tafseer")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        verseRange: { surahNumber: 1, startVerse: 1, endVerse: 2 },
+        filters: { language: "Turkish" },
+        stream: false,
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.cached).toBeUndefined();
+    expect(res.body.aiResponse).not.toBe("ÖNBELLEK YANITI");
+    // AI is disabled in tests, so the fresh path lands on the shown fallback.
+    expect(res.body.fallback).toBe(true);
+  });
+
+  it("does not persist fallback responses, so they cannot poison the cache (regression)", async () => {
+    const body = {
+      verseId: SEED_VERSE_ID,
+      filters: { language: "Turkish", responseLength: 2 },
+      stream: false,
+    };
+    const fallbackCountBefore = await prisma.searchResult.count({
+      where: { aiResponse: { contains: "Fallback Response" } },
+    });
+
+    const first = await request(app)
+      .post("/tafseer")
+      .set("Authorization", `Bearer ${token}`)
+      .send(body);
+    expect(first.status).toBe(200);
+    expect(first.body.fallback).toBe(true);
+
+    // Same request immediately after: must be a fresh attempt, not the
+    // fallback served from the 1-hour cache.
+    const second = await request(app)
+      .post("/tafseer")
+      .set("Authorization", `Bearer ${token}`)
+      .send(body);
+    expect(second.status).toBe(200);
+    expect(second.body.cached).toBeUndefined();
+    expect(second.body.fallback).toBe(true);
+
+    const fallbackCountAfter = await prisma.searchResult.count({
+      where: { aiResponse: { contains: "Fallback Response" } },
+    });
+    expect(fallbackCountAfter).toBe(fallbackCountBefore);
+
+    const fallbackSnapshots = await prisma.academicSnapshot.count({
+      where: { aiResponse: { contains: "Fallback Response" } },
+    });
+    expect(fallbackSnapshots).toBe(0);
+  });
+});
+
+describe("Faz 1B security hardening", () => {
+  it("SEC-01 regression: non-string idToken returns 400 and the process stays alive", async () => {
+    for (const bad of [123, { x: 1 }, ["t"], null]) {
+      const res = await request(app)
+        .post("/auth/sso/google")
+        .send({ idToken: bad });
+      expect(res.status).toBe(400);
+    }
+    // Süreç hâlâ ayakta: basit bir istek daha.
+    const health = await request(app).get("/health");
+    expect(health.status).toBe(200);
+  });
+
+  it("wrong-typed login fields return 400", async () => {
+    const res = await request(app)
+      .post("/auth/login")
+      .send({ email: 42, password: TEST_PASSWORD });
+    expect(res.status).toBe(400);
+  });
+
+  it("1B.5: short and oversized passwords are rejected", async () => {
+    const shortRes = await request(app).post("/auth/register").send({
+      email: `pw-test-${Date.now()}@example.com`,
+      password: "short",
+    });
+    expect(shortRes.status).toBe(400);
+
+    const longRes = await request(app).post("/auth/register").send({
+      email: `pw-test2-${Date.now()}@example.com`,
+      password: "ü".repeat(37), // 74 bytes > bcrypt 72-byte limit
+    });
+    expect(longRes.status).toBe(400);
+  });
+
+  it("1B.5: invalid email formats are rejected", async () => {
+    const res = await request(app).post("/auth/register").send({
+      email: "not-an-email",
+      password: "longenough123",
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("1B.2: requesting a new code invalidates the previous unused one (SEC-04 quick half)", async () => {
+    const email = `oldcode-${Date.now()}@example.com`;
+    await request(app).post("/auth/register").send({
+      email,
+      password: "initialpass1234",
+    });
+    const spy = mockRandomInt(100000, 222222);
+    await request(app).post("/auth/password/reset/request").send({ email });
+    await request(app).post("/auth/password/reset/request").send({ email });
+    spy.mockRestore();
+
+    // Eski kod artık geçersiz:
+    const oldCode = await request(app)
+      .post("/auth/password/reset/confirm")
+      .send({ email, code: "100000", newPassword: "newpass12345" });
+    expect(oldCode.status).toBe(400);
+
+    // Yeni kod çalışır:
+    const newCode = await request(app)
+      .post("/auth/password/reset/confirm")
+      .send({ email, code: "222222", newPassword: "newpass12345" });
+    expect(newCode.status).toBe(200);
+  });
+
+  it("1B.8: repeated failed login attempts hit the rate limit (429)", async () => {
+    const email = `limit-${Date.now()}@example.com`;
+    await request(app).post("/auth/register").send({
+      email,
+      password: "validpassword1",
+    });
+    let lastStatus = 0;
+    for (let i = 0; i < 6; i++) {
+      const res = await request(app)
+        .post("/auth/login")
+        .send({ email, password: "wrongpassword" });
+      lastStatus = res.status;
+    }
+    expect(lastStatus).toBe(429);
+  });
+
+  it("1B.8: too many failed reset confirmations are locked out (429)", async () => {
+    const email = `lockout-${Date.now()}@example.com`;
+    await request(app).post("/auth/register").send({
+      email,
+      password: "validpassword1",
+    });
+    const spy = mockRandomInt(999999);
+    await request(app).post("/auth/password/reset/request").send({ email });
+    spy.mockRestore();
+
+    let lastStatus = 0;
+    for (let i = 0; i < 6; i++) {
+      const res = await request(app)
+        .post("/auth/password/reset/confirm")
+        .send({ email, code: "100001", newPassword: "newpass12345" });
+      lastStatus = res.status;
+    }
+    expect(lastStatus).toBe(429);
+
+    // Kontrol bulgusu 1: kilit, kod karşılaştırmasından ÖNCE uygulanır —
+    // DOĞRU kod bile artık parolayı değiştiremez.
+    const correctButLocked = await request(app)
+      .post("/auth/password/reset/confirm")
+      .send({ email, code: "999999", newPassword: "hacked12345" });
+    expect(correctButLocked.status).toBe(429);
+
+    // Parola gerçekten değişmedi:
+    const login = await request(app)
+      .post("/auth/login")
+      .send({ email, password: "validpassword1" });
+    expect(login.status).toBe(200);
+  });
+
+  it("1B.8: email counters use account normalization — case/whitespace variants cannot bypass limits", async () => {
+    const email = `normlimit-${Date.now()}@example.com`;
+    await request(app).post("/auth/register").send({
+      email,
+      password: "validpassword1",
+    });
+    // Aynı hesabın büyük/küçük harf ve boşluklu yazımları:
+    const variants = [
+      email.toUpperCase(),
+      ` ${email} `,
+      email.toUpperCase(),
+      ` ${email.toUpperCase()} `,
+      email,
+    ];
+    for (const variant of variants) {
+      const res = await request(app)
+        .post("/auth/login")
+        .send({ email: variant, password: "wrongpassword" });
+      expect([401, 429]).toContain(res.status);
+    }
+    // 5 deneme sayacı doldurdu; normalize edilmiş düz yazım da 429 almalı:
+    const res = await request(app)
+      .post("/auth/login")
+      .send({ email, password: "wrongpassword" });
+    expect(res.status).toBe(429);
+  });
+
+  it("1B.3 (SEC-07): an ownerless snapshot is denied by default", async () => {
+    const login = await request(app)
+      .post("/auth/login")
+      .send({ email: "testuser@example.com", password: TEST_PASSWORD });
+    const token = login.body.token;
+
+    const created = await prisma.academicSnapshot.create({
+      data: {
+        snapshotId: `OWNERLESS-${Date.now()}`,
+        verseId: SEED_VERSE_ID,
+        queryText: "orphan",
+        corpusVersion: "1.0",
+        embeddingModel: "test",
+        llmModel: "test",
+        promptHash: "test",
+        aiResponse: "private content",
+        citationKey: "key",
+        searchId: null,
+      },
+    });
+
+    const res = await request(app)
+      .get(`/tafseer/snapshots/${created.snapshotId}`)
+      .set("Authorization", `Bearer ${token}`);
+    expect(res.status).toBe(404);
+    expect(JSON.stringify(res.body)).not.toContain("private content");
   });
 });

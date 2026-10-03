@@ -3,6 +3,7 @@ import cors from "cors";
 import "./env.js";
 import { prisma } from "./prisma.js";
 import { requestLogger } from "./middleware/request-logger.js";
+import { InputPolicyError } from "./utils/input-policy.js";
 import healthRouter from "./routes/health.js";
 import authRouter from "./routes/auth.js";
 import tafseerRouter from "./routes/tafseer.js";
@@ -31,6 +32,9 @@ app.use(
     res: express.Response,
     _next: express.NextFunction,
   ) => {
+    if (err instanceof InputPolicyError) {
+      return res.status(400).json({ error: err.message });
+    }
     console.error(
       JSON.stringify({
         level: "error",
