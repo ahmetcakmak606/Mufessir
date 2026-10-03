@@ -74,7 +74,10 @@ export function DashboardShell({
           </nav>
 
           <div className="ml-auto flex items-center gap-3 text-sm text-[var(--text-muted)]">
-            <span className="tabular-nums" title={t.quotaLabel}>
+            <span
+              className="ui-badge tabular-nums"
+              title={t.quotaLabel}
+            >
               {q.quotaLeft}: {user.dailyQuota}
             </span>
             <div

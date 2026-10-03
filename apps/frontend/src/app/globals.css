@@ -353,8 +353,8 @@ a {
 .ui-ayat {
   direction: rtl;
   text-align: justify;
-  font-size: 1.85rem;
-  line-height: 2.3;
+  font-size: 1.45rem;
+  line-height: 2.05;
   margin: 0;
 }
 
@@ -403,7 +403,7 @@ a {
     padding: 0 1rem 6rem;
   }
   .ui-ayat {
-    font-size: 1.5rem;
+    font-size: 1.3rem;
   }
 }
 

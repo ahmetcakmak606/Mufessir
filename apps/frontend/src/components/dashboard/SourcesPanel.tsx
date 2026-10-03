@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { formatScholarName } from "@/lib/metadata-labels";
+import { formatScholarName, type UiLang } from "@/lib/metadata-labels";
 import type { Citation, SourceExcerpt } from "@/lib/tafseer";
 
 interface SourcesPanelProps {
   citations: Citation[];
   excerpts: SourceExcerpt[];
+  lang: UiLang;
   labels: {
     title: string;
     summary: string;
@@ -31,9 +32,19 @@ const COLLAPSED_COUNT = 6;
 
 // Atıflar ve alıntılar backend'den ayrı listeler olarak geliyor; okuyucu için
 // aynı müfessire ait künye ve alıntıyı tek satırda birleştiriyoruz.
+// TR arayüzde Türkçe isim varsa o gösterilir (veri eksikse Latince kalır).
+function pickScholarName(
+  lang: UiLang,
+  name: string,
+  nameTr?: string | null,
+): string {
+  return lang === "tr" && nameTr ? nameTr : name;
+}
+
 export function mergeSources(
   citations: Citation[],
   excerpts: SourceExcerpt[],
+  lang: UiLang = "tr",
 ): SourceEntry[] {
   const entries = new Map<string, SourceEntry>();
   for (const citation of citations) {
@@ -41,7 +52,11 @@ export function mergeSources(
     if (!entries.has(id)) {
       entries.set(id, {
         scholarId: id,
-        scholarName: citation.scholarName,
+        scholarName: pickScholarName(
+          lang,
+          citation.scholarName,
+          citation.scholarNameTr,
+        ),
         citation,
         excerpts: [],
       });
@@ -54,7 +69,11 @@ export function mergeSources(
     else
       entries.set(id, {
         scholarId: id,
-        scholarName: excerpt.scholarName,
+        scholarName: pickScholarName(
+          lang,
+          excerpt.scholarName,
+          excerpt.scholarNameTr,
+        ),
         excerpts: [excerpt.excerpt],
       });
   }
@@ -65,10 +84,15 @@ function isArabic(text: string) {
   return /[؀-ۿ]/.test(text.slice(0, 80));
 }
 
-export function SourcesPanel({ citations, excerpts, labels }: SourcesPanelProps) {
+export function SourcesPanel({
+  citations,
+  excerpts,
+  lang,
+  labels,
+}: SourcesPanelProps) {
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
   const [showAll, setShowAll] = useState(false);
-  const entries = mergeSources(citations, excerpts);
+  const entries = mergeSources(citations, excerpts, lang);
   const visible = showAll ? entries : entries.slice(0, COLLAPSED_COUNT);
   const hidden = entries.length - visible.length;
 

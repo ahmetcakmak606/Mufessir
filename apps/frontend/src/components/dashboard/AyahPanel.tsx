@@ -23,6 +23,17 @@ function toArabicDigits(n: number) {
   return String(n).replace(/\d/g, (d) => ARABIC_DIGITS[Number(d)]);
 }
 
+// Veritabanındaki meal kolonu (ayah_text_tr) şu an Arapça metin + "Fâtiha 1/1"
+// tarzı referans içeriyor; gerçek Türkçe meal yok. Meal ancak Latin harfler
+// Arapça harflerden çoğunuktaysa gösterilir — aksi halde Arapçayı ikiye
+// katlamaktan başka işe yaramıyor.
+function isUsableMeal(translation: string | null | undefined) {
+  if (!translation) return false;
+  const latin = (translation.match(/[A-Za-zÇĞİÖŞÜçğıöşü]/g) || []).length;
+  const arabic = (translation.match(/[\u0600-\u06FF]/g) || []).length;
+  return latin > 0 && latin >= arabic;
+}
+
 export function AyahPanel({
   surahNumber,
   startVerse,
@@ -62,7 +73,7 @@ export function AyahPanel({
   }, [surahNumber, startVerse, endVerse]);
 
   const withText = verses.filter((v) => v.arabicText);
-  const withMeal = verses.filter((v) => v.translation);
+  const withMeal = verses.filter((v) => isUsableMeal(v.translation));
 
   return (
     <div>

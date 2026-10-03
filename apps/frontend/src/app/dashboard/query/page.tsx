@@ -748,6 +748,7 @@ export default function QueryWorkspacePage() {
           <SourcesPanel
             citations={citations}
             excerpts={sourceExcerpts}
+            lang={lang}
             labels={{
               title: q.sourcesTitle,
               summary: q.sourcesSummary,
