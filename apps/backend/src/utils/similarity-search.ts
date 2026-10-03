@@ -115,6 +115,7 @@ async function runSampleSearch(
       v.ayah_number AS verse_number,
       m.mufassir_id::text AS scholar_id,
       COALESCE(m.mufassir_en, m.mufassir_tr, m.mufassir_ar, 'Unknown') AS scholar_name,
+      m.mufassir_tr AS scholar_name_tr,
       m.century,
       m.madhab,
       m.period,
@@ -138,6 +139,7 @@ async function runSampleSearch(
   return rows.map((row) => ({
     tafsirId: String(row.tafsir_id),
     scholarName: String(row.scholar_name),
+    scholarNameTr: row.scholar_name_tr ? String(row.scholar_name_tr) : null,
     tafsirText: String(row.tafsir_text || ""),
     similarityScore: 0.8,
     verseId: String(row.verse_id),
@@ -146,6 +148,7 @@ async function runSampleSearch(
     scholar: {
       id: String(row.scholar_id),
       name: String(row.scholar_name),
+      nameTr: row.scholar_name_tr ? String(row.scholar_name_tr) : null,
       century: Number(row.century || 0),
       madhab: row.madhab ?? null,
       period: row.period ?? null,
@@ -156,6 +159,7 @@ async function runSampleSearch(
     mufassir: {
       id: String(row.scholar_id),
       name: String(row.scholar_name),
+      nameTr: row.scholar_name_tr ? String(row.scholar_name_tr) : null,
       century: Number(row.century || 0),
       madhab: row.madhab ?? null,
       period: row.period ?? null,
@@ -311,6 +315,7 @@ export async function performSimilaritySearch(
         SELECT
           d.tafsir_id::text AS "tafsirId",
           COALESCE(m.mufassir_en, m.mufassir_tr, m.mufassir_ar, 'Unknown') AS "scholarName",
+          m.mufassir_tr AS "scholarNameTr",
           ${textMode === "parent" ? "pt.commentary" : "d.hit_text"} AS "tafsirText",
           1 - d.dist AS "similarityScore",
           d.verse_id AS "verseId",
@@ -336,6 +341,7 @@ export async function performSimilaritySearch(
         SELECT
           t.id::text AS "tafsirId",
           COALESCE(m.mufassir_en, m.mufassir_tr, m.mufassir_ar, 'Unknown') AS "scholarName",
+          m.mufassir_tr AS "scholarNameTr",
           t.commentary AS "tafsirText",
           1 - (t.embedding <=> $1::vector) AS "similarityScore",
           t.verse_id AS "verseId",
@@ -369,6 +375,7 @@ export async function performSimilaritySearch(
         const scholar = {
           id: String(res.scholarId),
           name: String(res.scholarName),
+          nameTr: res.scholarNameTr ? String(res.scholarNameTr) : null,
           century: Number(res.century),
           madhab: res.madhab as string | null,
           period: res.period as string | null,
@@ -379,6 +386,7 @@ export async function performSimilaritySearch(
         return {
           tafsirId: String(res.tafsirId),
           scholarName: String(res.scholarName),
+          scholarNameTr: res.scholarNameTr ? String(res.scholarNameTr) : null,
           tafsirText: String(res.tafsirText),
           similarityScore: Number(res.similarityScore),
           verseId: String(res.verseId),

@@ -175,12 +175,20 @@ function parseStoredCitations(value: any | null): Citation[] {
     .map((item) => asRecord(item))
     .filter(
       (row) =>
-        typeof row.mufassirId === "string" &&
-        typeof row.scholarName === "string",
+        // Geçmiş kayıtlarda iki şekil var: loadCitations çıktısı (scholarId)
+        // ve eski varsayım (mufassirId). String/number ikisi de kabul; isim şart.
+        (typeof row.scholarId === "string" ||
+          typeof row.scholarId === "number" ||
+          typeof row.mufassirId === "string" ||
+          typeof row.mufassirId === "number") &&
+        typeof row.scholarName === "string" &&
+        row.scholarName.length > 0,
     )
     .map((row) => ({
-      scholarId: String(row.mufassirId),
+      scholarId: String(row.scholarId ?? row.mufassirId ?? ""),
       scholarName: String(row.scholarName),
+      scholarNameTr:
+        typeof row.scholarNameTr === "string" ? row.scholarNameTr : null,
       sourceType:
         typeof row.sourceType === "string" ? row.sourceType : "UNKNOWN",
       sourceTitle:
@@ -197,7 +205,27 @@ function parseStoredCitations(value: any | null): Citation[] {
     }));
 }
 
-function buildRunSummary(search: any) {
+// Search.verseId düz metin ( ilişki değil) — surah/verse etiketi için
+// ayrıca sorgulanmış Verse satırlarından payload kurar.
+function buildVersePayload(
+  verseId: string,
+  verseById: Map<string, { verseNumber: number; surahNumber: number; surah: { nameTr: string | null; nameEn: string | null; surahNumber: number } | null } | undefined>,
+) {
+  const verse = verseById.get(verseId);
+  const surah = verse?.surah ?? null;
+  return {
+    id: verseId,
+    surahNumber: verse?.surahNumber ?? surah?.surahNumber ?? null,
+    surahName:
+      surah?.nameTr || surah?.nameEn || `Sure ${verse?.surahNumber ?? "?"}`,
+    verseNumber: verse?.verseNumber ?? null,
+  };
+}
+
+function buildRunSummary(
+  search: any,
+  verseById: Map<any, any>,
+) {
   const latest = search.results?.[0];
   const citations = parseStoredCitations(latest?.citations ?? null);
   const runMeta = extractRunMeta(search.query as any | null);
@@ -205,12 +233,7 @@ function buildRunSummary(search: any) {
   return {
     runId: search.id,
     searchId: search.id,
-    verse: {
-      id: search.verseId.id,
-      surahNumber: search.verseId.surahNumber,
-      surahName: search.verseId.surahName,
-      verseNumber: search.verseId.verseNumber,
-    },
+    verse: buildVersePayload(String(search.verseId ?? ""), verseById),
     filters: extractFiltersFromQuery(search.query as any | null),
     title: runMeta.title,
     notes: runMeta.notes,
@@ -262,8 +285,28 @@ router.get("/runs", authenticateJWT, async (req, res) => {
     const hasMore = rows.length > limit;
     const pageItems = hasMore ? rows.slice(0, limit) : rows;
 
+    const verseIds = [
+      ...new Set(
+        pageItems
+          .map((row) => (typeof row.verseId === "string" ? row.verseId : ""))
+          .filter(Boolean),
+      ),
+    ];
+    const verseRows = verseIds.length
+      ? await prisma.verse.findMany({
+          where: { id: { in: verseIds } },
+          select: {
+            id: true,
+            verseNumber: true,
+            surahNumber: true,
+            surah: { select: { surahNumber: true, nameTr: true, nameEn: true } },
+          },
+        })
+      : [];
+    const verseById = new Map(verseRows.map((verse) => [verse.id, verse]));
+
     res.json({
-      items: pageItems.map(buildRunSummary),
+      items: pageItems.map((row) => buildRunSummary(row, verseById)),
       nextCursor: hasMore
         ? (pageItems[pageItems.length - 1]?.id ?? null)
         : null,
@@ -305,10 +348,23 @@ router.get("/runs/:runId", authenticateJWT, async (req, res) => {
       runMeta.updatedAt || latest?.createdAt || search.createdAt;
     const sourceExcerpts: SourceExcerpt[] = [];
 
+    const verseRow = search.verseId
+      ? await prisma.verse.findFirst({
+          where: { id: search.verseId },
+          select: {
+            id: true,
+            verseNumber: true,
+            surahNumber: true,
+            surah: { select: { surahNumber: true, nameTr: true, nameEn: true } },
+          },
+        })
+      : null;
+    const verseById = new Map(verseRow ? [[verseRow.id, verseRow]] : []);
+
     return res.json({
       runId: search.id,
       searchId: search.id,
-      verse: search.verseId,
+      verse: buildVersePayload(String(search.verseId ?? ""), verseById),
       filters: extractFiltersFromQuery(search.query as any | null),
       title: runMeta.title,
       notes: runMeta.notes,
@@ -413,7 +469,24 @@ router.patch("/runs/:runId", authenticateJWT, async (req, res) => {
       },
     });
 
-    return res.json(buildRunSummary(updated));
+    const updatedVerseRow = updated.verseId
+      ? await prisma.verse.findFirst({
+          where: { id: updated.verseId },
+          select: {
+            id: true,
+            verseNumber: true,
+            surahNumber: true,
+            surah: { select: { surahNumber: true, nameTr: true, nameEn: true } },
+          },
+        })
+      : null;
+
+    return res.json(
+      buildRunSummary(
+        updated,
+        new Map(updatedVerseRow ? [[updatedVerseRow.id, updatedVerseRow]] : []),
+      ),
+    );
   } catch (error) {
     console.error("Run update error:", error);
     return res.status(500).json({ error: "Internal server error" });
@@ -424,6 +497,7 @@ export function buildSourceExcerpts(similarTafsirs: any[]): SourceExcerpt[] {
   return similarTafsirs.slice(0, 5).map((result: any) => ({
     scholarId: result.mufassir.id,
     scholarName: result.mufassir.name,
+    scholarNameTr: result.mufassir.nameTr || null,
     excerpt:
       result.tafsirText.length > 500
         ? `${result.tafsirText.slice(0, 500)}...`
@@ -527,20 +601,23 @@ export async function loadCitations(
   ];
   if (!scholarIds.length) return [];
 
-  return scholarIds.map((id: string) => ({
-    scholarId: id,
-    scholarName:
-      similarTafsirs.find((t: any) => t.mufassir.id === id)?.mufassir.name ||
-      "",
-    sourceType: "Tafsir",
-    sourceTitle: "",
-    volume: null,
-    page: null,
-    edition: null,
-    citationText: null,
-    provenance: null,
-    isPrimary: false,
-  }));
+  return scholarIds.map((id: string) => {
+    const mufassir =
+      similarTafsirs.find((t: any) => t.mufassir.id === id)?.mufassir ?? {};
+    return {
+      scholarId: String(id),
+      scholarName: mufassir.name || "",
+      scholarNameTr: mufassir.nameTr || null,
+      sourceType: "Tafsir",
+      sourceTitle: "",
+      volume: null,
+      page: null,
+      edition: null,
+      citationText: null,
+      provenance: null,
+      isPrimary: false,
+    };
+  });
 }
 
 // Protected endpoint that requires auth and enforces quota
