@@ -25,13 +25,16 @@ import {
   useRunDetailQuery,
   useUpdateRunMutation,
 } from "@/hooks/use-run-history";
-import { QueryComposer } from "@/components/dashboard/QueryComposer";
-import { FilterFacets } from "@/components/dashboard/FilterFacets";
 import { ResultStream } from "@/components/dashboard/ResultStream";
 import { RunActions } from "@/components/dashboard/RunActions";
-import { CitationPanel } from "@/components/dashboard/CitationPanel";
-import { SourceSnippetPanel } from "@/components/dashboard/SourceSnippetPanel";
 import { QueryBar } from "@/components/dashboard/QueryBar";
+import { AyahPanel } from "@/components/dashboard/AyahPanel";
+import { SourcesPanel } from "@/components/dashboard/SourcesPanel";
+import {
+  SettingsDrawer,
+  lengthStepFor,
+  type SettingsTab,
+} from "@/components/dashboard/SettingsDrawer";
 
 const defaultFilters: RunDraftFilters = {
   language: "Turkish",
@@ -39,25 +42,12 @@ const defaultFilters: RunDraftFilters = {
   responseLength: 6,
 };
 
-function getConfidenceStatus(
-  confidence: number | null,
-): { level: "high" | "medium" | "low"; message: string } | null {
-  if (confidence === null) return null;
-  if (confidence >= 0.7)
-    return { level: "high", message: "Yüksek güvenilirlik" };
-  if (confidence >= 0.4)
-    return { level: "medium", message: "Orta güvenilirlik" };
-  return {
-    level: "low",
-    message: "Düşük güvenilirlik - kaynaklar sorgulanabilir",
-  };
-}
-
 export default function QueryWorkspacePage() {
   const { user, refreshUser } = useAuth();
   const { lang } = useLang();
   const t = locales[lang].dashboardQuery;
   const dashboard = locales[lang].dashboard;
+  const q = locales[lang].queryUi;
   const searchParams = useSearchParams();
 
   const runIdParam = searchParams.get("runId") || undefined;
@@ -108,10 +98,8 @@ export default function QueryWorkspacePage() {
   });
 
   const [currentRunId, setCurrentRunId] = useState<string | null>(null);
-  const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
-  const [mobileResultTab, setMobileResultTab] = useState<
-    "result" | "citations" | "snippets"
-  >("result");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<SettingsTab>("basics");
 
   const hydratedRunRef = useRef<string | null>(null);
   const replayedRef = useRef(false);
@@ -487,40 +475,23 @@ export default function QueryWorkspacePage() {
     setStatus(t.shareLinkCopied);
   };
 
-  const includeScholar = (id: string) => {
-    const next = new Set(filters.scholars || []);
-    next.add(id);
-    const nextExclude = new Set(filters.excludeScholars || []);
-    nextExclude.delete(id);
-    setFilters((prev) => ({
-      ...prev,
-      scholars: Array.from(next),
-      excludeScholars: Array.from(nextExclude),
-    }));
-  };
-
-  const excludeScholar = (id: string) => {
-    const next = new Set(filters.excludeScholars || []);
-    next.add(id);
-    const nextInclude = new Set(filters.scholars || []);
-    nextInclude.delete(id);
-    setFilters((prev) => ({
-      ...prev,
-      excludeScholars: Array.from(next),
-      scholars: Array.from(nextInclude),
-    }));
-  };
-
-  const resetScholar = (id: string) => {
-    const nextInclude = new Set(filters.scholars || []);
-    const nextExclude = new Set(filters.excludeScholars || []);
-    nextInclude.delete(id);
-    nextExclude.delete(id);
-    setFilters((prev) => ({
-      ...prev,
-      scholars: Array.from(nextInclude),
-      excludeScholars: Array.from(nextExclude),
-    }));
+  const toggleScholar = (id: string, include: boolean) => {
+    setFilters((prev) => {
+      const nextInclude = new Set(prev.scholars || []);
+      const nextExclude = new Set(prev.excludeScholars || []);
+      if (include) {
+        nextInclude.add(id);
+        nextExclude.delete(id);
+      } else {
+        nextInclude.delete(id);
+        nextExclude.add(id);
+      }
+      return {
+        ...prev,
+        scholars: Array.from(nextInclude),
+        excludeScholars: Array.from(nextExclude),
+      };
+    });
   };
 
   const includeAll = () => {
@@ -533,6 +504,22 @@ export default function QueryWorkspacePage() {
     setFilters((prev) => ({ ...prev, scholars: [], excludeScholars: ids }));
   };
 
+  const resetFilters = () => {
+    setScholarQuery("");
+    setFilters({
+      ...defaultFilters,
+      scholars: (availableFilters?.scholars || []).map((s) => String(s.id)),
+      excludeScholars: [],
+    });
+  };
+
+  const openDrawer = (tab: SettingsTab) => {
+    setDrawerTab(tab);
+    setDrawerOpen(true);
+  };
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+
+  const surahMeta = surahs.find((surah) => surah.number === surahNumber);
   const revelationLabel =
     revelationType === "Mekki"
       ? dashboard.mekki
@@ -542,379 +529,235 @@ export default function QueryWorkspacePage() {
   const noValueLabel = t.notAvailable;
   const provenanceLabel = formatProvenance(provenance, lang, noValueLabel);
 
-  const queryComposerNode = (
-    <div className="space-y-4">
-      <QueryComposer
+  // Seçili müfessir sayısı yalnızca bu surede yorumu olanlar üzerinden okunur.
+  const visibleScholarIds = (availableFilters?.scholars || [])
+    .map((s) => String(s.id))
+    .filter((id) => verseScholarIds === null || verseScholarIds.has(id));
+  const selectedVisible = visibleScholarIds.filter((id) => includeIds.has(id));
+  const scholarSummary =
+    visibleScholarIds.length > 0 &&
+    selectedVisible.length === visibleScholarIds.length
+      ? `${q.scholarsAll} (${visibleScholarIds.length})`
+      : `${selectedVisible.length} ${q.scholarsSelected}`;
+  const settingsSummary = q[lengthStepFor(filters.responseLength).key];
+
+  const activeFacets: Array<{ key: keyof RunDraftFilters; label: string }> = [
+    ...(filters.periodCodes || []).map((v) => ({
+      key: "periodCodes" as const,
+      label: formatFacetValue(lang, "periodCodes", v),
+    })),
+    ...(filters.madhabs || []).map((v) => ({
+      key: "madhabs" as const,
+      label: formatFacetValue(lang, "madhabs", v),
+    })),
+    ...(filters.traditions || []).map((v) => ({
+      key: "traditions" as const,
+      label: formatFacetValue(lang, "traditions", v),
+    })),
+    ...(filters.tafsirTypes || []).map((v) => ({
+      key: "tafsirTypes" as const,
+      label: formatFacetValue(lang, "tafsirTypes", v),
+    })),
+  ];
+  const activeFacetLabels = Array.from(
+    new Set(activeFacets.map((f) => f.label.replace(/\s*\/\s*/g, " / "))),
+  );
+
+  const surahTitle = surahMeta?.nameTr || surahName;
+  const ayahHeading = `${surahTitle} ${surahNumber} / ${verseNumber}${
+    endVerseNumber > verseNumber ? `–${endVerseNumber}` : ""
+  } · ${revelationLabel}`;
+
+  const timing =
+    startedAt && completedAt
+      ? `${firstByteAt ? Math.max(0, Math.round(firstByteAt - startedAt)) : "—"} ms / ${Math.max(0, Math.round(completedAt - startedAt))} ms`
+      : noValueLabel;
+  const hasResult = Boolean(streamContent || turkishTafsir || arabicTafsir);
+
+  return (
+    <div className="pb-24 sm:pb-0">
+      <QueryBar
         surahNumber={surahNumber}
         verseNumber={verseNumber}
         endVerseNumber={endVerseNumber}
-        surahName={
-          surahName ||
-          surahs.find((surah) => surah.number === surahNumber)?.nameTr ||
-          ""
-        }
-        revelationLabel={revelationLabel}
         surahOptions={surahs}
-        filters={filters}
-        availableFilters={availableFilters}
-        filteredScholars={filteredScholars}
-        scholarQuery={scholarQuery}
-        includeIds={includeIds}
-        excludeIds={excludeIds}
-        loadingFilters={filtersQuery.isLoading}
-        canAnalyze={canAnalyze}
-        isAnalyzing={isAnalyzing}
-        error={error}
-        onSurahNumberChange={(v) => {
+        scholarSummary={scholarSummary}
+        settingsSummary={settingsSummary}
+        canAnalyze={canAnalyze && !filtersQuery.isLoading}
+        analyzing={isAnalyzing}
+        onSurahChange={(v) => {
           setSurahNumber(v);
           setVerseNumber(1);
           setEndVerseNumber(1);
         }}
-        onVerseNumberChange={(v) => { setVerseNumber(v); setEndVerseNumber(v); }}
-        onEndVerseNumberChange={setEndVerseNumber}
-        onFilterChange={setFilters}
-        onScholarQueryChange={setScholarQuery}
-        onInclude={includeScholar}
-        onExclude={excludeScholar}
-        onResetScholar={resetScholar}
-        onIncludeAll={includeAll}
-        onExcludeAll={excludeAll}
-        onAnalyze={() => void handleAnalyze()}
-        labels={{
-          verseTitle: dashboard.verseTitle,
-          surahLabel: dashboard.surahLabel,
-          verseLabel: dashboard.verseLabel,
-          startVerseLabel: dashboard.startVerseLabel,
-          endVerseLabel: dashboard.endVerseLabel,
-          revelationType: dashboard.revelationType,
-          filtersTitle: dashboard.filtersTitle,
-          methodLabel: dashboard.methodLabel,
-          lengthLabel: dashboard.lengthLabel,
-          languageLabel: dashboard.languageLabel,
-          includeAll: dashboard.includeAll,
-          excludeAll: dashboard.excludeAll,
-          resetSelections: dashboard.resetSelections,
-          scholarSearchPlaceholder: dashboard.scholarsSearchPlaceholder,
-          tableScholar: dashboard.tableScholar,
-          tableDeath: dashboard.tableDeath,
-          tableSelection: dashboard.tableSelection,
-          actionInclude: dashboard.actionInclude,
-          actionExclude: dashboard.actionExclude,
-          actionReset: dashboard.actionReset,
-          analyze: dashboard.analyze,
-          analyzing: dashboard.analyzing,
-          quotaExhausted: dashboard.quotaExhausted,
-          loadingFilters: t.loadingFilters,
-        }}
-      />
-
-      <FilterFacets
-        availableFilters={availableFilters}
-        filters={filters}
-        onChange={setFilters}
-        getOptionLabel={(filterKey, value) =>
-          formatFacetValue(lang, filterKey, value)
-        }
-        labels={{
-          title: t.facetTitle,
-          periodCodes: t.facetPeriodCodes,
-          madhabs: t.facetMadhabs,
-          traditions: t.facetTraditions,
-          sourceAccessibilities: t.facetSourceAccess,
-          tafsirTypes: t.facetTafsirTypes,
-          empty: t.facetEmpty,
-        }}
-      />
-    </div>
-  );
-
-  const activeFilterCount =
-    (filters.methodTags?.length || 0) +
-    (filters.periodCodes?.length || 0) +
-    (filters.madhabs?.length || 0) +
-    (filters.traditions?.length || 0) +
-    (filters.sourceAccessibilities?.length || 0);
-
-  return (
-    <div className="space-y-0">
-      <QueryBar
-        surahNumber={surahNumber}
-        verseNumber={verseNumber}
-        surahOptions={surahs}
-        onSurahChange={setSurahNumber}
         onVerseChange={setVerseNumber}
-        onOpenFilters={() => setMobileControlsOpen(true)}
+        onEndVerseChange={setEndVerseNumber}
+        onOpenScholars={() => openDrawer("scholars")}
+        onOpenSettings={() => openDrawer("basics")}
         onAnalyze={() => void handleAnalyze()}
-        activeFilterCount={activeFilterCount}
-        canAnalyze={canAnalyze}
-        analyzing={isAnalyzing}
+        labels={{
+          surah: q.surah,
+          verses: q.verses,
+          startVerse: dashboard.startVerseLabel,
+          endVerse: dashboard.endVerseLabel,
+          scholars: q.scholarsButton,
+          settings: q.settingsButton,
+          interpret: q.interpret,
+          interpreting: q.interpreting,
+          quotaExhausted: dashboard.quotaExhausted,
+        }}
       />
 
-      {status && (
-        <p className="mx-auto max-w-4xl px-4 py-2 text-center text-sm text-[var(--text-muted)]">
-          {status}
+      {activeFacetLabels.length > 0 && (
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[0.82rem] text-[var(--text-muted)]">
+          <span>{q.activeFilters}:</span>
+          {activeFacetLabels.map((label) => (
+            <button
+              key={label}
+              type="button"
+              className="ui-chip py-0 text-[0.8rem]"
+              onClick={() => openDrawer("schools")}
+            >
+              {label}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="ui-link ml-1 text-[0.82rem] underline underline-offset-4"
+            onClick={() =>
+              setFilters((prev) => ({
+                ...prev,
+                periodCodes: [],
+                madhabs: [],
+                traditions: [],
+                tafsirTypes: [],
+              }))
+            }
+          >
+            {q.clearFilters}
+          </button>
+        </div>
+      )}
+
+      {(error || status) && (
+        <p
+          role={error ? "alert" : "status"}
+          className={`mt-3 rounded-[0.5rem] px-3 py-2 text-sm ${error ? "ui-danger" : "ui-muted"}`}
+        >
+          {error || status}
         </p>
       )}
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <aside className="hidden xl:col-span-3 xl:block">
-          {queryComposerNode}
-        </aside>
+      <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <main className="min-w-0 space-y-9">
+          <AyahPanel
+            surahNumber={surahNumber}
+            startVerse={verseNumber}
+            endVerse={endVerseNumber}
+            heading={ayahHeading}
+            labels={{
+              mealShow: q.mealShow,
+              mealHide: q.mealHide,
+              mealSource: q.mealSource,
+              loading: q.verseLoading,
+            }}
+          />
 
-        <main className="space-y-4 xl:col-span-6">
-          <div className="ui-panel-strong px-4 py-4 sm:px-5">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <RunActions
-                canSave={Boolean(currentRunId)}
-                saving={updateRunMutation.isPending}
-                onSave={() => void saveCurrentRun()}
-                onReplay={() => void handleAnalyze()}
-                onCopyCitations={() => void copyCitations()}
-                onShare={() => void shareRun()}
-                labels={{
-                  saveRun: t.saveRun,
-                  savingRun: t.savingRun,
-                  replay: t.replayRun,
-                  copyCitations: t.copyCitations,
-                  share: t.shareRun,
-                }}
-              />
-
-              <button
-                type="button"
-                onClick={() => setMobileControlsOpen(true)}
-                data-testid="mobile-open-controls-button"
-                className="ui-button-secondary px-3 py-2 text-xs xl:hidden"
-              >
-                {t.openControls}
-              </button>
-            </div>
-
+          <div>
             <ResultStream
-              title={dashboard.resultTitle}
+              title={q.commentaryTitle}
               streamContent={streamContent}
               arabicTafsir={arabicTafsir}
               turkishTafsir={turkishTafsir}
-              placeholder={dashboard.resultHelp}
+              placeholder={q.emptyState}
               isAnalyzing={isAnalyzing}
-              startedAt={startedAt}
-              firstByteAt={firstByteAt}
-              completedAt={completedAt}
-              usage={usage}
               noTafsirMessage={noTafsirMessage}
               missingScholars={missingScholars}
               labels={{
-                analyzing: dashboard.analyzing,
-                perfTitle: dashboard.perfTitle,
-                perfStart: dashboard.perfStart,
-                perfFirstByte: dashboard.perfFirstByte,
-                perfTotal: dashboard.perfTotal,
-                perfTokens: dashboard.perfTokens,
+                analyzing: q.interpreting,
                 arabic: dashboard.arabic || "Arabic",
                 turkish: dashboard.turkish || "Turkish",
+                noTafsirTitle: q.noTafsirTitle,
+                missingScholars: q.missingScholars,
               }}
             />
-            {citationKey && (
-              <div className="mt-2 flex items-center gap-2 px-4">
-                <span className="ui-muted text-xs">Citation:</span>
-                <code className="ui-badge text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                  {citationKey}
-                </code>
-                <button
-                  type="button"
-                  onClick={() => navigator.clipboard.writeText(citationKey)}
-                  className="ui-button-ghost text-xs px-2 py-1"
-                  title="Copy citation"
-                >
-                  Copy
-                </button>
+
+            {(hasResult || currentRunId) && (
+              <div className="mt-4 border-t border-[var(--border-soft)] pt-3.5">
+                <RunActions
+                  canSave={Boolean(currentRunId)}
+                  saving={updateRunMutation.isPending}
+                  onSave={() => void saveCurrentRun()}
+                  onReplay={() => void handleAnalyze()}
+                  onCopyCitations={() => void copyCitations()}
+                  onShare={() => void shareRun()}
+                  labels={{
+                    saveRun: t.saveRun,
+                    savingRun: t.savingRun,
+                    replay: t.replayRun,
+                    copyCitations: t.copyCitations,
+                    share: t.shareRun,
+                  }}
+                />
               </div>
             )}
-          </div>
 
-
-          {/* Ayet metni — mobile only; desktop shows it in the aside */}
-          {verseTextTr && (
-            <div className="ui-panel-strong px-4 py-4 mb-4 flex flex-col gap-2 xl:hidden">
-              <div className="flex items-center justify-between">
-                <p className="ui-muted mb-1 text-xs font-semibold uppercase tracking-wide">Ayet Metni</p>
-                <button
-                  type="button"
-                  className="ui-button-ghost text-xs px-2 py-1"
-                  onClick={() => navigator.clipboard.writeText(verseTextTr)}
-                  title="Kopyala"
-                >
-                  Kopyala
-                </button>
-              </div>
-              <pre className="text-sm text-[var(--text-strong)] leading-relaxed whitespace-pre-wrap break-words select-all bg-transparent border-0 p-0 m-0">{verseTextTr}</pre>
-            </div>
-          )}
-          {sourceExcerpts.length > 0 && (
-            <SourceSnippetPanel
-              title={dashboard.snippetsTitle}
-              empty={t.emptySnippets}
-              excerpts={sourceExcerpts}
-            />
-          )}
-
-          <div className="ui-panel-strong px-4 py-4 xl:hidden">
-            <div className="mb-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="ui-button-ghost"
-                data-active={mobileResultTab === "result"}
-                onClick={() => setMobileResultTab("result")}
-              >
-                {t.mobileResultTab}
-              </button>
-              <button
-                type="button"
-                className="ui-button-ghost"
-                data-active={mobileResultTab === "citations"}
-                onClick={() => setMobileResultTab("citations")}
-              >
-                {t.mobileCitationsTab}
-              </button>
-              <button
-                type="button"
-                className="ui-button-ghost"
-                data-active={mobileResultTab === "snippets"}
-                onClick={() => setMobileResultTab("snippets")}
-              >
-                {t.mobileSnippetsTab}
-              </button>
-            </div>
-
-            {mobileResultTab === "result" && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="ui-kpi">
-                  <div className="ui-muted text-xs">
-                    {dashboard.metricConfidence}
-                  </div>
-                  <div
-                    className={`text-xl font-semibold ${
-                      getConfidenceStatus(confidence)?.level === "low"
-                        ? "text-red-600"
-                        : "text-[var(--brand-dark)]"
-                    }`}
-                  >
+            {(citationKey || provenance || usage || completedAt) && (
+              <details className="mt-6 text-[0.82rem] text-[var(--text-muted)]">
+                <summary className="cursor-pointer">{q.techDetails}</summary>
+                <dl className="mt-2.5 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 tabular-nums">
+                  {citationKey && (
+                    <>
+                      <dt>{q.techCitationKey}</dt>
+                      <dd className="flex items-center gap-2 text-[var(--ink-soft)]">
+                        <code>{citationKey}</code>
+                        <button
+                          type="button"
+                          className="ui-link underline underline-offset-2"
+                          onClick={() =>
+                            void navigator.clipboard
+                              .writeText(citationKey)
+                              .catch(() => undefined)
+                          }
+                        >
+                          {q.copy}
+                        </button>
+                      </dd>
+                    </>
+                  )}
+                  <dt>{q.techSourceMode}</dt>
+                  <dd className="text-[var(--ink-soft)]">{provenanceLabel}</dd>
+                  <dt>{q.techModelScore}</dt>
+                  <dd className="text-[var(--ink-soft)]">
                     {typeof confidence === "number"
-                      ? `${Math.round(confidence * 100)}%`
+                      ? confidence.toFixed(2)
                       : noValueLabel}
-                  </div>
-                </div>
-                <div className="ui-kpi">
-                  <div className="ui-muted text-xs">
-                    {dashboard.metricCitations}
-                  </div>
-                  <div className="text-xl font-semibold text-[var(--text-strong)]">
-                    {citations.length}
-                  </div>
-                </div>
-                <div className="ui-kpi">
-                  <div className="ui-muted text-xs">
-                    {dashboard.metricExcerpts}
-                  </div>
-                  <div className="text-xl font-semibold text-[var(--text-strong)]">
-                    {sourceExcerpts.length}
-                  </div>
-                </div>
-                <div className="ui-kpi">
-                  <div className="ui-muted text-xs">
-                    {dashboard.metricProvenance}
-                  </div>
-                  <div className="text-base font-medium text-[var(--text-strong)]">
-                    {provenanceLabel}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {mobileResultTab === "citations" && (
-              <CitationPanel
-                title={dashboard.academicCitationsTitle}
-                empty={t.emptyCitations}
-                citations={citations}
-                labels={{
-                  volumeShort: dashboard.volumeShort,
-                  pageShort: dashboard.pageShort,
-                }}
-              />
-            )}
-
-            {mobileResultTab === "snippets" && (
-              <SourceSnippetPanel
-                title={dashboard.snippetsTitle}
-                empty={t.emptySnippets}
-                excerpts={sourceExcerpts}
-              />
+                  </dd>
+                  <dt>{q.techTiming}</dt>
+                  <dd className="text-[var(--ink-soft)]">{timing}</dd>
+                  <dt>{q.techTokens}</dt>
+                  <dd className="text-[var(--ink-soft)]">
+                    {usage?.totalTokens ?? noValueLabel}
+                  </dd>
+                </dl>
+              </details>
             )}
           </div>
         </main>
 
-        <aside className="hidden space-y-4 xl:col-span-3 xl:block">
-          <div className="grid grid-cols-1 gap-3">
-            <div className="ui-kpi">
-              <div className="ui-muted text-xs">
-                {dashboard.metricConfidence}
-              </div>
-              <div
-                className={`text-xl font-semibold ${
-                  getConfidenceStatus(confidence)?.level === "low"
-                    ? "text-red-600"
-                    : "text-[var(--brand-dark)]"
-                }`}
-              >
-                {typeof confidence === "number"
-                  ? `${Math.round(confidence * 100)}%`
-                  : noValueLabel}
-              </div>
-              {getConfidenceStatus(confidence)?.level === "low" && (
-                <div className="text-xs text-red-600 mt-1">
-                  {getConfidenceStatus(confidence)?.message}
-                </div>
-              )}
-            </div>
-            <div className="ui-kpi">
-              <div className="ui-muted text-xs">
-                {dashboard.metricProvenance}
-              </div>
-              <div className="text-base font-medium text-[var(--text-strong)]">
-                {provenanceLabel}
-              </div>
-            </div>
-            <div className="ui-kpi">
-              <div className="ui-muted text-xs">
-                {dashboard.metricCitations}
-              </div>
-              <div className="text-base font-medium text-[var(--text-strong)]">
-                {citations.length}
-              </div>
-            </div>
-          </div>
-
-          {verseTextTr && (
-            <div className="ui-panel-strong px-4 py-4 flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <p className="ui-muted mb-1 text-xs font-semibold uppercase tracking-wide">Ayet Metni</p>
-                <button
-                  type="button"
-                  className="ui-button-ghost text-xs px-2 py-1"
-                  onClick={() => navigator.clipboard.writeText(verseTextTr)}
-                  title="Kopyala"
-                >
-                  Kopyala
-                </button>
-              </div>
-              <pre className="text-sm text-[var(--text-strong)] leading-relaxed whitespace-pre-wrap break-words select-all bg-transparent border-0 p-0 m-0">{verseTextTr}</pre>
-            </div>
-          )}
-          <CitationPanel
-            title={dashboard.academicCitationsTitle}
-            empty={t.emptyCitations}
+        <aside className="min-w-0">
+          <SourcesPanel
             citations={citations}
+            excerpts={sourceExcerpts}
+            lang={lang}
             labels={{
+              title: q.sourcesTitle,
+              summary: q.sourcesSummary,
+              empty: q.sourcesEmpty,
+              showAll: q.showAllSources,
+              showFewer: q.showFewerSources,
+              more: q.moreSources,
+              noExcerpt: q.noExcerpt,
               volumeShort: dashboard.volumeShort,
               pageShort: dashboard.pageShort,
             }}
@@ -922,81 +765,90 @@ export default function QueryWorkspacePage() {
         </aside>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border-soft)] bg-white/95 px-3 py-2 shadow-lg xl:hidden">
-        <div className="mx-auto flex max-w-5xl items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setMobileControlsOpen(true)}
-            data-testid="mobile-open-controls-bottom-button"
-            className="ui-button-secondary flex-1 px-3 py-2 text-sm"
-          >
-            {t.openControls}
-          </button>
+      <section className="mt-12 flex flex-wrap items-baseline justify-between gap-3 border-t border-[var(--border-soft)] pt-4 text-sm text-[var(--text-muted)]">
+        <span>
+          <strong className="font-semibold text-[var(--ink-soft)]">
+            {q.compareTitle}
+          </strong>{" "}
+          · {q.compareText}
+        </span>
+      </section>
+
+      {/* Telefonda sabit alt çubuk: sorgu çubuğundaki Yorumla düğmesi burada gizlenir. */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border-soft)] bg-[var(--sheet)] px-4 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom,0px))] sm:hidden">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => void handleAnalyze()}
             disabled={!canAnalyze}
             data-testid="mobile-analyze-button"
-            className="ui-button flex-1 px-3 py-2 text-sm"
+            className="ui-button flex-[2] px-3 py-2.5 text-sm"
           >
-            {isAnalyzing ? dashboard.analyzing : dashboard.analyze}
+            {isAnalyzing ? q.interpreting : q.interpret}
           </button>
           <button
             type="button"
             onClick={() => void saveCurrentRun()}
             disabled={!currentRunId || updateRunMutation.isPending}
             data-testid="mobile-save-run-button"
-            className="ui-button-secondary flex-1 px-3 py-2 text-sm"
+            className="ui-button-secondary flex-1 px-3 py-2.5 text-sm"
           >
             {t.saveRun}
           </button>
         </div>
       </div>
 
-      {mobileControlsOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/45 xl:hidden"
-          onClick={() => setMobileControlsOpen(false)}
-        >
-          <div
-            className="absolute inset-x-0 bottom-0 max-h-[88vh] overflow-auto rounded-t-2xl border border-[var(--border-soft)] bg-white p-4"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="ui-title text-lg font-semibold">
-                {t.mobileControlsTitle}
-              </h2>
-              <button
-                type="button"
-                className="ui-button-secondary px-3 py-1.5 text-xs"
-                onClick={() => setMobileControlsOpen(false)}
-              >
-                {t.closeControls}
-              </button>
-            </div>
-            {queryComposerNode}
-          </div>
-        </div>
-      )}
-
-      <section className="ui-panel-strong overflow-hidden">
-        <div className="space-y-2 px-4 py-4 sm:px-5">
-          <h3 className="ui-title text-base font-semibold">
-            {t.comparisonPlaceholderTitle}
-          </h3>
-          <p className="ui-muted text-sm">{t.comparisonPlaceholderText}</p>
-          <p className="ui-muted text-xs">
-            {t.primaryRunLabel}:{" "}
-            {comparisonRuns.primaryRun
-              ? comparisonRuns.primaryRun.runId
-              : noValueLabel}{" "}
-            · {t.secondaryRunLabel}:{" "}
-            {comparisonRuns.secondaryRun
-              ? comparisonRuns.secondaryRun.runId
-              : noValueLabel}
-          </p>
-        </div>
-      </section>
+      <SettingsDrawer
+        open={drawerOpen}
+        tab={drawerTab}
+        onTabChange={setDrawerTab}
+        onClose={closeDrawer}
+        filters={filters}
+        onFilterChange={setFilters}
+        availableFilters={availableFilters}
+        filteredScholars={filteredScholars}
+        includeIds={includeIds}
+        scholarQuery={scholarQuery}
+        onScholarQueryChange={setScholarQuery}
+        onToggleScholar={toggleScholar}
+        onIncludeAll={includeAll}
+        onExcludeAll={excludeAll}
+        onReset={resetFilters}
+        getOptionLabel={(filterKey, value) =>
+          formatFacetValue(lang, filterKey, value)
+        }
+        labels={{
+          drawerTitle: q.drawerTitle,
+          close: q.close,
+          apply: q.apply,
+          reset: q.reset,
+          tabBasics: q.tabBasics,
+          tabScholars: q.tabScholars,
+          tabSchools: q.tabSchools,
+          lengthLabel: q.lengthLabel,
+          lengthShort: q.lengthShort,
+          lengthMedium: q.lengthMedium,
+          lengthLong: q.lengthLong,
+          answerLanguage: q.answerLanguage,
+          methodLabel: q.methodLabel,
+          methodHelp: q.methodHelp,
+          scholarsHelp: q.scholarsHelp,
+          selectAll: q.selectAll,
+          selectNone: q.selectNone,
+          schoolsHelp: q.schoolsHelp,
+          deathShort: q.deathShort,
+          noScholarsMatch: q.noScholarsMatch,
+          searchPlaceholder: dashboard.scholarsSearchPlaceholder,
+          periodCodes: t.facetPeriodCodes,
+          madhabs: t.facetMadhabs,
+          traditions: t.facetTraditions,
+          tafsirTypes: t.facetTafsirTypes,
+          facetEmpty: t.facetEmpty,
+          langTurkish: dashboard.langTurkish,
+          langEnglish: dashboard.langEnglish,
+          langArabic: dashboard.langArabic,
+        }}
+      />
     </div>
   );
 }

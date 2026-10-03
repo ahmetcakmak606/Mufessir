@@ -1,24 +1,50 @@
 import type { Metadata } from "next";
-import { Manrope, Merriweather } from "next/font/google";
+import {
+  Amiri_Quran,
+  Cormorant_Garamond,
+  Noto_Naskh_Arabic,
+  Source_Sans_3,
+  Source_Serif_4,
+} from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { LangProvider } from "@/context/LangContext";
 import { QueryProvider } from "@/context/QueryProvider";
 
-const manrope = Manrope({
-  variable: "--font-manrope",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+// Başlık: Cormorant Garamond (yalnızca büyük boyutlarda). Arayüz: Source Sans 3.
+// Uzun Türkçe okuma: Source Serif 4. Ayet: Amiri Quran. Tefsir alıntıları: Noto Naskh Arabic.
+const displayFace = Cormorant_Garamond({
+  variable: "--font-display-face",
+  subsets: ["latin", "latin-ext"],
+  weight: ["500", "600"],
 });
 
-const merriweather = Merriweather({
-  variable: "--font-merriweather",
-  subsets: ["latin"],
-  weight: ["400", "700"],
+const uiFace = Source_Sans_3({
+  variable: "--font-ui",
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500", "600"],
+});
+
+const readingFace = Source_Serif_4({
+  variable: "--font-reading",
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "600"],
+});
+
+const quranFace = Amiri_Quran({
+  variable: "--font-quran",
+  subsets: ["arabic"],
+  weight: "400",
+});
+
+const naskhFace = Noto_Naskh_Arabic({
+  variable: "--font-naskh",
+  subsets: ["arabic"],
+  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
-  title: "Mufessir AI - AI-powered Tafsir Platform",
+  title: "MüfessirAI",
   description:
     "AI-powered Tafsir platform with traditional Islamic scholarship",
 };
@@ -31,7 +57,7 @@ export default function RootLayout({
   return (
     <html lang="tr">
       <body
-        className={`${manrope.variable} ${merriweather.variable} antialiased`}
+        className={`${displayFace.variable} ${uiFace.variable} ${readingFace.variable} ${quranFace.variable} ${naskhFace.variable} antialiased`}
       >
         <QueryProvider>
           <AuthProvider>

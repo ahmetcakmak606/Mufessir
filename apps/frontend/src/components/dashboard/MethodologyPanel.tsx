@@ -91,15 +91,13 @@ export function MethodologyPanel({
 
   return (
     <div className="space-y-3">
-      <label className="ui-muted block text-xs font-semibold uppercase tracking-[0.08em]">
-        {label}
-      </label>
+      <h3 className="ui-label">{label}</h3>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {dimensions.map((dimension) => (
           <div key={dimension.id} className="space-y-1.5">
-            <label className="text-xs font-medium text-[var(--text-muted)]">
+            <p className="text-xs font-medium text-[var(--text-muted)]">
               {dimension.label}
-            </label>
+            </p>
             <div className="flex flex-wrap gap-1.5">
               {dimension.options.map((option) => {
                 const isSelected = selectedTags.includes(option.value);
@@ -108,11 +106,8 @@ export function MethodologyPanel({
                     key={option.value}
                     type="button"
                     onClick={() => toggleTag(option.value)}
-                    className={`rounded-md border px-2 py-1 text-xs transition-colors ${
-                      isSelected
-                        ? "border-[var(--brand)] bg-[var(--brand)] text-white"
-                        : "border-[var(--border-soft)] bg-white text-[var(--text-strong)] hover:border-[var(--brand)] hover:text-[var(--brand-dark)]"
-                    }`}
+                    aria-pressed={isSelected}
+                    className="ui-chip"
                   >
                     {option.label}
                   </button>

@@ -62,6 +62,7 @@ export interface FiltersResponse {
 export interface Citation {
   scholarId: string;
   scholarName: string;
+  scholarNameTr?: string | null;
   sourceType: string;
   sourceTitle: string;
   volume: string | null;
@@ -75,6 +76,7 @@ export interface Citation {
 export interface SourceExcerpt {
   scholarId: string;
   scholarName: string;
+  scholarNameTr?: string | null;
   excerpt: string;
 }
 

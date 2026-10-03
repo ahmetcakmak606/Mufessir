@@ -1,37 +1,78 @@
 @import "tailwindcss";
 
+/*
+ * Palet: sergi panelinden ("Vahiyden Mushaf'a") türetildi.
+ * Açık tema kâğıt (krem zemin, koyu yeşil mürekkep); koyu tema panelin kendi zemini.
+ * Altın (#b5a375) krem üzerinde metin için yetersiz kontrastlı (2.2:1), bu yüzden
+ * yalnızca çizgi/vurgu olarak kullanılır; altın tonlu metin --gold-ink ile yazılır.
+ * Eski token adları (--brand, --text-strong …) korunur ki tüm sayfalar aynı paleti alsın.
+ */
 :root {
-  --bg-top: #f4f8f4;
-  --bg-bottom: #e7efea;
-  --surface: rgba(255, 255, 255, 0.88);
-  --surface-strong: #ffffff;
-  --border-soft: rgba(12, 57, 61, 0.12);
-  --border-strong: rgba(12, 57, 61, 0.18);
-  --text-strong: #0f2325;
-  --text-muted: #4f696c;
-  --brand: #0e7a69;
-  --brand-dark: #095a4b;
-  --brand-soft: #d5ece6;
-  --danger-soft: #f9e4e4;
-  --danger-text: #962f2f;
+  --paper: #f4f1e8;
+  --sheet: #fbf9f3;
+  --ink: #1c3836;
+  --ink-soft: #4a5c58;
+  --gold: #b5a375;
+  --gold-ink: #7a6838;
+  --hairline: rgba(28, 56, 54, 0.14);
+  --hairline-strong: rgba(28, 56, 54, 0.26);
+  --highlight: rgba(181, 163, 117, 0.22);
+  --scrim: rgba(20, 35, 33, 0.38);
+  --accent: #1c3836;
+  --on-accent: #f4f1e8;
+
+  --bg-top: var(--paper);
+  --bg-bottom: var(--paper);
+  --surface: var(--sheet);
+  --surface-strong: var(--sheet);
+  --border-soft: var(--hairline);
+  --border-strong: var(--hairline-strong);
+  --text-strong: var(--ink);
+  --text-muted: #5f6b66;
+  --brand: var(--accent);
+  --brand-dark: var(--accent);
+  --brand-soft: var(--highlight);
+  --danger-soft: #f6e3df;
+  --danger-text: #8f2f24;
+  --warn-soft: #f5ecd6;
+  --warn-text: #6b5420;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #122625;
+    --sheet: #1c3836;
+    --ink: #f4f1e8;
+    --ink-soft: #c5c1b5;
+    --gold-ink: #c9b886;
+    --hairline: rgba(244, 241, 232, 0.14);
+    --hairline-strong: rgba(244, 241, 232, 0.28);
+    --highlight: rgba(181, 163, 117, 0.16);
+    --scrim: rgba(0, 0, 0, 0.5);
+    --accent: #b5a375;
+    --on-accent: #122625;
+    --text-muted: #a39f92;
+    --danger-soft: rgba(143, 47, 36, 0.25);
+    --danger-text: #f0b3a8;
+    --warn-soft: rgba(181, 163, 117, 0.14);
+    --warn-text: #e3d3a6;
+    color-scheme: dark;
+  }
 }
 
 @theme inline {
-  --color-background: var(--bg-bottom);
-  --color-foreground: var(--text-strong);
-  --font-sans: var(--font-manrope);
-  --font-display: var(--font-merriweather);
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --font-sans: var(--font-ui);
+  --font-display: var(--font-display-face);
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  color: var(--text-strong);
-  font-family: var(--font-manrope), sans-serif;
-  background:
-    radial-gradient(circle at 15% 10%, rgba(14, 122, 105, 0.14), transparent 45%),
-    radial-gradient(circle at 85% 12%, rgba(12, 57, 61, 0.12), transparent 44%),
-    linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+  color: var(--ink);
+  background: var(--paper);
+  font-family: var(--font-ui), system-ui, sans-serif;
 }
 
 a {
@@ -39,11 +80,31 @@ a {
 }
 
 ::selection {
-  background: rgba(14, 122, 105, 0.2);
+  background: var(--highlight);
 }
 
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* Bileşen sınıfları katmanda durur ki Tailwind yardımcıları (hidden, w-full …) onları ezebilsin. */
+@layer components {
 .font-display {
-  font-family: var(--font-merriweather), serif;
+  font-family: var(--font-display-face), Georgia, serif;
+  font-weight: 600;
+}
+
+.font-reading {
+  font-family: var(--font-reading), Georgia, serif;
+}
+
+.font-quran {
+  font-family: var(--font-quran), var(--font-naskh), "Geeza Pro", serif;
+}
+
+.font-naskh {
+  font-family: var(--font-naskh), "Geeza Pro", serif;
 }
 
 .ui-shell {
@@ -53,32 +114,44 @@ a {
 
 .ui-container {
   margin: 0 auto;
-  max-width: 88rem;
-  padding: 1.25rem;
+  max-width: 76rem;
+  padding: 0 1.25rem 3rem;
 }
 
 .ui-panel {
   border: 1px solid var(--border-soft);
   background: var(--surface);
-  border-radius: 1rem;
-  box-shadow: 0 24px 48px -36px rgba(12, 57, 61, 0.55);
-  backdrop-filter: blur(8px);
+  border-radius: 0.6rem;
 }
 
 .ui-panel-strong {
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border-soft);
   background: var(--surface-strong);
-  border-radius: 1rem;
-  box-shadow: 0 24px 48px -36px rgba(12, 57, 61, 0.45);
+  border-radius: 0.6rem;
 }
 
 .ui-title {
-  letter-spacing: -0.02em;
   color: var(--text-strong);
 }
 
 .ui-muted {
   color: var(--text-muted);
+}
+
+.ui-eyebrow {
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-ink);
+  font-weight: 600;
+}
+
+.ui-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 600;
 }
 
 .ui-badge {
@@ -87,110 +160,172 @@ a {
   gap: 0.4rem;
   border-radius: 9999px;
   border: 1px solid var(--border-strong);
-  background: rgba(255, 255, 255, 0.82);
+  background: transparent;
   color: var(--text-muted);
   font-size: 0.76rem;
   line-height: 1;
   font-weight: 600;
-  padding: 0.45rem 0.72rem;
+  padding: 0.4rem 0.7rem;
 }
 
-.ui-button {
+.ui-button,
+.ui-button-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 0.78rem;
-  border: 1px solid var(--brand);
-  background: linear-gradient(180deg, var(--brand) 0%, var(--brand-dark) 100%);
-  color: #ffffff;
-  font-weight: 650;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  border-radius: 0.5rem;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: filter 0.2s ease, opacity 0.2s ease;
 }
 
-.ui-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 16px 28px -20px rgba(9, 90, 75, 0.8);
+.ui-button:hover:not(:disabled),
+.ui-button-primary:hover:not(:disabled) {
+  filter: brightness(1.12);
 }
 
 .ui-button:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
 }
 
 .ui-button-secondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 0.78rem;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
   border: 1px solid var(--border-strong);
-  background: rgba(255, 255, 255, 0.9);
+  background: transparent;
   color: var(--text-strong);
-  font-weight: 600;
+  font-weight: 500;
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
-.ui-button-secondary:hover {
-  background: #ffffff;
-  border-color: rgba(12, 57, 61, 0.35);
+.ui-button-secondary:hover:not(:disabled) {
+  background: var(--highlight);
+}
+
+.ui-button-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .ui-button-ghost {
-  border-radius: 0.7rem;
+  border-radius: 0.5rem;
   border: 1px solid transparent;
   color: var(--text-muted);
   padding: 0.36rem 0.62rem;
-  font-size: 0.79rem;
-  font-weight: 600;
+  font-size: 0.82rem;
+  font-weight: 500;
 }
 
 .ui-button-ghost[data-active="true"] {
-  border-color: var(--brand);
-  color: #ffffff;
-  background: var(--brand);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  background: var(--accent);
+}
+
+.ui-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--ink-soft);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ui-link:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.ui-link:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-chip {
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--ink-soft);
+  border-radius: 9999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.85rem;
+  transition: background 0.15s ease;
+}
+
+.ui-chip[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.ui-seg {
+  display: inline-flex;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.ui-seg button {
+  border: 0;
+  background: none;
+  padding: 0.4rem 1rem;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.ui-seg button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .ui-input,
 .ui-select {
   width: 100%;
-  border-radius: 0.75rem;
-  border: 1px solid var(--border-soft);
-  background: rgba(255, 255, 255, 0.94);
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-strong);
+  background: transparent;
   color: var(--text-strong);
-  padding: 0.62rem 0.74rem;
+  padding: 0.55rem 0.7rem;
   font-size: 0.92rem;
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  transition: border-color 0.2s ease;
 }
 
 .ui-input:focus,
 .ui-select:focus {
-  border-color: rgba(14, 122, 105, 0.55);
-  box-shadow: 0 0 0 4px rgba(14, 122, 105, 0.12);
-  background: #ffffff;
+  border-color: var(--gold);
 }
 
 .ui-input::placeholder {
-  color: #7f9497;
+  color: var(--text-muted);
+}
+
+.ui-select option {
+  background: var(--sheet);
+  color: var(--ink);
 }
 
 .ui-slider {
   width: 100%;
-  accent-color: var(--brand);
+  accent-color: var(--accent);
 }
 
 .ui-kpi {
-  border-radius: 0.82rem;
+  border-radius: 0.5rem;
   border: 1px solid var(--border-soft);
-  background: rgba(255, 255, 255, 0.82);
+  background: transparent;
   padding: 0.7rem 0.75rem;
 }
 
 .ui-table-head {
   position: sticky;
   top: 0;
-  background: #eef4f2;
+  background: var(--sheet);
   z-index: 10;
 }
 
@@ -199,13 +334,55 @@ a {
 }
 
 .ui-table-row:hover {
-  background: rgba(14, 122, 105, 0.08);
+  background: var(--highlight);
 }
 
 .ui-danger {
-  border: 1px solid rgba(150, 47, 47, 0.2);
+  border: 1px solid var(--border-soft);
   background: var(--danger-soft);
   color: var(--danger-text);
+}
+
+.ui-warn {
+  border: 1px solid var(--border-soft);
+  background: var(--warn-soft);
+  color: var(--warn-text);
+}
+
+/* Okuma alanı */
+.ui-ayat {
+  direction: rtl;
+  text-align: justify;
+  font-size: 1.45rem;
+  line-height: 2.05;
+  margin: 0;
+}
+
+.ui-ayat-num {
+  color: var(--gold-ink);
+  font-size: 0.9em;
+  padding-inline: 0.15em;
+}
+
+.ui-prose {
+  font-family: var(--font-reading), Georgia, serif;
+  font-size: 1.1rem;
+  line-height: 1.75;
+  /* Yorum bloğu ayet paneliyle aynı genişlikte — satır başına daha çok
+     kelime sığar ve iki kenar da hizalı biter. */
+  text-align: justify;
+  white-space: pre-wrap;
+}
+
+.ui-prose[dir="rtl"] {
+  font-family: var(--font-naskh), "Geeza Pro", serif;
+  font-size: 1.2rem;
+  line-height: 2;
+}
+
+.ui-rule-gold {
+  border-top: 1px solid var(--gold);
+  border-bottom: 1px solid var(--gold);
 }
 
 .ui-fade-up {
@@ -225,6 +402,19 @@ a {
 
 @media (max-width: 640px) {
   .ui-container {
-    padding: 0.95rem;
+    padding: 0 1rem 6rem;
   }
+  .ui-ayat {
+    font-size: 1.3rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
 }
