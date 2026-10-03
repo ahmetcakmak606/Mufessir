@@ -46,7 +46,7 @@ export function DashboardShell({
             href="/dashboard/query"
             className="font-display text-[1.9rem] leading-none text-[var(--ink)]"
           >
-            Müfessir<span className="text-[var(--gold-ink)]">AI</span>
+            Mufessir<span className="text-[var(--gold-ink)]">AI</span>
           </Link>
 
           <nav className="order-3 flex w-full gap-1 sm:order-none sm:w-auto sm:flex-1">
@@ -115,6 +115,10 @@ export function DashboardShell({
         </header>
 
         <div className="pt-6">{children}</div>
+
+        <footer className="mt-10 border-t border-[var(--border-soft)] pt-4 pb-6 text-center text-xs text-[var(--text-muted)]">
+          {t.aiDisclaimer}
+        </footer>
       </div>
     </div>
   );

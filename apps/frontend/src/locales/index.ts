@@ -176,6 +176,7 @@ export const locales = {
       verseRangeLabel: "Ayet Aralığı",
     },
     dashboardShell: {
+      aiDisclaimer: "Yapay zekâ hata yapabilir.",
       userLabel: "Kullanıcı",
       quotaLabel: "Kota",
       langLabel: "Dil",
@@ -227,8 +228,8 @@ export const locales = {
       scholarsAll: "Tümü",
       scholarsSelected: "seçili",
       settingsButton: "Ayarlar",
-      interpret: "Yorumla",
-      interpreting: "Yorumlanıyor…",
+      interpret: "Tefsirî Yorum",
+      interpreting: "Tefsîr yazılıyor…",
       quotaLeft: "Kalan hak",
       activeFilters: "Etkin süzgeçler",
       clearFilters: "Temizle",
@@ -381,7 +382,7 @@ export const locales = {
   },
   en: {
     home: {
-      brand: "Mufessir AI",
+      brand: "MufessirAI",
       title: "AI-powered Tafsir Platform",
       subtitle:
         "Experience the wisdom of traditional Islamic scholarship enhanced by modern AI technology. Access centuries of Quranic commentary with intelligent analysis and personalized insights.",
@@ -554,6 +555,7 @@ export const locales = {
       verseRangeLabel: "Verse Range",
     },
     dashboardShell: {
+      aiDisclaimer: "AI can make mistakes.",
       userLabel: "User",
       quotaLabel: "Quota",
       langLabel: "Lang",
@@ -605,8 +607,8 @@ export const locales = {
       scholarsAll: "All",
       scholarsSelected: "selected",
       settingsButton: "Settings",
-      interpret: "Interpret",
-      interpreting: "Interpreting…",
+      interpret: "Tafsir Commentary",
+      interpreting: "Commenting…",
       quotaLeft: "Remaining",
       activeFilters: "Active filters",
       clearFilters: "Clear",

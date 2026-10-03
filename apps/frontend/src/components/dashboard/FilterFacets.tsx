@@ -83,26 +83,35 @@ export function FilterFacets({
         return (
           <div key={filterKey} className="space-y-2">
             <h3 className="ui-label">{labels[filterKey as keyof typeof labels]}</h3>
-            <div className="flex flex-wrap gap-1.5">
-              {groupFacetOptions(options).map((variants) => {
+            <ul className="divide-y divide-[var(--border-soft)] rounded-[0.5rem] border border-[var(--border-soft)]">
+              {groupFacetOptions(options).map((variants, optionIndex) => {
                 const first = variants[0];
                 const selected = variants.some((v) => current.includes(v));
                 const label = getOptionLabel
                   ? getOptionLabel(filterKey, first)
                   : first;
+                const inputId = `facet-${filterKey}-${optionIndex}`;
                 return (
-                  <button
-                    key={`${filterKey}-${first}`}
-                    type="button"
-                    aria-pressed={selected}
-                    onClick={() => toggleGroup(filterKey, variants)}
-                    className="ui-chip"
-                  >
-                    {label.replace(/\s*\/\s*/g, " / ")}
-                  </button>
+                  <li key={`${filterKey}-${first}`}>
+                    <label
+                      htmlFor={inputId}
+                      className="flex cursor-pointer items-center gap-3 px-3 py-2 text-sm"
+                    >
+                      <input
+                        id={inputId}
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleGroup(filterKey, variants)}
+                        className="accent-[var(--accent)]"
+                      />
+                      <span className="min-w-0 flex-1">
+                        {label.replace(/\s*\/\s*/g, " / ")}
+                      </span>
+                    </label>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           </div>
         );
       })}

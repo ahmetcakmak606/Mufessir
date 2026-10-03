@@ -368,7 +368,9 @@ a {
   font-family: var(--font-reading), Georgia, serif;
   font-size: 1.1rem;
   line-height: 1.75;
-  max-width: 65ch;
+  /* Yorum bloğu ayet paneliyle aynı genişlikte — satır başına daha çok
+     kelime sığar ve iki kenar da hizalı biter. */
+  text-align: justify;
   white-space: pre-wrap;
 }
 
