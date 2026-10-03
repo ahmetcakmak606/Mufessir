@@ -11,6 +11,7 @@ interface AyahPanelProps {
   labels: {
     mealShow: string;
     mealHide: string;
+    mealSource: string;
     loading: string;
   };
 }
@@ -95,16 +96,19 @@ export function AyahPanel({
         )}
 
         {showMeal && withMeal.length > 0 && (
-          <p className="font-reading mt-4 max-w-[65ch] text-base leading-relaxed text-[var(--ink-soft)]">
-            {withMeal.map((verse) => (
-              <span key={verse.id}>
-                <sup className="mr-0.5 font-sans text-[0.7rem] text-[var(--gold-ink)]">
-                  {verse.verseNumber}
-                </sup>
-                {verse.translation}{" "}
-              </span>
-            ))}
-          </p>
+          <div className="mt-4">
+            <p className="font-reading max-w-[65ch] text-base leading-relaxed text-[var(--ink-soft)]">
+              {withMeal.map((verse) => (
+                <span key={verse.id}>
+                  <sup className="mr-0.5 font-sans text-[0.7rem] text-[var(--gold-ink)]">
+                    {verse.verseNumber}
+                  </sup>
+                  {verse.translation}{" "}
+                </span>
+              ))}
+            </p>
+            <p className="ui-muted mt-1.5 text-xs">{labels.mealSource}</p>
+          </div>
         )}
 
         {withMeal.length > 0 && (

@@ -658,6 +658,7 @@ export default function QueryWorkspacePage() {
             labels={{
               mealShow: q.mealShow,
               mealHide: q.mealHide,
+              mealSource: q.mealSource,
               loading: q.verseLoading,
             }}
           />

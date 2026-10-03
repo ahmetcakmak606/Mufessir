@@ -234,6 +234,7 @@ export const locales = {
       clearFilters: "Temizle",
       mealShow: "Meali göster",
       mealHide: "Meali gizle",
+      mealSource: "Diyanet İşleri Başkanlığı Meali",
       verseLoading: "Ayet metni yükleniyor…",
       commentaryTitle: "Yorum",
       emptyState:
@@ -611,6 +612,7 @@ export const locales = {
       clearFilters: "Clear",
       mealShow: "Show translation",
       mealHide: "Hide translation",
+      mealSource: "Diyanet (Turkish Presidency of Religious Affairs)",
       verseLoading: "Loading verse text…",
       commentaryTitle: "Commentary",
       emptyState:

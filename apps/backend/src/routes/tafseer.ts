@@ -609,7 +609,8 @@ export async function loadCitations(
       scholarName: mufassir.name || "",
       scholarNameTr: mufassir.nameTr || null,
       sourceType: "Tafsir",
-      sourceTitle: "",
+      // mufassirs tablosundaki tefsir adı — kaynak panelindeki künye satırı
+      sourceTitle: mufassir.bookTafsir || "",
       volume: null,
       page: null,
       edition: null,
