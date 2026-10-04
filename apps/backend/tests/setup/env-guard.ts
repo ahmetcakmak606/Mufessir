@@ -41,7 +41,6 @@ if (!process.env.JWT_SECRET) process.env.JWT_SECRET = "test-secret";
 // Never set QUALITY_TESTS in CI or on a machine where DATABASE_URL may
 // point at anything you are not prepared to read-load.
 if (process.env.QUALITY_TESTS === "1") {
-  // eslint-disable-next-line no-console
   console.warn(
     "[env-guard] QUALITY_TESTS=1 — DATABASE_URL yeniden yazılmıyor; " +
       "testler .env içindeki GERÇEK veritabanına bağlanacak.",

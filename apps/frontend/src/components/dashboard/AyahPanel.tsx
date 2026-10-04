@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchVerseByNumbers, type VersePayload } from "@/lib/tafseer";
+import { fetchVerseByNumbers, MAX_VERSE_RANGE, type VersePayload } from "@/lib/tafseer";
 
 interface AyahPanelProps {
   surahNumber: number;
@@ -11,13 +11,11 @@ interface AyahPanelProps {
   labels: {
     mealShow: string;
     mealHide: string;
-    mealSource: string;
     loading: string;
+    verseFailed: string;
+    retry: string;
   };
 }
-
-// Uzun aralıklarda her ayet için ayrı istek atılıyor; ekranda gösterilen üst sınır bu.
-const MAX_VERSES = 40;
 
 const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
 function toArabicDigits(n: number) {
@@ -43,35 +41,40 @@ export function AyahPanel({
   labels,
 }: AyahPanelProps) {
   const [verses, setVerses] = useState<VersePayload[]>([]);
+  const [failedNumbers, setFailedNumbers] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const [showMeal, setShowMeal] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    const last = Math.min(endVerse, startVerse + MAX_VERSES - 1);
+    const last = Math.min(endVerse, startVerse + MAX_VERSE_RANGE - 1);
     const numbers = Array.from(
       { length: Math.max(0, last - startVerse + 1) },
       (_, i) => startVerse + i,
     );
+    // Yeni seçim: eski ayetler yeni başlık altında yanlışlıkla görünmesin.
+    setVerses([]);
+    setFailedNumbers([]);
     setLoading(true);
     void Promise.allSettled(
       numbers.map((n) => fetchVerseByNumbers(surahNumber, n)),
     ).then((results) => {
       if (cancelled) return;
-      setVerses(
-        results
-          .filter(
-            (r): r is PromiseFulfilledResult<VersePayload> =>
-              r.status === "fulfilled",
-          )
-          .map((r) => r.value),
-      );
+      const loaded: VersePayload[] = [];
+      const failed: number[] = [];
+      results.forEach((result, i) => {
+        if (result.status === "fulfilled") loaded.push(result.value);
+        else failed.push(numbers[i]);
+      });
+      setVerses(loaded);
+      setFailedNumbers(failed);
       setLoading(false);
     });
     return () => {
       cancelled = true;
     };
-  }, [surahNumber, startVerse, endVerse]);
+  }, [surahNumber, startVerse, endVerse, retryCount]);
 
   const withText = verses.filter((v) => v.arabicText);
   const withMeal = verses.filter((v) => isUsableMeal(v.translation));
@@ -96,19 +99,16 @@ export function AyahPanel({
         )}
 
         {showMeal && withMeal.length > 0 && (
-          <div className="mt-4">
-            <p className="font-reading max-w-[65ch] text-base leading-relaxed text-[var(--ink-soft)]">
-              {withMeal.map((verse) => (
-                <span key={verse.id}>
-                  <sup className="mr-0.5 font-sans text-[0.7rem] text-[var(--gold-ink)]">
-                    {verse.verseNumber}
-                  </sup>
-                  {verse.translation}{" "}
-                </span>
-              ))}
-            </p>
-            <p className="ui-muted mt-1.5 text-xs">{labels.mealSource}</p>
-          </div>
+          <p className="font-reading mt-4 max-w-[65ch] text-base leading-relaxed text-[var(--ink-soft)]">
+            {withMeal.map((verse) => (
+              <span key={verse.id}>
+                <sup className="mr-0.5 font-sans text-[0.7rem] text-[var(--gold-ink)]">
+                  {verse.verseNumber}
+                </sup>
+                {verse.translation}{" "}
+              </span>
+            ))}
+          </p>
         )}
 
         {withMeal.length > 0 && (
@@ -119,6 +119,24 @@ export function AyahPanel({
           >
             {showMeal ? labels.mealHide : labels.mealShow}
           </button>
+        )}
+
+        {failedNumbers.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+            <p className="ui-muted">
+              {labels.verseFailed.replace(
+                "{n}",
+                failedNumbers.map(String).join(", "),
+              )}
+            </p>
+            <button
+              type="button"
+              className="ui-button-secondary px-3 py-1.5 text-xs"
+              onClick={() => setRetryCount((c) => c + 1)}
+            >
+              {labels.retry}
+            </button>
+          </div>
         )}
       </div>
     </div>

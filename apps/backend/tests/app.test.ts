@@ -507,6 +507,35 @@ describe("Tafseer result cache & fallback persistence (plan Faz 1)", () => {
     expect(res.body.fallback).toBe(true);
   });
 
+  it("rejects verse ranges above the shared 10-verse limit", async () => {
+    const res = await request(app)
+      .post("/tafseer")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        verseRange: { surahNumber: 1, startVerse: 1, endVerse: 11 },
+        filters: { language: "Turkish" },
+        stream: false,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/maximum of 10 verses/);
+  });
+
+  it("accepts a range of exactly 10 verses (boundary)", async () => {
+    const res = await request(app)
+      .post("/tafseer")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        verseRange: { surahNumber: 1, startVerse: 1, endVerse: 10 },
+        filters: { language: "Turkish" },
+        stream: false,
+      });
+
+    // Doğrulama yalnız sayı sınırına bakar (tohumda Fâtiha'nın 7 ayeti var);
+    // sınır içindeki istek 400 almamalı.
+    expect(res.status).not.toBe(400);
+  });
+
   it("does not persist fallback responses, so they cannot poison the cache (regression)", async () => {
     const body = {
       verseId: SEED_VERSE_ID,

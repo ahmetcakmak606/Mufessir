@@ -276,10 +276,25 @@ export type StreamEvent = {
   verseRange?: { surahNumber: number; startVerse: number; endVerse: number; verseCount: number };
 };
 
+// Sunucuyla paylaşılan ortak aralık sınırı (backend MAX_RANGE_VERSES).
+export const MAX_VERSE_RANGE = 10;
+
+// Bitiş ayetini [start, start + MAX_VERSE_RANGE - 1] ve sure sınırı içinde
+// tutar; saf fonksiyondur, birim testi var.
+export function clampVerseRange(
+  start: number,
+  end: number,
+  surahMax: number,
+): number {
+  const upper = Math.min(surahMax, start + MAX_VERSE_RANGE - 1);
+  return Math.min(Math.max(end, start), upper);
+}
+
 export async function startTafseerStream(
   body: TafseerRequestBody,
   token: string,
   onEvent: (evt: StreamEvent) => void,
+  signal?: AbortSignal,
 ) {
   const res = await fetch(`${API_BASE_URL}/tafseer`, {
     method: "POST",
@@ -288,6 +303,7 @@ export async function startTafseerStream(
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ ...body, stream: true }),
+    signal,
   });
 
   if (!res.ok) {
@@ -304,6 +320,8 @@ export async function startTafseerStream(
   while (true) {
     const { value, done } = await reader.read();
     if (done) break;
+    // Seçim değişip akış iptal edildiyse kalan parçaları işleme.
+    if (signal?.aborted) return;
     buffer += decoder.decode(value, { stream: true });
 
     let idx;

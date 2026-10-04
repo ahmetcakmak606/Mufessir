@@ -721,12 +721,21 @@ router.post(
       }
 
       // Resolve verse range: fetch all verses in range (max 10)
+      const MAX_RANGE_VERSES = 10;
       const isRange = verseRange && verseRange.endVerse > verseRange.startVerse;
       let rangeVerses: typeof verse[] = [];
 
       if (isRange) {
         const start = verseRange.startVerse;
-        const end = Math.min(verseRange.endVerse, start + 9); // cap at 10 verses
+        const requestedCount = verseRange.endVerse - start + 1;
+        // Sessizce kırpmak yerine reddet: UI ile sunucu aynı 10 ayet sınırını
+        // paylaşır (ön yüzde MAX_VERSE_RANGE) ve kullanıcı açık hata görür.
+        if (requestedCount > MAX_RANGE_VERSES) {
+          return res.status(400).json({
+            error: `Verse range exceeds the maximum of ${MAX_RANGE_VERSES} verses`,
+          });
+        }
+        const end = verseRange.endVerse;
         rangeVerses = await prisma.verse.findMany({
           where: {
             surahNumber: verseRange.surahNumber,

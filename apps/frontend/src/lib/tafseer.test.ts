@@ -1,10 +1,29 @@
 import { describe, expect, it } from "vitest";
 import {
+  clampVerseRange,
   deserializeReplayPayload,
+  MAX_VERSE_RANGE,
   normalizeTafseerResponseToRun,
   serializeReplayPayload,
   type ReplayPayload,
 } from "@/lib/tafseer";
+
+describe("clampVerseRange", () => {
+  it("keeps in-range selections untouched", () => {
+    expect(clampVerseRange(1, 5, 286)).toBe(5);
+    expect(clampVerseRange(100, 100, 286)).toBe(100);
+  });
+
+  it("clamps the end verse to the shared 10-verse limit", () => {
+    expect(clampVerseRange(1, 286, 286)).toBe(MAX_VERSE_RANGE);
+    expect(clampVerseRange(50, 70, 286)).toBe(50 + MAX_VERSE_RANGE - 1);
+  });
+
+  it("never lets the end fall below the start or beyond the surah", () => {
+    expect(clampVerseRange(7, 3, 286)).toBe(7);
+    expect(clampVerseRange(3, 12, 5)).toBe(5);
+  });
+});
 
 describe("tafseer lib helpers", () => {
   it("serializes and deserializes replay payloads", () => {

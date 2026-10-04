@@ -235,8 +235,10 @@ export const locales = {
       clearFilters: "Temizle",
       mealShow: "Meali göster",
       mealHide: "Meali gizle",
-      mealSource: "Diyanet İşleri Başkanlığı Meali",
+      rangeLimitNote: "En fazla {n} ayet",
       verseLoading: "Ayet metni yükleniyor…",
+      verseFailed: "Ayet {n} yüklenemedi.",
+      retry: "Yeniden dene",
       commentaryTitle: "Yorum",
       emptyState:
         "Sure ve ayet aralığını seçip Yorumla'ya basın. Yorum, seçili müfessirlerin metinlerine dayanarak burada akacak.",
@@ -614,8 +616,10 @@ export const locales = {
       clearFilters: "Clear",
       mealShow: "Show translation",
       mealHide: "Hide translation",
-      mealSource: "Diyanet (Turkish Presidency of Religious Affairs)",
+      rangeLimitNote: "Up to {n} verses",
       verseLoading: "Loading verse text…",
+      verseFailed: "Verse {n} failed to load.",
+      retry: "Retry",
       commentaryTitle: "Commentary",
       emptyState:
         "Choose a surah and verse range, then press Interpret. The commentary, grounded in the selected exegetes, streams here.",

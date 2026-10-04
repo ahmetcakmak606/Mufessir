@@ -104,15 +104,46 @@ export function SettingsDrawer({
   labels,
 }: SettingsDrawerProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const openerRef = useRef<Element | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    // Açan düğmeye kapanınca odak geri döner (WCAG 2.4.3).
+    openerRef.current = document.activeElement;
     closeRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
+      // Tab odağını çekmece içinde tutar (aria-modal ile birlikte).
+      if (event.key === "Tab") {
+        const panel = panelRef.current;
+        if (!panel) return;
+        const focusables = panel.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        );
+        if (!focusables.length) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement;
+        if (!event.shiftKey && active === last) {
+          event.preventDefault();
+          first.focus();
+        } else if (event.shiftKey && (active === first || active === panel)) {
+          event.preventDefault();
+          last.focus();
+        }
+      }
     };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      if (
+        openerRef.current instanceof HTMLElement &&
+        document.contains(openerRef.current)
+      ) {
+        openerRef.current.focus();
+      }
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -136,6 +167,7 @@ export function SettingsDrawer({
         aria-hidden="true"
       />
       <section
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label={labels.drawerTitle}

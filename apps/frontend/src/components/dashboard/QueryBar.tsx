@@ -1,6 +1,7 @@
 "use client";
 
 import type { SurahMeta } from "@/lib/surahs";
+import { clampVerseRange, MAX_VERSE_RANGE } from "@/lib/tafseer";
 
 interface QueryBarProps {
   surahNumber: number;
@@ -11,6 +12,7 @@ interface QueryBarProps {
   settingsSummary: string;
   canAnalyze: boolean;
   analyzing: boolean;
+  filtersLoading?: boolean;
   onSurahChange: (value: number) => void;
   onVerseChange: (value: number) => void;
   onEndVerseChange: (value: number) => void;
@@ -27,6 +29,7 @@ interface QueryBarProps {
     interpret: string;
     interpreting: string;
     quotaExhausted: string;
+    rangeLimitNote: string;
   };
 }
 
@@ -43,6 +46,7 @@ export function QueryBar({
   settingsSummary,
   canAnalyze,
   analyzing,
+  filtersLoading = false,
   onSurahChange,
   onVerseChange,
   onEndVerseChange,
@@ -95,6 +99,8 @@ export function QueryBar({
               const v = clamp(Number(e.target.value) || 1, 1, maxVerse);
               onVerseChange(v);
               if (endVerseNumber < v) onEndVerseChange(v);
+              else if (endVerseNumber > v + MAX_VERSE_RANGE - 1)
+                onEndVerseChange(clampVerseRange(v, endVerseNumber, maxVerse));
             }}
             className="w-[3.6rem] bg-transparent text-center outline-none"
           />
@@ -104,17 +110,27 @@ export function QueryBar({
             aria-label={labels.endVerse}
             type="number"
             min={verseNumber}
-            max={maxVerse}
+            max={Math.min(maxVerse, verseNumber + MAX_VERSE_RANGE - 1)}
             value={endVerseNumber}
             onChange={(e) =>
               onEndVerseChange(
-                clamp(Number(e.target.value) || verseNumber, verseNumber, maxVerse),
+                clampVerseRange(
+                  verseNumber,
+                  Number(e.target.value) || verseNumber,
+                  maxVerse,
+                ),
               )
             }
             className="w-[3.6rem] bg-transparent text-center outline-none"
           />
           <span className="text-sm font-normal text-[var(--text-muted)]">
             / {maxVerse}
+          </span>
+          <span
+            className="ml-1 text-[0.68rem] text-[var(--text-muted)]"
+            title={labels.rangeLimitNote.replace("{n}", String(MAX_VERSE_RANGE))}
+          >
+            {labels.rangeLimitNote.replace("{n}", String(MAX_VERSE_RANGE))}
           </span>
         </div>
       </div>
@@ -141,15 +157,17 @@ export function QueryBar({
 
       <button
         type="submit"
-        disabled={!canAnalyze}
+        disabled={!canAnalyze || analyzing || filtersLoading}
         data-testid="analyze-button"
         className="ui-button hidden px-7 py-2.5 text-base sm:inline-flex"
       >
         {analyzing
           ? labels.interpreting
-          : canAnalyze
-            ? labels.interpret
-            : labels.quotaExhausted}
+          : filtersLoading
+            ? labels.interpret + "…"
+            : canAnalyze
+              ? labels.interpret
+              : labels.quotaExhausted}
       </button>
     </form>
   );

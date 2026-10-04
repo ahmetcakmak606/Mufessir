@@ -98,6 +98,9 @@ export default function QueryWorkspacePage() {
   });
 
   const [currentRunId, setCurrentRunId] = useState<string | null>(null);
+  const streamAbortRef = useRef<AbortController | null>(null);
+  const suppressResetRef = useRef(false);
+  const selectionRef = useRef({ s: 1, v: 1, e: 1 });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTab, setDrawerTab] = useState<SettingsTab>("basics");
 
@@ -225,6 +228,7 @@ export default function QueryWorkspacePage() {
     if (!detail || hydratedRunRef.current === detail.runId) return;
 
     hydratedRunRef.current = detail.runId;
+    suppressResetRef.current = true;
     setCurrentRunId(detail.runId);
     setSurahNumber(detail.verse.surahNumber);
     setVerseNumber(detail.verse.verseNumber);
@@ -263,6 +267,40 @@ export default function QueryWorkspacePage() {
     setComparisonRuns((prev) => ({ ...prev, primaryRun: run }));
   }, [runDetailQuery.data]);
 
+  // Seçim değişince önceki sorgunun sonucu bu seçime ait değildir: akan
+  // isteği iptal et ve sonuç durumunu temizle. Geçmişten hidrasyon (replay)
+  // seçimi VE sonucu birlikte kurar; o durumda temizleme atlanır.
+  useEffect(() => {
+    const prev = selectionRef.current;
+    const changed =
+      prev.s !== surahNumber ||
+      prev.v !== verseNumber ||
+      prev.e !== endVerseNumber;
+    selectionRef.current = {
+      s: surahNumber,
+      v: verseNumber,
+      e: endVerseNumber,
+    };
+    if (!changed) return;
+    if (suppressResetRef.current) {
+      suppressResetRef.current = false;
+      return;
+    }
+    streamAbortRef.current?.abort();
+    setStreamContent("");
+    setArabicTafsir(undefined);
+    setTurkishTafsir(undefined);
+    setConfidence(null);
+    setProvenance(null);
+    setCitations([]);
+    setSourceExcerpts([]);
+    setNoTafsirMessage(null);
+    setMissingScholars([]);
+    setCurrentRunId(null);
+    setError("");
+    setStatus("");
+  }, [surahNumber, verseNumber, endVerseNumber]);
+
   const handleAnalyze = useCallback(async () => {
     if (!user) return;
 
@@ -284,6 +322,10 @@ export default function QueryWorkspacePage() {
     setSourceExcerpts([]);
     setCitationKey(null);
     setVerseTextTr(null);
+
+    streamAbortRef.current?.abort();
+    const controller = new AbortController();
+    streamAbortRef.current = controller;
 
     let accumulated = "";
 
@@ -402,11 +444,14 @@ export default function QueryWorkspacePage() {
             setComparisonRuns((prev) => ({ ...prev, primaryRun: run }));
           }
         },
+        controller.signal,
       );
     } catch (err) {
+      // Seçim değiştiği için iptal edildiyse hata gösterme.
+      if (controller.signal.aborted) return;
       setError(err instanceof Error ? err.message : dashboard.analysisFailed);
     } finally {
-      setIsAnalyzing(false);
+      if (!controller.signal.aborted) setIsAnalyzing(false);
     }
   }, [
     user,
@@ -583,8 +628,9 @@ export default function QueryWorkspacePage() {
         surahOptions={surahs}
         scholarSummary={scholarSummary}
         settingsSummary={settingsSummary}
-        canAnalyze={canAnalyze && !filtersQuery.isLoading}
+        canAnalyze={canAnalyze}
         analyzing={isAnalyzing}
+        filtersLoading={filtersQuery.isLoading}
         onSurahChange={(v) => {
           setSurahNumber(v);
           setVerseNumber(1);
@@ -605,6 +651,7 @@ export default function QueryWorkspacePage() {
           interpret: q.interpret,
           interpreting: q.interpreting,
           quotaExhausted: dashboard.quotaExhausted,
+          rangeLimitNote: q.rangeLimitNote,
         }}
       />
 
@@ -658,8 +705,9 @@ export default function QueryWorkspacePage() {
             labels={{
               mealShow: q.mealShow,
               mealHide: q.mealHide,
-              mealSource: q.mealSource,
               loading: q.verseLoading,
+              verseFailed: q.verseFailed,
+              retry: q.retry,
             }}
           />
 
