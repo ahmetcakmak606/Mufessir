@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 interface ResultStreamProps {
   title: string;
@@ -11,6 +11,7 @@ interface ResultStreamProps {
   isAnalyzing: boolean;
   noTafsirMessage?: string | null;
   missingScholars?: string[];
+  onCitationMarker?: (markerNumber: number) => void;
   labels: {
     analyzing: string;
     arabic: string;
@@ -18,6 +19,31 @@ interface ResultStreamProps {
     noTafsirTitle: string;
     missingScholars: string;
   };
+}
+
+// Yorum metnindeki [C1], [C2] … atıf çapalarını tıklanabilir düğmelere
+// çevirir; numara kaynağın sırasına işaret eder.
+function renderWithCitationMarkers(
+  content: string,
+  onMarker?: (markerNumber: number) => void,
+): ReactNode[] {
+  const parts = content.split(/(\[C\d+\])/gi);
+  return parts.map((part, i) => {
+    const m = /^\[C(\d+)\]$/i.exec(part);
+    if (!m) return part;
+    const n = Number(m[1]);
+    return (
+      <button
+        key={i}
+        type="button"
+        onClick={() => onMarker?.(n)}
+        title={`C${n}`}
+        className="mx-0.5 inline-block rounded-sm border border-[var(--gold-soft,var(--gold))] px-1 align-baseline text-[0.78em] font-semibold text-[var(--gold-ink)]"
+      >
+        C{n}
+      </button>
+    );
+  });
 }
 
 export function ResultStream({
@@ -29,6 +55,7 @@ export function ResultStream({
   isAnalyzing,
   noTafsirMessage,
   missingScholars,
+  onCitationMarker,
   labels,
 }: ResultStreamProps) {
   const [displayLang, setDisplayLang] = useState<"tr" | "ar">("tr");
@@ -96,7 +123,7 @@ export function ResultStream({
             dir={showArabic ? "rtl" : "ltr"}
             lang={showArabic ? "ar" : undefined}
           >
-            {displayContent}
+            {renderWithCitationMarkers(displayContent, onCitationMarker)}
           </div>
         ) : (
           <p className="ui-muted max-w-[60ch] text-[0.95rem]">{placeholder}</p>

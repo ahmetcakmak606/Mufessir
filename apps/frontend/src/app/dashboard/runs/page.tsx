@@ -231,6 +231,7 @@ export default function RunsPage() {
           unstar: t.unstar,
           starredBadge: t.starredBadge,
           confidence: t.confidence,
+          confidenceUnverified: t.confidenceUnverified,
           provenance: t.provenance,
           citations: t.citations,
           createdAt: t.createdAt,

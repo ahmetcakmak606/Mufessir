@@ -144,7 +144,7 @@ export default function RunDetailPage() {
             <span className="ui-badge">
               {t.confidence}:{" "}
               {typeof run.confidence === "number"
-                ? `${Math.round(run.confidence * 100)}%`
+                ? `${Math.round(run.confidence * 100)}% · ${t.confidenceUnverified}`
                 : t.notAvailable}
             </span>
             <span className="ui-badge">

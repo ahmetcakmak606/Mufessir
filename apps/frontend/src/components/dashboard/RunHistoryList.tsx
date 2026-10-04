@@ -17,6 +17,7 @@ interface RunHistoryListProps {
     unstar: string;
     starredBadge: string;
     confidence: string;
+    confidenceUnverified: string;
     provenance: string;
     citations: string;
     createdAt: string;
@@ -84,7 +85,7 @@ export function RunHistoryList({
               <span className="ui-badge">
                 {labels.confidence}:{" "}
                 {typeof run.confidence === "number"
-                  ? `${Math.round(run.confidence * 100)}%`
+                  ? `${Math.round(run.confidence * 100)}% · ${labels.confidenceUnverified}`
                   : labels.notAvailable}
               </span>
               <span className="ui-badge">

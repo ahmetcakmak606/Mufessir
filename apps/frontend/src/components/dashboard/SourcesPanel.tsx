@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatScholarName, type UiLang } from "@/lib/metadata-labels";
 import type { Citation, SourceExcerpt } from "@/lib/tafseer";
 
@@ -8,6 +8,7 @@ interface SourcesPanelProps {
   citations: Citation[];
   excerpts: SourceExcerpt[];
   lang: UiLang;
+  highlightKey?: string | null;
   labels: {
     title: string;
     summary: string;
@@ -22,6 +23,7 @@ interface SourcesPanelProps {
 }
 
 interface SourceEntry {
+  key: string;
   scholarId: string;
   scholarName: string;
   citation?: Citation;
@@ -41,17 +43,25 @@ function pickScholarName(
   return lang === "tr" && nameTr ? nameTr : name;
 }
 
+// Aynı müfessirin farklı eser/cilt/sayfa künyeleri ayrı satırlar olarak
+// korunur (bugün veri künye başına tek olsa da anahtar bileşik).
+export function citationKey(c: Citation): string {
+  return [c.scholarId, c.sourceTitle, c.volume ?? "", c.page ?? ""].join("|");
+}
+
 export function mergeSources(
   citations: Citation[],
   excerpts: SourceExcerpt[],
   lang: UiLang = "tr",
 ): SourceEntry[] {
   const entries = new Map<string, SourceEntry>();
+  const scholarFirstKey = new Map<string, string>();
   for (const citation of citations) {
-    const id = String(citation.scholarId);
-    if (!entries.has(id)) {
-      entries.set(id, {
-        scholarId: id,
+    const key = citationKey(citation);
+    if (!entries.has(key)) {
+      entries.set(key, {
+        key,
+        scholarId: String(citation.scholarId),
         scholarName: pickScholarName(
           lang,
           citation.scholarName,
@@ -60,15 +70,21 @@ export function mergeSources(
         citation,
         excerpts: [],
       });
+      if (!scholarFirstKey.has(String(citation.scholarId))) {
+        scholarFirstKey.set(String(citation.scholarId), key);
+      }
     }
   }
   for (const excerpt of excerpts) {
-    const id = String(excerpt.scholarId);
-    const entry = entries.get(id);
+    const scholarId = String(excerpt.scholarId);
+    // Alıntılar künye taşımıyor: müfessirin ilk künye satırına eklenir.
+    const key = scholarFirstKey.get(scholarId);
+    const entry = key ? entries.get(key) : undefined;
     if (entry) entry.excerpts.push(excerpt.excerpt);
-    else
-      entries.set(id, {
-        scholarId: id,
+    else if (!entries.has(`x-${scholarId}`))
+      entries.set(`x-${scholarId}`, {
+        key: `x-${scholarId}`,
+        scholarId,
         scholarName: pickScholarName(
           lang,
           excerpt.scholarName,
@@ -88,6 +104,7 @@ export function SourcesPanel({
   citations,
   excerpts,
   lang,
+  highlightKey,
   labels,
 }: SourcesPanelProps) {
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
@@ -95,6 +112,18 @@ export function SourcesPanel({
   const entries = mergeSources(citations, excerpts, lang);
   const visible = showAll ? entries : entries.slice(0, COLLAPSED_COUNT);
   const hidden = entries.length - visible.length;
+  const listRef = useRef<HTMLOListElement>(null);
+
+  // Yorumdaki [Cn] işaretine basılınca ilgili künye satırı açılır ve
+  // görünüme kaydırılır.
+  useEffect(() => {
+    if (!highlightKey) return;
+    setOpenIds((prev) => new Set(prev).add(highlightKey));
+    const el = listRef.current?.querySelector(
+      `[data-source-key="${CSS.escape(highlightKey)}"]`,
+    );
+    el?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [highlightKey]);
 
   const toggle = (id: string) =>
     setOpenIds((prev) => {
@@ -116,9 +145,9 @@ export function SourcesPanel({
           <p className="ui-muted mb-3 mt-1 text-sm">
             {labels.summary.replace("{n}", String(entries.length))}
           </p>
-          <ol className="border-t border-[var(--border-soft)]">
+          <ol className="border-t border-[var(--border-soft)]" ref={listRef}>
             {visible.map((entry, index) => {
-              const open = openIds.has(entry.scholarId);
+              const open = openIds.has(entry.key);
               const c = entry.citation;
               const meta = [
                 c?.sourceTitle,
@@ -129,13 +158,14 @@ export function SourcesPanel({
                 .join(" · ");
               return (
                 <li
-                  key={entry.scholarId}
+                  key={entry.key}
+                  data-source-key={entry.key}
                   className="border-b border-[var(--border-soft)]"
                 >
                   <button
                     type="button"
                     aria-expanded={open}
-                    onClick={() => toggle(entry.scholarId)}
+                    onClick={() => toggle(entry.key)}
                     className="grid w-full grid-cols-[1.6rem_1fr_auto] items-baseline gap-2 px-1 py-3 text-left"
                   >
                     <span className="text-xs font-semibold tabular-nums text-[var(--gold-ink)]">

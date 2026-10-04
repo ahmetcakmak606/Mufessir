@@ -29,7 +29,8 @@ import { ResultStream } from "@/components/dashboard/ResultStream";
 import { RunActions } from "@/components/dashboard/RunActions";
 import { QueryBar } from "@/components/dashboard/QueryBar";
 import { AyahPanel } from "@/components/dashboard/AyahPanel";
-import { SourcesPanel } from "@/components/dashboard/SourcesPanel";
+import { SourcesPanel, citationKey as sourceKeyOf } from "@/components/dashboard/SourcesPanel";
+import { ComparisonPanel } from "@/components/dashboard/ComparisonPanel";
 import {
   SettingsDrawer,
   lengthStepFor,
@@ -99,6 +100,11 @@ export default function QueryWorkspacePage() {
 
   const [currentRunId, setCurrentRunId] = useState<string | null>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
+  const [resolvedVerseId, setResolvedVerseId] = useState<string | undefined>();
+  const [sourceHighlightKey, setSourceHighlightKey] = useState<string | null>(
+    null,
+  );
+  const [citationNotice, setCitationNotice] = useState("");
   const suppressResetRef = useRef(false);
   const selectionRef = useRef({ s: 1, v: 1, e: 1 });
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -300,6 +306,33 @@ export default function QueryWorkspacePage() {
     setError("");
     setStatus("");
   }, [surahNumber, verseNumber, endVerseNumber]);
+
+  // Karşılaştırma paneli seçili ayetin kimliğini bilmeli; seçim
+  // değiştikçe arka planda çözülür.
+  useEffect(() => {
+    let cancelled = false;
+    void resolveVerse().then((verse) => {
+      if (!cancelled) setResolvedVerseId(verse?.id);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // resolveVerse bağımlılığı bilinçli olarak yok: seçime göre kapanır.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [surahNumber, verseNumber, endVerseNumber]);
+
+  // Yorumdaki [Cn] işareti: eşleşen künye varsa kaynak panelinde açılır,
+  // yoksa açıklayıcı not gösterilir.
+  const onCitationMarker = (n: number) => {
+    const citation = citations[n - 1];
+    if (citation) {
+      setCitationNotice("");
+      setSourceHighlightKey(sourceKeyOf(citation));
+    } else {
+      setSourceHighlightKey(null);
+      setCitationNotice(q.citationNoSources);
+    }
+  };
 
   const handleAnalyze = useCallback(async () => {
     if (!user) return;
@@ -719,6 +752,7 @@ export default function QueryWorkspacePage() {
               turkishTafsir={turkishTafsir}
               placeholder={q.emptyState}
               isAnalyzing={isAnalyzing}
+              onCitationMarker={onCitationMarker}
               noTafsirMessage={noTafsirMessage}
               missingScholars={missingScholars}
               labels={{
@@ -794,10 +828,16 @@ export default function QueryWorkspacePage() {
         </main>
 
         <aside className="min-w-0">
+          {citationNotice && (
+            <p className="ui-muted mt-2 text-sm" role="status">
+              {citationNotice}
+            </p>
+          )}
           <SourcesPanel
             citations={citations}
             excerpts={sourceExcerpts}
             lang={lang}
+            highlightKey={sourceHighlightKey}
             labels={{
               title: q.sourcesTitle,
               summary: q.sourcesSummary,
@@ -813,14 +853,33 @@ export default function QueryWorkspacePage() {
         </aside>
       </div>
 
-      <section className="mt-12 flex flex-wrap items-baseline justify-between gap-3 border-t border-[var(--border-soft)] pt-4 text-sm text-[var(--text-muted)]">
-        <span>
-          <strong className="font-semibold text-[var(--ink-soft)]">
-            {q.compareTitle}
-          </strong>{" "}
-          · {q.compareText}
-        </span>
-      </section>
+      <ComparisonPanel
+        scholars={filteredScholars}
+        baseFilters={filters}
+        lang={lang}
+        quotaLeft={user?.dailyQuota ?? 0}
+        verseId={endVerseNumber > verseNumber ? undefined : resolvedVerseId}
+        verseRange={
+          endVerseNumber > verseNumber
+            ? {
+                surahNumber,
+                startVerse: verseNumber,
+                endVerse: endVerseNumber,
+              }
+            : undefined
+        }
+        getToken={() => tokenStorage.get()}
+        onQuotaUsed={() => void refreshUser()}
+        labels={{
+          title: q.compareTitle,
+          run: q.compareRun,
+          comparing: q.compareComparing,
+          scholarPlaceholder: q.compareScholarPlaceholder,
+          hint: q.compareHint,
+          needsTwo: q.compareNeedsTwo,
+          failed: q.compareFailed,
+        }}
+      />
 
       {/* Telefonda sabit alt çubuk: sorgu çubuğundaki Yorumla düğmesi burada gizlenir. */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border-soft)] bg-[var(--sheet)] px-4 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom,0px))] sm:hidden">
