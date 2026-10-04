@@ -99,7 +99,7 @@ export function AyahPanel({
         )}
 
         {showMeal && withMeal.length > 0 && (
-          <p className="font-reading mt-4 max-w-[65ch] text-base leading-relaxed text-[var(--ink-soft)]">
+          <p className="font-reading mt-4 text-base leading-relaxed text-justify text-[var(--ink-soft)]">
             {withMeal.map((verse) => (
               <span key={verse.id}>
                 <sup className="mr-0.5 font-sans text-[0.7rem] text-[var(--gold-ink)]">
