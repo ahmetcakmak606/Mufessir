@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   startTafseerStream,
   type Citation,
@@ -62,6 +62,14 @@ export function ComparisonPanel({
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState<SideResult[]>([]);
   const [error, setError] = useState("");
+
+  // Ayet seçimi değişip liste daraldığında artık geçersiz seçimler
+  // temizlenir; kullanıcı boş sonuç üretecek bir eşleşmeyi gönderemez.
+  useEffect(() => {
+    const ids = new Set(scholars.map((s) => String(s.id)));
+    setLeftId((prev) => (prev && ids.has(prev) ? prev : ""));
+    setRightId((prev) => (prev && ids.has(prev) ? prev : ""));
+  }, [scholars]);
 
   const canRun =
     Boolean(leftId) &&

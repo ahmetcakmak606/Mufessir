@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ComparisonPanel } from "@/components/dashboard/ComparisonPanel";
 import { useAuth } from "@/context/AuthContext";
 import { useLang } from "@/context/LangContext";
@@ -10,6 +10,7 @@ import { locales } from "@/locales";
 import { surahs } from "@/lib/surahs";
 import {
   clampVerseRange,
+  fetchScholarsForVerse,
   fetchVerseByNumbers,
   MAX_VERSE_RANGE,
   type ScholarOption,
@@ -29,11 +30,44 @@ export default function AnalysisPage() {
   const [startVerse, setStartVerse] = useState(1);
   const [endVerse, setEndVerse] = useState(1);
   const [resolvedVerseId, setResolvedVerseId] = useState<string | undefined>();
+  // Seçili ayet(ler) için tefsiri OLAN müfessirlerin kimlikleri; null =
+  // sorgu tutarsız/başarısız → liste sınırlamasız düşer.
+  const [verseScholarIds, setVerseScholarIds] = useState<Set<string> | null>(
+    null,
+  );
 
   const availableFilters = filtersQuery.data || null;
-  const scholars = (availableFilters?.scholars as ScholarOption[]) || [];
+  const allScholars = (availableFilters?.scholars as ScholarOption[]) || [];
+  const scholars = useMemo(
+    () =>
+      verseScholarIds === null
+        ? allScholars
+        : allScholars.filter((scholar) =>
+            verseScholarIds.has(String(scholar.id)),
+          ),
+    [allScholars, verseScholarIds],
+  );
   const maxVerse =
     surahs.find((s) => s.number === surahNumber)?.totalAyahs ?? 286;
+
+  // Seçilen aralıkta tefsiri olan müfessirleri getir; kullanıcı boş
+  // sonuç üretecek bir eşleşmeyi hiç seçemesin.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      let cancelled = false;
+      void fetchScholarsForVerse(surahNumber, startVerse, endVerse)
+        .then((ids) => {
+          if (!cancelled) setVerseScholarIds(new Set(ids));
+        })
+        .catch(() => {
+          if (!cancelled) setVerseScholarIds(null);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [surahNumber, startVerse, endVerse]);
 
   // Tek ayet seçiminde kimlik, karşılaştırma sorguları için çözülür.
   useEffect(() => {
@@ -130,6 +164,14 @@ export default function AnalysisPage() {
           </div>
         </div>
       </section>
+
+      <p className="ui-muted text-sm">
+        {verseScholarIds === null
+          ? q.compareScholarsFiltered
+          : scholars.length === 0
+            ? q.compareNoScholars
+            : q.compareScholarsFiltered}
+      </p>
 
       <ComparisonPanel
         scholars={scholars}
