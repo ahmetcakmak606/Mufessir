@@ -44,7 +44,7 @@ const naskhFace = Noto_Naskh_Arabic({
 });
 
 export const metadata: Metadata = {
-  title: "MüfessirAI",
+  title: "MufessirAI",
   description:
     "AI-powered Tafsir platform with traditional Islamic scholarship",
 };
@@ -55,7 +55,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="tr">
+    // suppressHydrationWarning: eklentiler/gömülü tarayıcı React hidrasyonundan
+    // önce <html>'e stil/öznitelik ekleyebilir; bilinen zararsız farkı
+    // sessizleştirir (Next.js'in önerdiği yöntem).
+    <html lang="tr" suppressHydrationWarning>
       <body
         className={`${displayFace.variable} ${uiFace.variable} ${readingFace.variable} ${quranFace.variable} ${naskhFace.variable} antialiased`}
       >
