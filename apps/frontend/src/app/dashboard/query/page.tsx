@@ -30,7 +30,6 @@ import { RunActions } from "@/components/dashboard/RunActions";
 import { QueryBar } from "@/components/dashboard/QueryBar";
 import { AyahPanel } from "@/components/dashboard/AyahPanel";
 import { SourcesPanel, citationKey as sourceKeyOf } from "@/components/dashboard/SourcesPanel";
-import { ComparisonPanel } from "@/components/dashboard/ComparisonPanel";
 import {
   SettingsDrawer,
   lengthStepFor,
@@ -100,7 +99,6 @@ export default function QueryWorkspacePage() {
 
   const [currentRunId, setCurrentRunId] = useState<string | null>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
-  const [resolvedVerseId, setResolvedVerseId] = useState<string | undefined>();
   const [sourceHighlightKey, setSourceHighlightKey] = useState<string | null>(
     null,
   );
@@ -305,20 +303,6 @@ export default function QueryWorkspacePage() {
     setCurrentRunId(null);
     setError("");
     setStatus("");
-  }, [surahNumber, verseNumber, endVerseNumber]);
-
-  // Karşılaştırma paneli seçili ayetin kimliğini bilmeli; seçim
-  // değiştikçe arka planda çözülür.
-  useEffect(() => {
-    let cancelled = false;
-    void resolveVerse().then((verse) => {
-      if (!cancelled) setResolvedVerseId(verse?.id);
-    });
-    return () => {
-      cancelled = true;
-    };
-    // resolveVerse bağımlılığı bilinçli olarak yok: seçime göre kapanır.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [surahNumber, verseNumber, endVerseNumber]);
 
   // Yorumdaki [Cn] işareti: eşleşen künye varsa kaynak panelinde açılır,
@@ -853,33 +837,6 @@ export default function QueryWorkspacePage() {
         </aside>
       </div>
 
-      <ComparisonPanel
-        scholars={filteredScholars}
-        baseFilters={filters}
-        lang={lang}
-        quotaLeft={user?.dailyQuota ?? 0}
-        verseId={endVerseNumber > verseNumber ? undefined : resolvedVerseId}
-        verseRange={
-          endVerseNumber > verseNumber
-            ? {
-                surahNumber,
-                startVerse: verseNumber,
-                endVerse: endVerseNumber,
-              }
-            : undefined
-        }
-        getToken={() => tokenStorage.get()}
-        onQuotaUsed={() => void refreshUser()}
-        labels={{
-          title: q.compareTitle,
-          run: q.compareRun,
-          comparing: q.compareComparing,
-          scholarPlaceholder: q.compareScholarPlaceholder,
-          hint: q.compareHint,
-          needsTwo: q.compareNeedsTwo,
-          failed: q.compareFailed,
-        }}
-      />
 
       {/* Telefonda sabit alt çubuk: sorgu çubuğundaki Yorumla düğmesi burada gizlenir. */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border-soft)] bg-[var(--sheet)] px-4 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom,0px))] sm:hidden">

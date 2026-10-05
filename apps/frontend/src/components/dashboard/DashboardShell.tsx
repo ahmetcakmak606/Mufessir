@@ -16,6 +16,7 @@ interface DashboardShellProps {
 const navConfig = [
   { href: "/dashboard/query", key: "navQuery" },
   { href: "/dashboard/runs", key: "navRuns" },
+  { href: "/dashboard/analysis", key: "navAnalysis" },
 ] as const;
 
 function initials(name: string): string {
