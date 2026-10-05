@@ -101,6 +101,45 @@ export async function generateTafsirStream(
   }
 }
 
+// Karşılaştırma sentezi gibi özel biçimli istemler için ince sarmalayıcı:
+// sistem+kullanıcı iletisini olduğu gibi gönderir.
+export async function generateRawChat(params: {
+  system: string;
+  user: string;
+  temperature?: number;
+  maxTokens?: number;
+}): Promise<TafsirGenerationResult> {
+  if (!openai) {
+    throw new Error(
+      aiDisabled
+        ? "OpenAI disabled by environment"
+        : "OpenAI API key not configured",
+    );
+  }
+
+  const response = await openai.chat.completions.create({
+    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+    messages: [
+      { role: "system", content: params.system },
+      { role: "user", content: params.user },
+    ],
+    temperature: params.temperature ?? 0.5,
+    max_tokens: params.maxTokens ?? Number(process.env.OPENAI_MAX_TOKENS ?? 1200),
+    stream: false,
+  });
+
+  const content = response.choices[0]?.message?.content || "";
+  const usage = response.usage
+    ? {
+        promptTokens: response.usage.prompt_tokens,
+        completionTokens: response.usage.completion_tokens,
+        totalTokens: response.usage.total_tokens,
+      }
+    : undefined;
+
+  return { content, usage };
+}
+
 export async function generateTafsirNonStreaming(
   options: TafsirGenerationOptions,
 ): Promise<TafsirGenerationResult> {

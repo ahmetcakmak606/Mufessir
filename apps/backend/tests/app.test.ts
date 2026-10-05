@@ -8,7 +8,7 @@ import versesRouter from "../src/routes/verses.js";
 import tafseerRouter from "../src/routes/tafseer.js";
 import { PrismaClient } from "@prisma/client";
 import { ensureTestDatabase, dropTestDatabase } from "./helpers/test-db.js";
-import { seedMinimalCorpus, SEED_VERSE_ID } from "./helpers/seed.js";
+import { seedMinimalCorpus, SEED_VERSE_ID, SEED_MUFASSIR_ID } from "./helpers/seed.js";
 import { buildTafsirCacheKey } from "../src/utils/tafseer-cache.js";
 import { InputPolicyError } from "../src/utils/input-policy.js";
 import crypto from "node:crypto";
@@ -505,6 +505,108 @@ describe("Tafseer result cache & fallback persistence (plan Faz 1)", () => {
     expect(res.body.aiResponse).not.toBe("ÖNBELLEK YANITI");
     // AI is disabled in tests, so the fresh path lands on the shown fallback.
     expect(res.body.fallback).toBe(true);
+  });
+
+
+  describe("Comparison endpoint", () => {
+    it("validates the scholar pair and verse", async () => {
+      const base = { verseId: SEED_VERSE_ID };
+      const auth = { Authorization: `Bearer ${token}` };
+
+      const noVerse = await request(app)
+        .post("/tafseer/compare")
+        .set(auth)
+        .send({ scholars: ["1", "2"] });
+      expect(noVerse.status).toBe(400);
+
+      const oneScholar = await request(app)
+        .post("/tafseer/compare")
+        .set(auth)
+        .send({ ...base, scholars: [String(SEED_MUFASSIR_ID)] });
+      expect(oneScholar.status).toBe(400);
+
+      const same = await request(app)
+        .post("/tafseer/compare")
+        .set(auth)
+        .send({ ...base, scholars: ["1", "1"] });
+      expect(same.status).toBe(400);
+    });
+
+    it("rejects with 422 when a scholar has no tafsir on the verse", async () => {
+      const res = await request(app)
+        .post("/tafseer/compare")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          verseId: SEED_VERSE_ID,
+          scholars: [String(SEED_MUFASSIR_ID), "999999"],
+        });
+
+      expect(res.status).toBe(422);
+      expect(res.body.error).toMatch(/999999/);
+    });
+
+    it("returns a labeled side-by-side fallback when generation is unavailable", async () => {
+      await prisma.mufassir.upsert({
+        where: { id: 900002 },
+        update: {},
+        create: {
+          id: 900002,
+          nameEn: "Second Test Mufassir",
+          nameTr: "İkinci Test Müfessiri",
+          nameAr: "مفسر ثانٍ",
+          reputationScore: 7,
+          century: 10,
+          madhab: "Maliki",
+          period: "CLASSICAL_MATURE",
+        },
+      });
+      const existing = await prisma.tafsir.findFirst({
+        where: { verseId: SEED_VERSE_ID, mufassirId: 900002 },
+      });
+      if (!existing) {
+        await prisma.tafsir.create({
+          data: {
+            verseId: SEED_VERSE_ID,
+            mufassirId: 900002,
+            tafsirText: "قال المفسر الثاني: البسملة استفتاح للأمر وبركة في العمل.",
+          },
+        });
+      }
+
+      const res = await request(app)
+        .post("/tafseer/compare")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          verseId: SEED_VERSE_ID,
+          scholars: [String(SEED_MUFASSIR_ID), "900002"],
+          language: "Turkish",
+        });
+
+      expect(res.status).toBe(200);
+      // AI testlerde kapalı: dürüst geri çekilme etiketli yan yana pasajlar
+      expect(res.body.fallback).toBe(true);
+      expect(res.body.aiResponse).toContain("MÜFESSİR A");
+      expect(res.body.aiResponse).toContain("MÜFESSİR B");
+      expect(res.body.citations.length).toBeGreaterThanOrEqual(2);
+      expect(res.body.sourceExcerpts.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe("GET /filters/scholars-for-verse", () => {
+    it("lists only scholars with tafsir for the exact verse range", async () => {
+      const hit = await request(app).get(
+        "/filters/scholars-for-verse?surahNumber=1&startVerse=1&endVerse=1",
+      );
+      expect(hit.status).toBe(200);
+      expect(hit.body.scholarIds).toContain(String(SEED_MUFASSIR_ID));
+
+      // Tohumda 1:2 için satır yok — sure bazlı eski davranış bunu döndürürdü.
+      const miss = await request(app).get(
+        "/filters/scholars-for-verse?surahNumber=1&startVerse=2&endVerse=2",
+      );
+      expect(miss.status).toBe(200);
+      expect(miss.body.scholarIds).not.toContain(String(SEED_MUFASSIR_ID));
+    });
   });
 
   it("rejects verse ranges above the shared 10-verse limit", async () => {

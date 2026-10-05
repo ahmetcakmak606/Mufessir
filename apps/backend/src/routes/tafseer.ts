@@ -12,6 +12,8 @@ import { PrismaClient } from "@prisma/client";
 import {
   generateTafsirStream,
   generateTafsirNonStreaming,
+  generateRawChat,
+  type TafsirGenerationResult,
 } from "../utils/openai.js";
 import type { ScholarMeta } from "../utils/prompt.js";
 import { finalizeResponse } from "../utils/text.js";
@@ -1864,6 +1866,261 @@ router.get("/snapshots/:snapshotId", authenticateJWT, asyncHandler(async (req, r
     return res.status(500).json({ error: "Internal server error" });
   }
 }),
+);
+
+
+// ---------------------------------------------------------------------------
+// Karşılaştırma sentezi: iki müfessirin aynı ayet için pasajlarını TEK bir
+// istemde birleştirip "A şöyle derken B böyle der" biçiminde karşılaştırmalı
+// yorum üretir. Tek LLM çağrısı = tek kota. Her iki tarafın da bu ayet için
+// tefsiri yoksa istem hiç yapılmaz (422).
+// ---------------------------------------------------------------------------
+router.post(
+  "/compare",
+  authenticateJWT,
+  enforceQuota(prisma),
+  decrementQuota(prisma),
+  asyncHandler(async (req, res) => {
+    const body = (req.body ?? {}) as {
+      verseId?: string;
+      verseRange?: {
+        surahNumber: number;
+        startVerse: number;
+        endVerse: number;
+      };
+      scholars?: unknown;
+      language?: string;
+    };
+    const verseId = typeof body.verseId === "string" ? body.verseId : "";
+    const verseRange = body.verseRange;
+    const scholarIds = Array.isArray(body.scholars)
+      ? body.scholars.map((id) => String(id))
+      : [];
+    const language =
+      typeof body.language === "string" && body.language
+        ? body.language
+        : "Turkish";
+
+    if (!verseId && !verseRange) {
+      return res
+        .status(400)
+        .json({ error: "verseId or verseRange is required" });
+    }
+    if (scholarIds.length !== 2 || scholarIds[0] === scholarIds[1]) {
+      return res
+        .status(400)
+        .json({ error: "scholars must contain two different ids" });
+    }
+    if (
+      verseRange &&
+      (!Number.isFinite(verseRange.surahNumber) ||
+        !Number.isFinite(verseRange.startVerse) ||
+        !Number.isFinite(verseRange.endVerse) ||
+        verseRange.endVerse < verseRange.startVerse ||
+        verseRange.endVerse - verseRange.startVerse + 1 > 10)
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Verse range exceeds the maximum of 10 verses" });
+    }
+
+    const userId = (req as any).user?.id as string;
+    const rangeVerses = verseRange
+      ? await prisma.verse.findMany({
+          where: {
+            surahNumber: verseRange.surahNumber,
+            verseNumber: { gte: verseRange.startVerse, lte: verseRange.endVerse },
+          },
+          orderBy: { verseNumber: "asc" },
+          include: { surah: { select: { nameTr: true, nameEn: true } } },
+        })
+      : [];
+    const verse = verseRange
+      ? rangeVerses[0]
+      : await prisma.verse.findFirst({
+          where: { id: verseId },
+          include: { surah: { select: { nameTr: true, nameEn: true } } },
+        });
+    if (!verse) {
+      return res.status(404).json({ error: "Verse not found" });
+    }
+    const queryText = verseRange
+      ? rangeVerses.map((v) => v.arabicText).join(" ")
+      : verse.arabicText;
+
+    // Her taraf için yalnız o müfessirin pasajları (üretim hattının okuduğu
+    // public verisinden — liste dayanaklarıyla aynı kaynak).
+    const retrieveFor = (scholarId: string) =>
+      performSimilaritySearch(prisma, {
+        query: queryText,
+        ...(verseRange ? { rangeFilter: verseRange } : { verseId }),
+        scholarIds: [scholarId],
+        limit: 4,
+      });
+
+    const [idA = "", idB = ""] = scholarIds;
+    const [sideA, sideB] = await Promise.all([
+      retrieveFor(idA),
+      retrieveFor(idB),
+    ]);
+
+    const nameFor = (side: typeof sideA) =>
+      side[0]?.mufassir?.nameTr ||
+      side[0]?.mufassir?.name ||
+      (side[0] ? String(side[0].mufassir?.id) : "");
+
+    const missing: string[] = [];
+    if (sideA.length === 0) missing.push(idA);
+    if (sideB.length === 0) missing.push(idB);
+    if (missing.length > 0) {
+      return res.status(422).json({
+        error:
+          "No tafsir found on this verse for scholar id(s): " +
+          missing.join(", "),
+      });
+    }
+
+    // Atıf çapaları: A tarafı 1..nA, B tarafı nA+1..nA+nB.
+    const excerptsA = sideA.slice(0, 4);
+    const excerptsB = sideB.slice(0, 4);
+    const anchor = (side: "A" | "B", i: number) =>
+      side === "A" ? `[C${i + 1}]` : `[C${excerptsA.length + i + 1}]`;
+
+    const block = (side: "A" | "B", rows: typeof sideA) => {
+      const head = rows[0]?.mufassir;
+      const künye = [head?.nameTr || head?.name, head?.bookTafsir]
+        .filter(Boolean)
+        .join(" — ");
+      const pasajlar = rows
+        .map(
+          (row, i) =>
+            `${anchor(side, i)} ${String(row.tafsirText || "").slice(0, 1200)}`,
+        )
+        .join("\n\n");
+      return `### ${side === "A" ? "MÜFESSİR A" : "MÜFESSİR B"}: ${künye}\n${pasajlar}`;
+    };
+
+    const isTurkish = language.toLowerCase().startsWith("turk");
+    const instruction = isTurkish
+      ? `Görev: Yukarıdaki iki müfessirin bu ayet için görüşlerini karşılaştırmalı olarak aktar — "biri şöyle derken diğeri böyle der" biçiminde bir sentez kur. Önce kısaca ortak noktayı, sonra ayrışma noktalarını yaz. Her iddiayı yalnızız [C1]…[C${excerptsA.length + excerptsB.length}] çapalarıyla destekle; pasajlarda olmayan hiçbir bilgiyi ekleme. Yanıtı Türkçe yaz.`
+      : `Task: Compare the two exegetes' views on this verse as a synthesis ("while the first says…, the other says…"). Start with the common ground, then the differences. Support every claim with the [C1]…[C${excerptsA.length + excerptsB.length}] anchors only; add nothing absent from the passages. Answer in ${language}.`;
+
+    const userPrompt = [
+      `Ayet (Arapça): ${queryText}`,
+      isTurkish && verse.translation ? `Meal: ${verse.translation}` : null,
+      "",
+      block("A", excerptsA),
+      "",
+      block("B", excerptsB),
+      "",
+      instruction,
+    ]
+      .filter((line) => line !== null)
+      .join("\n");
+
+    const citations = [...excerptsA, ...excerptsB].map((row) => ({
+      scholarId: String(row.mufassir?.id ?? ""),
+      scholarName: row.mufassir?.name || "",
+      scholarNameTr: row.mufassir?.nameTr || null,
+      sourceType: "Tafsir",
+      sourceTitle: row.mufassir?.bookTafsir || "",
+      volume: null,
+      page: null,
+      edition: null,
+      citationText: null,
+      provenance: null,
+      isPrimary: false,
+    }));
+    const sourceExcerpts = [...excerptsA, ...excerptsB].map((row) => ({
+      scholarId: String(row.mufassir?.id ?? ""),
+      scholarName: row.mufassir?.name || "",
+      scholarNameTr: row.mufassir?.nameTr || null,
+      excerpt:
+        String(row.tafsirText || "").length > 500
+          ? `${String(row.tafsirText).slice(0, 500)}...`
+          : String(row.tafsirText || ""),
+    }));
+
+    const search = await prisma.search.create({
+      data: {
+        userId,
+        verseId: verse.id,
+        query: {
+          comparison: true,
+          scholars: scholarIds,
+          language,
+          verse: {
+            surahNumber: verse.surahNumber,
+            verseNumber: verse.verseNumber,
+          },
+        },
+      },
+    });
+
+    let aiResponse = "";
+    let usage: TafsirGenerationResult["usage"];
+    let degraded = false;
+    try {
+      const generated = await generateRawChat({
+        system:
+          "You are an expert Islamic scholar and linguist. Provide accurate, comparative tafsir synthesis based only on provided context and keep evidence traceable to the citation anchors.",
+        user: userPrompt,
+      });
+      aiResponse = generated.content.trim();
+      usage = generated.usage;
+    } catch (error) {
+      // Üretim yapılamadıysa dürüst geri çekilme: kaynak pasajları etiketli
+      // olarak gösterilir, ölü uç yok (plan 1.4 ilkesi). Kayda işlenmez.
+      console.error("Comparison generation failed:", error);
+      degraded = true;
+      aiResponse = [
+        isTurkish
+          ? "**Karşılaştırmalı sentez üretilemedi** — iki müfessirin pasajları yan yana:"
+          : "**Comparative synthesis unavailable** — the two exegetes' passages side by side:",
+        "",
+        block("A", excerptsA),
+        "",
+        block("B", excerptsB),
+      ].join("\n");
+    }
+
+    if (!degraded) {
+      await prisma.searchResult.create({
+        data: {
+          searchId: search.id,
+          tafsirId: String(excerptsA[0]?.tafsirId ?? "compare"),
+          aiResponse,
+          citations: citations as unknown as any,
+          confidenceScore: computeConfidenceScore({
+            similarityScores: [...excerptsA, ...excerptsB].map(
+              (row) => row.similarityScore || 0,
+            ),
+            citationCount: citations.length,
+            excerptCount: sourceExcerpts.length,
+            sourceVerseMatch: true,
+            scholarReputationScores: [],
+          }),
+          similarityScore: excerptsA[0]?.similarityScore ?? null,
+        },
+      });
+    }
+
+    return res.json({
+      runId: search.id,
+      searchId: search.id,
+      verse: {
+        id: verse.id,
+        surahNumber: verse.surahNumber,
+        surahName: verse.surah?.nameTr || verse.surah?.nameEn || "",
+        verseNumber: verse.verseNumber,
+      },
+      aiResponse,
+      citations,
+      sourceExcerpts,
+      usage: usage ?? null,
+      fallback: degraded || undefined,
+    });
+  }),
 );
 
 export default router;

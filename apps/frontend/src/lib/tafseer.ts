@@ -241,6 +241,26 @@ export async function fetchScholarsForVerse(
   return data.scholarIds;
 }
 
+// Karşılaştırma sentezi: iki müfessirin aynı ayet pasajlarından TEK
+// karşılaştırmalı yorum üretir (tek kota). 422 = bir tarafın tefsiri yok.
+export async function compareTafseers(
+  body: { verseId: string; scholars: [string, string]; language?: string },
+  token?: string | null,
+): Promise<{
+  runId: string;
+  aiResponse: string;
+  citations: Citation[];
+  sourceExcerpts: SourceExcerpt[];
+  fallback?: boolean;
+  verse?: VersePayload;
+}> {
+  return apiRequest<never>("/tafseer/compare", {
+    method: "POST",
+    body,
+    token,
+  });
+}
+
 export async function fetchVerseByNumbers(
   surahNumber: number,
   verseNumber: number,

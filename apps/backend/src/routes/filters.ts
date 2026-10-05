@@ -122,21 +122,36 @@ router.get("/", async (_req: Request, res: Response) => {
 router.get("/scholars-for-verse", async (req: Request, res: Response) => {
   const surahNumber = Number(req.query.surahNumber);
   const startVerse = Number(req.query.startVerse);
+  const endVerse = Number(req.query.endVerse || startVerse);
 
   if (!surahNumber || !startVerse) {
     return res.status(400).json({ error: "surahNumber and startVerse are required" });
   }
 
   try {
-    // Use the mufassirai_tafsirdb schema which has direct surah_id/ayah_id
-    // columns and contains the full dataset (public.all_tafsirs is a processed
-    // subset that misses many scholars for certain surahs).
+    // Kaynak doğrulaması: üretim hattı public.all_tafsirs'tan okur; liste de
+    // oradan ve seçilen ayet aralığından gelmelidir — eski şema kopyası
+    // (mufassirai_tafsirdb) gönderilmeyen müfessirleri gösteriyordu.
+    // verse_id biçimleri: kurallı "s-v" + geçmiş import biçimleri.
     const rows = await prisma.$queryRawUnsafe<Array<{ mufassir_id: number }>>(
-      `SELECT DISTINCT t.mufassir_id
-       FROM mufassirai_tafsirdb.all_tafsirs t
-       WHERE t.surah_id = $1
-         AND t.mufassir_id IN (SELECT mufassir_id FROM public.mufassirs)`,
+      `WITH ayah_map AS (
+         SELECT id, surah_id, ayah_number,
+                ROW_NUMBER() OVER (ORDER BY surah_id ASC, ayah_number ASC) AS legacy_id
+         FROM public.ayahs
+         WHERE surah_id = $1 AND ayah_number BETWEEN $2 AND $3
+       )
+       SELECT DISTINCT t.mufassir_id
+       FROM public.all_tafsirs t
+       JOIN ayah_map v
+         ON t.verse_id = v.id
+         OR t.verse_id = v.legacy_id::text
+         OR t.verse_id = 'verse-' || v.surah_id || '-' || v.ayah_number
+         OR t.verse_id = v.surah_id || ':' || v.ayah_number
+         OR t.verse_id = v.surah_id || '-' || v.ayah_number
+       WHERE t.mufassir_id IN (SELECT mufassir_id FROM public.mufassirs)`,
       surahNumber,
+      Math.max(1, startVerse),
+      Math.max(startVerse, endVerse || startVerse),
     );
 
     res.json({ scholarIds: rows.map((r) => String(r.mufassir_id)) });

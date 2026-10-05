@@ -23,7 +23,7 @@ interface ResultStreamProps {
 
 // Yorum metnindeki [C1], [C2] … atıf çapalarını tıklanabilir düğmelere
 // çevirir; numara kaynağın sırasına işaret eder.
-function renderWithCitationMarkers(
+export function renderWithCitationMarkers(
   content: string,
   onMarker?: (markerNumber: number) => void,
 ): ReactNode[] {

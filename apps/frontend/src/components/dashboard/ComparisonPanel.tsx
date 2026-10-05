@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 import {
-  startTafseerStream,
+  compareTafseers,
   type Citation,
   type RunDraftFilters,
   type ScholarOption,
   type SourceExcerpt,
 } from "@/lib/tafseer";
 import { formatScholarName, type UiLang } from "@/lib/metadata-labels";
+import { SourcesPanel, citationKey } from "@/components/dashboard/SourcesPanel";
+import { renderWithCitationMarkers } from "@/components/dashboard/ResultStream";
 
 interface ComparisonPanelProps {
   scholars: ScholarOption[];
@@ -17,7 +19,6 @@ interface ComparisonPanelProps {
   quotaLeft: number;
   verseId: string | undefined;
   verseRange?: { surahNumber: number; startVerse: number; endVerse: number };
-  getToken: () => string | null;
   onQuotaUsed: () => void;
   labels: {
     title: string;
@@ -28,15 +29,24 @@ interface ComparisonPanelProps {
     needsTwo: string;
     failed: string;
   };
+  sourcesLabels: {
+    title: string;
+    summary: string;
+    empty: string;
+    showAll: string;
+    showFewer: string;
+    more: string;
+    noExcerpt: string;
+    volumeShort: string;
+    pageShort: string;
+  };
 }
 
-interface SideResult {
-  scholarId: string;
-  scholarName: string;
-  content: string;
+interface ComparisonResult {
+  aiResponse: string;
   citations: Citation[];
-  excerpts: SourceExcerpt[];
-  error?: string;
+  sourceExcerpts: SourceExcerpt[];
+  fallback?: boolean;
 }
 
 function scholarDisplayName(scholar: ScholarOption, lang: UiLang) {
@@ -44,8 +54,8 @@ function scholarDisplayName(scholar: ScholarOption, lang: UiLang) {
   return formatScholarName(name);
 }
 
-// İki müfessirin aynı ayet(ler) için yorumunu yan yana üretir. Her taraf
-// tek müfessir filtresiyle ayrı bir sorgudur; toplam 2 kota hakkı kullanır.
+// İki müfessirin pasajlarından TEK karşılaştırmalı sentez üretir
+// (POST /tafseer/compare — tek kota, tek LLM çağrısı).
 export function ComparisonPanel({
   scholars,
   baseFilters,
@@ -53,90 +63,52 @@ export function ComparisonPanel({
   quotaLeft,
   verseId,
   verseRange,
-  getToken,
   onQuotaUsed,
   labels,
+  sourcesLabels,
 }: ComparisonPanelProps) {
   const [leftId, setLeftId] = useState("");
   const [rightId, setRightId] = useState("");
   const [running, setRunning] = useState(false);
-  const [results, setResults] = useState<SideResult[]>([]);
+  const [result, setResult] = useState<ComparisonResult | null>(null);
   const [error, setError] = useState("");
+  const [highlightKey, setHighlightKey] = useState<string | null>(null);
 
-  // Ayet seçimi değişip liste daraldığında artık geçersiz seçimler
-  // temizlenir; kullanıcı boş sonuç üretecek bir eşleşmeyi gönderemez.
+  // Ayet seçimi değişip liste daraldığında geçersiz seçimler temizlenir.
   useEffect(() => {
     const ids = new Set(scholars.map((s) => String(s.id)));
     setLeftId((prev) => (prev && ids.has(prev) ? prev : ""));
     setRightId((prev) => (prev && ids.has(prev) ? prev : ""));
+    setResult(null);
+    setError("");
   }, [scholars]);
 
   const canRun =
     Boolean(leftId) &&
     Boolean(rightId) &&
     leftId !== rightId &&
-    quotaLeft >= 2 &&
+    quotaLeft >= 1 &&
     !running &&
     Boolean(verseId || verseRange);
-
-  const runOne = async (
-    scholarId: string,
-    scholarName: string,
-  ): Promise<SideResult> => {
-    const token = getToken();
-    if (!token) throw new Error(labels.failed);
-    const result: SideResult = {
-      scholarId,
-      scholarName,
-      content: "",
-      citations: [],
-      excerpts: [],
-    };
-    await startTafseerStream(
-      {
-        verseId,
-        verseRange,
-        filters: {
-          ...baseFilters,
-          scholars: [scholarId],
-        },
-        stream: true,
-      },
-      token,
-      (evt) => {
-        if (evt.type === "chunk" && evt.content) {
-          result.content += evt.content;
-          setResults((prev) =>
-            prev.map((r) => (r.scholarId === scholarId ? { ...result } : r)),
-          );
-        }
-        if (evt.type === "complete") {
-          result.citations = Array.isArray(evt.citations) ? evt.citations : [];
-          result.excerpts = Array.isArray(evt.sourceExcerpts)
-            ? evt.sourceExcerpts
-            : [];
-          setResults((prev) =>
-            prev.map((r) => (r.scholarId === scholarId ? { ...result } : r)),
-          );
-        }
-      },
-    );
-    return result;
-  };
 
   const onCompare = async () => {
     if (!canRun) return;
     setError("");
-    setResults([]);
+    setResult(null);
     setRunning(true);
-    const left = scholars.find((s) => String(s.id) === leftId);
-    const right = scholars.find((s) => String(s.id) === rightId);
     try {
-      // Sırayla: her biri tek müfessir filtresiyle tam bir sorgu.
-      const first = await runOne(leftId, scholarDisplayName(left!, lang));
-      setResults([first]);
-      const second = await runOne(rightId, scholarDisplayName(right!, lang));
-      setResults([first, second]);
+      const data = await compareTafseers({
+        verseId: verseId || "",
+        ...(verseRange ? { verseRange } : {}),
+        scholars: [leftId, rightId],
+        language: baseFilters.language || (lang === "tr" ? "Turkish" : "English"),
+      });
+      setResult({
+        aiResponse: data.aiResponse,
+        citations: data.citations || [],
+        sourceExcerpts: data.sourceExcerpts || [],
+        fallback: data.fallback,
+      });
       onQuotaUsed();
     } catch (err) {
       setError(err instanceof Error ? err.message : labels.failed);
@@ -145,12 +117,16 @@ export function ComparisonPanel({
     }
   };
 
+  const onMarker = (n: number) => {
+    const citation = result?.citations[n - 1];
+    if (citation) setHighlightKey(citationKey(citation));
+  };
+
   return (
-    <section aria-labelledby="comparison-title" className="mt-10">
+    <section aria-labelledby="comparison-title">
       <h2 id="comparison-title" className="font-display text-[1.45rem]">
         {labels.title}
       </h2>
-      <p className="ui-muted mt-1 text-sm">{labels.hint}</p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <select
@@ -192,26 +168,25 @@ export function ComparisonPanel({
       {leftId && rightId && leftId === rightId && (
         <p className="ui-muted mt-2 text-sm">{labels.needsTwo}</p>
       )}
-      {quotaLeft < 2 && (
-        <p className="ui-muted mt-2 text-sm">{labels.needsTwo}</p>
+      {quotaLeft < 1 && <p className="ui-muted mt-2 text-sm">{labels.needsTwo}</p>}
+      {error && (
+        <p className="ui-danger mt-2 text-sm" role="alert">
+          {error}
+        </p>
       )}
-      {error && <p className="ui-danger mt-2 text-sm">{error}</p>}
 
-      {results.length > 0 && (
-        <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {results.map((side) => (
-            <article key={side.scholarId} className="ui-panel p-4">
-              <h3 className="font-display text-lg">{side.scholarName}</h3>
-              <div className="ui-prose mt-2 text-[0.98rem]">
-                {side.content || "…"}
-              </div>
-              {side.citations.length > 0 && (
-                <p className="ui-muted mt-2 text-xs">
-                  {side.citations.length} × kaynak
-                </p>
-              )}
-            </article>
-          ))}
+      {result && (
+        <div className="mt-5 space-y-6">
+          <div className="ui-prose" dir="ltr">
+            {renderWithCitationMarkers(result.aiResponse, onMarker)}
+          </div>
+          <SourcesPanel
+            citations={result.citations}
+            excerpts={result.sourceExcerpts}
+            lang={lang}
+            highlightKey={highlightKey}
+            labels={sourcesLabels}
+          />
         </div>
       )}
     </section>

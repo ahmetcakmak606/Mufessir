@@ -35,6 +35,20 @@ export interface SimilaritySearchResult {
     originCountry: string | null;
     reputationScore: number | null;
   };
+  // scholar'ın rota yardımcılarına bıraktığı takma adı; Türkçe isim ve
+  // tefsir (eser) adını da taşır.
+  mufassir: {
+    id: string;
+    name: string;
+    nameTr: string | null;
+    bookTafsir: string | null;
+    century: number;
+    madhab: string | null;
+    period: string | null;
+    environment: string | null;
+    originCountry: string | null;
+    reputationScore: number | null;
+  };
 }
 
 export async function createQueryEmbedding(text: string): Promise<number[]> {

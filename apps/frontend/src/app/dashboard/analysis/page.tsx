@@ -186,7 +186,6 @@ export default function AnalysisPage() {
             ? { surahNumber, startVerse, endVerse }
             : undefined
         }
-        getToken={() => tokenStorage.get()}
         onQuotaUsed={() => void refreshUser()}
         labels={{
           title: q.compareTitle,
@@ -196,6 +195,17 @@ export default function AnalysisPage() {
           hint: q.compareHint,
           needsTwo: q.compareNeedsTwo,
           failed: q.compareFailed,
+        }}
+        sourcesLabels={{
+          title: q.sourcesTitle,
+          summary: q.sourcesSummary,
+          empty: q.sourcesEmpty,
+          showAll: q.showAllSources,
+          showFewer: q.showFewerSources,
+          more: q.moreSources,
+          noExcerpt: q.noExcerpt,
+          volumeShort: dashboard.volumeShort,
+          pageShort: dashboard.pageShort,
         }}
       />
     </div>
