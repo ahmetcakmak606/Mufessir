@@ -87,23 +87,26 @@ describe("account policy switches (1B.8)", () => {
     expect(shouldAllowEmailLinking({ emailVerified: true }, {})).toBe(true);
   });
 
-  it("requires verified email for quota in production by default", () => {
+  it("keeps the verification gate OFF by default in every environment", () => {
+    // 2026-10-09 kararı: kodda doğrulama akışı yok ve hiçbir mevcut kullanıcı
+    // doğrulanmış değil — varsayılan açık, dağıtımı kilitleyen ayak tabancasıydı.
+    // Kapı 3.x'te akışla birlikte REQUIRE_VERIFIED_EMAIL=1 ile açılacak.
     expect(
       requiresVerifiedEmailForQuota({ NODE_ENV: "production" }),
-    ).toBe(true);
+    ).toBe(false);
+    expect(requiresVerifiedEmailForQuota({ NODE_ENV: "test" })).toBe(false);
   });
 
-  it("keeps non-production open and honors the explicit override", () => {
-    expect(requiresVerifiedEmailForQuota({ NODE_ENV: "test" })).toBe(false);
+  it("honors the explicit REQUIRE_VERIFIED_EMAIL override", () => {
     expect(
       requiresVerifiedEmailForQuota({
         NODE_ENV: "production",
-        REQUIRE_VERIFIED_EMAIL: "0",
+        REQUIRE_VERIFIED_EMAIL: "1",
       }),
-    ).toBe(false);
-    expect(requiresVerifiedEmailForQuota({ REQUIRE_VERIFIED_EMAIL: "1" })).toBe(
-      true,
-    );
+    ).toBe(true);
+    expect(
+      requiresVerifiedEmailForQuota({ REQUIRE_VERIFIED_EMAIL: "1" }),
+    ).toBe(true);
   });
 });
 

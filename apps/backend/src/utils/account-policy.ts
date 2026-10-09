@@ -19,17 +19,17 @@ export function shouldAllowEmailLinking(
 }
 
 /**
- * Plan 1B.8: without an email-verification flow, unverified local accounts
- * (trivially mass-created — SEC-05) must not consume generation quota in
- * production. REQUIRE_VERIFIED_EMAIL overrides explicitly (0/1);
- * non-production environments stay open so development and tests are
- * unaffected.
+ * Plan 1B.8 (güncelleme 2026-10-09): kodda henüz doğrulama e-postası akışı
+ * YOK (tek sendMail şifre sıfırlamada) ve mevcut kullanıcıların hiçbirinin
+ * e-postası doğrulanmış değil. Varsayılanı üretimde açık bırakmak, akışı
+ * olmayan bir kapı demek — dağıtımı tek bir env değişkenine bağlamak bir
+ * ayak tabancasıydı. Bu nedenle kapı varsayılan KAPALI; 3.x'te doğrulama
+ * akışı geldiğinde REQUIRE_VERIFIED_EMAIL=1 ile bilinçli açılacak (dağıtım
+ * değişkeniyle, kod değişikliği olmadan). "0" açık yazılımında bir şey
+ * değiştirmez.
  */
 export function requiresVerifiedEmailForQuota(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
-  if (env.REQUIRE_VERIFIED_EMAIL !== undefined) {
-    return env.REQUIRE_VERIFIED_EMAIL === "1";
-  }
-  return env.NODE_ENV === "production";
+  return env.REQUIRE_VERIFIED_EMAIL === "1";
 }
