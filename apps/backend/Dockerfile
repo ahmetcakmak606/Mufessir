@@ -2,6 +2,8 @@ FROM node:22-slim
 
 WORKDIR /app
 
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl python3 make g++
+
 COPY package*.json ./
 COPY packages/database/package*.json packages/database/
 COPY apps/backend/package*.json apps/backend/

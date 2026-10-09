@@ -2,7 +2,9 @@ FROM node:22-slim
 
 WORKDIR /app
 
-RUN apt-get update -y && apt-get install -y openssl
+# better-sqlite3 icin on-kurulu ikili yok (node:22-slim/Node 22) — kaynaktan
+# derleme python3 + make + g++ ister (openssl: Prisma sorgu motoru).
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl python3 make g++
 
 COPY package*.json packages/database/package*.json apps/backend/package*.json ./
 COPY package-lock.json* ./
