@@ -5,11 +5,14 @@ const baseURL = `http://localhost:${port}`;
 
 export default defineConfig({
   testDir: "./e2e",
-  timeout: 45_000,
+  timeout: 60_000,
   expect: {
-    timeout: 8_000,
+    timeout: 15_000,
   },
   fullyParallel: false,
+  // CI koşucuları 2 çekirdek: 3 proje paralel koşunca CPU çekişmesi E2E'yi
+  // titretiyor — CI'da projeler sırayla, tek işçiyle koşar.
+  workers: process.env.CI ? 1 : undefined,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI
     ? [["github"], ["html", { open: "never" }]]
@@ -24,7 +27,7 @@ export default defineConfig({
     command: `npm run dev -- --port ${port}`,
     cwd: __dirname,
     port,
-    timeout: 180_000,
+    timeout: 240_000,
     reuseExistingServer: !process.env.CI,
     env: {
       NEXT_PUBLIC_API_URL: `${baseURL}/mock-api`,
