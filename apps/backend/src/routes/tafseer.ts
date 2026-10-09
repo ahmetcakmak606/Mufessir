@@ -1964,11 +1964,6 @@ router.post(
       retrieveFor(idB),
     ]);
 
-    const nameFor = (side: typeof sideA) =>
-      side[0]?.mufassir?.nameTr ||
-      side[0]?.mufassir?.name ||
-      (side[0] ? String(side[0].mufassir?.id) : "");
-
     const missing: string[] = [];
     if (sideA.length === 0) missing.push(idA);
     if (sideB.length === 0) missing.push(idB);
