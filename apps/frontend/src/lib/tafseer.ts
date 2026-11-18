@@ -331,11 +331,33 @@ export async function startTafseerStream(
     throw new Error(err.error || "Request failed");
   }
 
+  // Sunucu akış yerine düz JSON döndüyse yanıtı tamamlanmış bir akış gibi
+  // işle; aksi hâlde ekran sessizce boş kalır.
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    const payload = (await res.json().catch(() => null)) as
+      | Record<string, unknown>
+      | null;
+    if (signal?.aborted) return;
+    if (!payload) {
+      onEvent({ type: "error" });
+      return;
+    }
+    onEvent({ type: "start" });
+    onEvent({ ...(payload as Omit<StreamEvent, "type">), type: "complete" });
+    return;
+  }
+
   const reader = res.body?.getReader();
   if (!reader) throw new Error("No stream");
 
   const decoder = new TextDecoder("utf-8");
   let buffer = "";
+  let finished = false;
+  const emit = (evt: StreamEvent) => {
+    if (evt.type === "complete" || evt.type === "error") finished = true;
+    onEvent(evt);
+  };
 
   while (true) {
     const { value, done } = await reader.read();
@@ -352,13 +374,15 @@ export async function startTafseerStream(
         const jsonStr = raw.slice(5).trim();
         try {
           const evt = JSON.parse(jsonStr);
-          onEvent(evt);
+          emit(evt);
         } catch {
           // Ignore malformed stream event chunks
         }
       }
     }
   }
+  // Akış "complete" veya "error" olmadan bittiyse kullanıcıya hata göster.
+  if (!finished && !signal?.aborted) onEvent({ type: "error" });
 }
 
 export async function requestTafseer(

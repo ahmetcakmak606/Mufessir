@@ -1008,7 +1008,7 @@ router.post(
           .map((s: any) => s.nameTr || s.nameEn)
           .join(", ");
 
-        return res.status(200).json({
+        const noScholarTafsirBody = {
           verse,
           filters: filters || {},
           aiResponse: "",
@@ -1025,7 +1025,22 @@ router.post(
           missingScholarNames: allScholars.map(
             (s: any) => s.nameTr || s.nameEn,
           ),
-        });
+        };
+        // Model çağrılmadı: kotadan düşülmez.
+        res.locals.noModelCall = true;
+        // Akış istendiyse yanıt da akış olmalı; istemci düz JSON'u atlar.
+        if (stream) {
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          res.setHeader("Access-Control-Allow-Headers", "Cache-Control");
+          res.write(`data: ${JSON.stringify({ type: "start" })}\n\n`);
+          res.write(`data: ${JSON.stringify({ type: "complete", ...noScholarTafsirBody })}\n\n`);
+          res.end();
+          return;
+        }
+        return res.status(200).json(noScholarTafsirBody);
       }
 
       // For streaming: send noTafsir message to client
@@ -1140,6 +1155,7 @@ router.post(
       // Check if we have any sources to generate tafsir from
       if (similarTafsirs.length === 0) {
         // No tafsir data at all for this verse
+        res.locals.noModelCall = true;
         if (stream) {
           res.setHeader("Content-Type", "text/event-stream");
           res.setHeader("Cache-Control", "no-cache");

@@ -847,3 +847,60 @@ describe("Faz 1B security hardening", () => {
     expect(JSON.stringify(res.body)).not.toContain("private content");
   });
 });
+
+describe("Hotfix: seçili müfessirlerde tefsir yoksa akış ve kota (canlı boş ekran)", () => {
+  let token = "";
+  let userId = "";
+
+  beforeAll(async () => {
+    const login = await request(app)
+      .post("/auth/login")
+      .send({ email: "testuser@example.com", password: TEST_PASSWORD });
+    token = login.body.token;
+    const user = await prisma.user.findUnique({
+      where: { email: "testuser@example.com" },
+    });
+    userId = user!.id;
+  });
+
+  const quotaOf = async () =>
+    (await prisma.user.findUnique({ where: { id: userId } }))!.dailyQuota;
+
+  it("akış istenince 'tefsir yok' SSE start + complete olarak gelir ve kotadan düşmez", async () => {
+    const before = await quotaOf();
+    const res = await request(app)
+      .post("/tafseer")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        verseId: SEED_VERSE_ID,
+        stream: true,
+        filters: { scholars: ["999999"], language: "Turkish" },
+      });
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toMatch(/text\/event-stream/);
+    const events = res.text
+      .split("\n\n")
+      .filter((chunk) => chunk.startsWith("data: "))
+      .map((chunk) => JSON.parse(chunk.slice("data: ".length)));
+    expect(events.map((evt) => evt.type)).toEqual(["start", "complete"]);
+    expect(events[1].noTafsirForSelectedScholars).toBe(true);
+    // Kota düşümü yanıt sonrası asenkron; kısa bekleme.
+    await new Promise((r) => setTimeout(r, 200));
+    expect(await quotaOf()).toBe(before);
+  });
+
+  it("akışsız 'tefsir yok' yanıtı da kotadan düşmez", async () => {
+    const before = await quotaOf();
+    const res = await request(app)
+      .post("/tafseer")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        verseId: SEED_VERSE_ID,
+        filters: { scholars: ["999999"], language: "Turkish" },
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.noTafsirForSelectedScholars).toBe(true);
+    await new Promise((r) => setTimeout(r, 200));
+    expect(await quotaOf()).toBe(before);
+  });
+});

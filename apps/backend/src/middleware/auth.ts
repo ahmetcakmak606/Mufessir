@@ -78,7 +78,8 @@ export function decrementQuota(prisma: PrismaClient): RequestHandler {
 
     const decrement = () => {
       if (decremented) return;
-      if (res.statusCode >= 200 && res.statusCode < 300) {
+      // Model çağrılmayan yanıtlar (ör. "tefsir yok") kotadan düşmez.
+      if (res.statusCode >= 200 && res.statusCode < 300 && !res.locals.noModelCall) {
         const userId = req.user?.id;
         if (userId) {
           prisma.user
