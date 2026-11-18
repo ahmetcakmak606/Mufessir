@@ -18,6 +18,9 @@ import {
   fetchScholarsForVerse,
   normalizeTafseerResponseToRun,
   startTafseerStream,
+  MAX_SELECTED_SCHOLARS,
+  defaultScholarSelection,
+  clampReplayScholars,
 } from "@/lib/tafseer";
 import { formatFacetValue, formatProvenance } from "@/lib/metadata-labels";
 import { useFiltersQuery } from "@/hooks/use-filters-query";
@@ -62,6 +65,7 @@ export default function QueryWorkspacePage() {
   >("UNKNOWN");
 
   const [filters, setFilters] = useState<RunDraftFilters>(defaultFilters);
+  const [scholarLimitNotice, setScholarLimitNotice] = useState("");
   const [scholarQuery, setScholarQuery] = useState("");
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -129,9 +133,12 @@ export default function QueryWorkspacePage() {
     if (!availableFilters) return;
     setFilters((prev) => {
       if (Array.isArray(prev.scholars)) return prev;
+      // Varsayılan: tüm müfessirler değil, varsayılan beşli (18 Kas kararı).
       return {
         ...prev,
-        scholars: availableFilters.scholars.map((s) => String(s.id)),
+        scholars: defaultScholarSelection(
+          availableFilters.scholars.map((s) => String(s.id)),
+        ),
         excludeScholars: [],
       };
     });
@@ -237,7 +244,16 @@ export default function QueryWorkspacePage() {
     setSurahNumber(detail.verse.surahNumber);
     setVerseNumber(detail.verse.verseNumber);
     setSurahName(detail.verse.surahName);
-    setFilters({ ...defaultFilters, ...(detail.filters || {}) });
+    {
+      const replayFilters = { ...defaultFilters, ...(detail.filters || {}) };
+      const clamped = clampReplayScholars(replayFilters.scholars);
+      setFilters({
+        ...replayFilters,
+        scholars: clamped.scholars,
+        ...(clamped.replacedWithDefaults ? { excludeScholars: [] } : {}),
+      });
+      if (clamped.replacedWithDefaults) setStatus(q.replayDefaultsNotice);
+    }
 
     setStreamContent(detail.aiResponse || "");
     setArabicTafsir(detail.arabicTafsir);
@@ -269,7 +285,7 @@ export default function QueryWorkspacePage() {
     );
 
     setComparisonRuns((prev) => ({ ...prev, primaryRun: run }));
-  }, [runDetailQuery.data]);
+  }, [runDetailQuery.data, q.replayDefaultsNotice]);
 
   // Seçim değişince önceki sorgunun sonucu bu seçime ait değildir: akan
   // isteği iptal et ve sonuç durumunu temizle. Geçmişten hidrasyon (replay)
@@ -354,6 +370,14 @@ export default function QueryWorkspacePage() {
       if (!token) throw new Error(dashboard.notAuthenticated);
 
       const isRange = endVerseNumber > verseNumber;
+      // Hiç müfessir seçilmediyse varsayılan beşli kullanılır ve seçimde görünür.
+      let requestScholars = filters.scholars || [];
+      if (requestScholars.length === 0) {
+        requestScholars = defaultScholarSelection(
+          (availableFilters?.scholars || []).map((s) => String(s.id)),
+        );
+        setFilters((prev) => ({ ...prev, scholars: requestScholars, excludeScholars: [] }));
+      }
       await startTafseerStream(
         {
           verseId: isRange ? undefined : verse.id,
@@ -366,6 +390,8 @@ export default function QueryWorkspacePage() {
             : undefined,
           filters: {
             ...filters,
+            scholars: requestScholars,
+            excludeScholars: requestScholars === filters.scholars ? filters.excludeScholars : [],
             language:
               filters.language || (lang === "tr" ? "Turkish" : "English"),
           },
@@ -476,6 +502,7 @@ export default function QueryWorkspacePage() {
     endVerseNumber,
     verseNumber,
     filters,
+    availableFilters,
     lang,
     dashboard.notAuthenticated,
     dashboard.streamingError,
@@ -538,6 +565,13 @@ export default function QueryWorkspacePage() {
   };
 
   const toggleScholar = (id: string, include: boolean) => {
+    const current = new Set(filters.scholars || []);
+    if (include && !current.has(id) && current.size >= MAX_SELECTED_SCHOLARS) {
+      // Altıncı seçim engellenir; sessizce kırpılmaz, kullanıcı uyarılır.
+      setScholarLimitNotice(q.scholarsLimitWarning);
+      return;
+    }
+    setScholarLimitNotice("");
     setFilters((prev) => {
       const nextInclude = new Set(prev.scholars || []);
       const nextExclude = new Set(prev.excludeScholars || []);
@@ -556,21 +590,32 @@ export default function QueryWorkspacePage() {
     });
   };
 
-  const includeAll = () => {
-    const ids = filteredScholars.map((scholar) => String(scholar.id));
-    setFilters((prev) => ({ ...prev, scholars: ids, excludeScholars: [] }));
+  // "Tümünü seç" yerine varsayılan beşliye dönüş (en fazla 5 kuralı).
+  const selectDefaults = () => {
+    setScholarLimitNotice("");
+    setFilters((prev) => ({
+      ...prev,
+      scholars: defaultScholarSelection(
+        (availableFilters?.scholars || []).map((s) => String(s.id)),
+      ),
+      excludeScholars: [],
+    }));
   };
 
+  // Seçimi temizler; boş seçimle yorum istenirse varsayılan beşli kullanılır.
   const excludeAll = () => {
-    const ids = filteredScholars.map((scholar) => String(scholar.id));
-    setFilters((prev) => ({ ...prev, scholars: [], excludeScholars: ids }));
+    setScholarLimitNotice("");
+    setFilters((prev) => ({ ...prev, scholars: [], excludeScholars: [] }));
   };
 
   const resetFilters = () => {
     setScholarQuery("");
+    setScholarLimitNotice("");
     setFilters({
       ...defaultFilters,
-      scholars: (availableFilters?.scholars || []).map((s) => String(s.id)),
+      scholars: defaultScholarSelection(
+        (availableFilters?.scholars || []).map((s) => String(s.id)),
+      ),
       excludeScholars: [],
     });
   };
@@ -875,7 +920,8 @@ export default function QueryWorkspacePage() {
         scholarQuery={scholarQuery}
         onScholarQueryChange={setScholarQuery}
         onToggleScholar={toggleScholar}
-        onIncludeAll={includeAll}
+        onIncludeAll={selectDefaults}
+        scholarLimitNotice={scholarLimitNotice}
         onExcludeAll={excludeAll}
         onReset={resetFilters}
         getOptionLabel={(filterKey, value) =>
@@ -897,7 +943,7 @@ export default function QueryWorkspacePage() {
           methodLabel: q.methodLabel,
           methodHelp: q.methodHelp,
           scholarsHelp: q.scholarsHelp,
-          selectAll: q.selectAll,
+          selectAll: q.selectDefaults,
           selectNone: q.selectNone,
           schoolsHelp: q.schoolsHelp,
           deathShort: q.deathShort,

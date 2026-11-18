@@ -74,3 +74,34 @@ describe("startTafseerStream: boş ekran kalmaz", () => {
     expect(events.map((e) => e.type)).toEqual(["start", "chunk", "complete"]);
   });
 });
+
+import {
+  DEFAULT_SCHOLAR_IDS,
+  MAX_SELECTED_SCHOLARS,
+  clampReplayScholars,
+  defaultScholarSelection,
+} from "@/lib/tafseer";
+
+describe("müfessir seçim kuralı (18 Kas)", () => {
+  it("varsayılan beşli: Taberî, Mâtürîdî, Zemahşerî, Râzî, İbn Kesîr", () => {
+    expect(DEFAULT_SCHOLAR_IDS).toEqual(["7", "9", "19", "22", "29"]);
+    expect(MAX_SELECTED_SCHOLARS).toBe(5);
+  });
+
+  it("varsayılandan yalnız mevcut listede olanları seçer", () => {
+    expect(defaultScholarSelection(["7", "19", "100"])).toEqual(["7", "19"]);
+    expect(defaultScholarSelection()).toEqual(["7", "9", "19", "22", "29"]);
+  });
+
+  it("5'ten fazla müfessirli eski kaydı varsayılana döndürür ve bunu bildirir", () => {
+    const many = ["1", "2", "3", "4", "5", "6"];
+    expect(clampReplayScholars(many)).toEqual({
+      scholars: ["7", "9", "19", "22", "29"],
+      replacedWithDefaults: true,
+    });
+    expect(clampReplayScholars(["1", "2"])).toEqual({
+      scholars: ["1", "2"],
+      replacedWithDefaults: false,
+    });
+  });
+});

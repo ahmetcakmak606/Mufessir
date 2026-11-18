@@ -39,6 +39,8 @@ interface SettingsDrawerProps {
   onToggleScholar: (id: string, include: boolean) => void;
   onIncludeAll: () => void;
   onExcludeAll: () => void;
+  /** Seçim sınırı aşılmaya çalışıldığında gösterilen uyarı (boşsa gizli). */
+  scholarLimitNotice?: string;
   onReset: () => void;
   getOptionLabel: (
     filterKey: "periodCodes" | "madhabs" | "traditions" | "sourceAccessibilities" | "tafsirTypes",
@@ -99,6 +101,7 @@ export function SettingsDrawer({
   onToggleScholar,
   onIncludeAll,
   onExcludeAll,
+  scholarLimitNotice,
   onReset,
   getOptionLabel,
   labels,
@@ -277,6 +280,11 @@ export function SettingsDrawer({
                   {labels.selectNone}
                 </button>
               </div>
+              {scholarLimitNotice ? (
+                <p role="alert" className="ui-danger rounded-[0.5rem] px-3 py-2 text-sm">
+                  {scholarLimitNotice}
+                </p>
+              ) : null}
               {filteredScholars.length === 0 ? (
                 <p className="ui-muted text-sm">{labels.noScholarsMatch}</p>
               ) : (

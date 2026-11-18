@@ -12,6 +12,7 @@ import { seedMinimalCorpus, SEED_VERSE_ID, SEED_MUFASSIR_ID } from "./helpers/se
 import { buildTafsirCacheKey } from "../src/utils/tafseer-cache.js";
 import { InputPolicyError } from "../src/utils/input-policy.js";
 import crypto from "node:crypto";
+import jwt from "jsonwebtoken";
 
 // Tests use passwords that satisfy the 1B.5 policy (>= 10 chars).
 const TEST_PASSWORD = "pass12345678";
@@ -445,7 +446,9 @@ describe("Tafseer result cache & fallback persistence (plan Faz 1)", () => {
   });
 
   it("serves a stored result from cache, before any retrieval", async () => {
-    const filters = { language: "Turkish" };
+    // Kural (18 Kas): seçimsiz istek varsayılan beşliye gider; bu test önbelleği
+    // sınadığı için tohum müfessiri açıkça seçilir.
+    const filters = { scholars: [String(SEED_MUFASSIR_ID)], language: "Turkish" };
     const cacheKey = buildTafsirCacheKey({
       verseId: SEED_VERSE_ID,
       surahNumber: 1,
@@ -496,7 +499,7 @@ describe("Tafseer result cache & fallback persistence (plan Faz 1)", () => {
       .set("Authorization", `Bearer ${token}`)
       .send({
         verseRange: { surahNumber: 1, startVerse: 1, endVerse: 2 },
-        filters: { language: "Turkish" },
+        filters: { scholars: [String(SEED_MUFASSIR_ID)], language: "Turkish" },
         stream: false,
       });
 
@@ -641,7 +644,7 @@ describe("Tafseer result cache & fallback persistence (plan Faz 1)", () => {
   it("does not persist fallback responses, so they cannot poison the cache (regression)", async () => {
     const body = {
       verseId: SEED_VERSE_ID,
-      filters: { language: "Turkish", responseLength: 2 },
+      filters: { scholars: [String(SEED_MUFASSIR_ID)], language: "Turkish", responseLength: 2 },
       stream: false,
     };
     const fallbackCountBefore = await prisma.searchResult.count({
@@ -902,5 +905,65 @@ describe("Hotfix: seçili müfessirlerde tefsir yoksa akış ve kota (canlı bo�
     expect(res.body.noTafsirForSelectedScholars).toBe(true);
     await new Promise((r) => setTimeout(r, 200));
     expect(await quotaOf()).toBe(before);
+  });
+});
+
+describe("Müfessir seçim kuralı: en fazla 5, seçimsiz istekte varsayılan beşli (18 Kas)", () => {
+  let token = "";
+
+  beforeAll(async () => {
+    // Kendi kullanıcısı: paylaşılan test kullanıcısının parolası/kotası başka
+    // testlerde değişebilir.
+    const user = await prisma.user.create({
+      data: {
+        email: `scholar-limit-${crypto.randomUUID()}@example.com`,
+        passwordHash: "not-used-for-login",
+        name: "scholar-limit",
+        dailyQuota: 100,
+        quotaResetAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    });
+    token = jwt.sign({ email: user.email }, process.env.JWT_SECRET as string, {
+      subject: user.id,
+      expiresIn: "1h",
+    });
+  });
+
+  it("6 müfessirli istek 400 ve Türkçe uyarıyla reddedilir", async () => {
+    const res = await request(app)
+      .post("/tafseer")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        verseId: SEED_VERSE_ID,
+        stream: true,
+        filters: { scholars: ["1", "2", "3", "4", "5", "6"], language: "Turkish" },
+      });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("En fazla 5 müfessir seçebilirsiniz.");
+  });
+
+  it("5 müfessirli istek sınır nedeniyle reddedilmez", async () => {
+    const res = await request(app)
+      .post("/tafseer")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        verseId: SEED_VERSE_ID,
+        filters: {
+          scholars: [String(SEED_MUFASSIR_ID), "2", "3", "4", "5"],
+          language: "Turkish",
+        },
+      });
+    expect(res.status).toBe(200);
+  });
+
+  it("seçimsiz istek varsayılan beşliyle çalışır (tohum müfessiri kullanılmaz)", async () => {
+    const res = await request(app)
+      .post("/tafseer")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ verseId: SEED_VERSE_ID, filters: { language: "Turkish" } });
+    expect(res.status).toBe(200);
+    // Tohumda varsayılan beşliden kimsenin tefsiri yok; eski davranış tohum
+    // müfessirinin metnini döndürürdü.
+    expect(res.body.noTafsirForSelectedScholars).toBe(true);
   });
 });

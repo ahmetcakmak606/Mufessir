@@ -296,6 +296,30 @@ export type StreamEvent = {
   verseRange?: { surahNumber: number; startVerse: number; endVerse: number; verseCount: number };
 };
 
+// Müfessir seçimi kuralı (18 Kas kararı; sunucuda utils/scholar-selection.ts):
+// en fazla 5 müfessir; seçim yoksa varsayılan beşli (Taberî, Mâtürîdî,
+// Zemahşerî, Râzî, İbn Kesîr).
+export const MAX_SELECTED_SCHOLARS = 5;
+export const DEFAULT_SCHOLAR_IDS: readonly string[] = ["7", "9", "19", "22", "29"];
+
+/** Varsayılan beşliden, mevcut müfessir listesinde bulunanları döndürür. */
+export function defaultScholarSelection(availableIds?: Iterable<string>): string[] {
+  if (!availableIds) return [...DEFAULT_SCHOLAR_IDS];
+  const set = new Set(availableIds);
+  return DEFAULT_SCHOLAR_IDS.filter((id) => set.has(id));
+}
+
+/** Kayıttan gelen seçim sınırı aşıyorsa varsayılana döner; aşıldıysa true bildirir. */
+export function clampReplayScholars(scholars: string[] | undefined): {
+  scholars: string[] | undefined;
+  replacedWithDefaults: boolean;
+} {
+  if (Array.isArray(scholars) && scholars.length > MAX_SELECTED_SCHOLARS) {
+    return { scholars: [...DEFAULT_SCHOLAR_IDS], replacedWithDefaults: true };
+  }
+  return { scholars, replacedWithDefaults: false };
+}
+
 // Sunucuyla paylaşılan ortak aralık sınırı (backend MAX_RANGE_VERSES).
 export const MAX_VERSE_RANGE = 10;
 

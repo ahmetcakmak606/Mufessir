@@ -21,6 +21,10 @@ import { performSimilaritySearch } from "../utils/similarity-search.js";
 import { findMostSimilarTafsir } from "../utils/similarity-calculation.js";
 import { EMBEDDING_MODEL } from "../embedding-constants.js";
 import { buildTafsirCacheKey } from "../utils/tafseer-cache.js";
+import {
+  normalizeScholarSelection,
+  ScholarSelectionError,
+} from "../utils/scholar-selection.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import {
   computeConfidenceScore,
@@ -701,7 +705,7 @@ router.post(
       const {
         verseId,
         verseRange,
-        filters,
+        filters: rawFilters,
         stream = false,
       } = req.body as {
         verseId: string;
@@ -720,6 +724,18 @@ router.post(
 
       if (!verseId && !verseRange) {
         return res.status(400).json({ error: "Verse ID is required" });
+      }
+
+      // En fazla 5 müfessir; seçim yoksa varsayılan beşli (18 Kas kararı).
+      // Önbellek anahtarından önce uygulanır ki anahtar gerçek seçimi yansıtsın.
+      let filters: typeof rawFilters;
+      try {
+        filters = normalizeScholarSelection(rawFilters);
+      } catch (selectionError) {
+        if (selectionError instanceof ScholarSelectionError) {
+          return res.status(400).json({ error: selectionError.message });
+        }
+        throw selectionError;
       }
 
       // Resolve verse range: fetch all verses in range (max 10)
